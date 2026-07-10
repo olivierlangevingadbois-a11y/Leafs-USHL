@@ -1,0 +1,23 @@
+{
+  "name": "leafs-ushl",
+  "version": "1.0.0",
+  "description": "Tableau de bord du DG — Maple Leafs de Toronto (USHL Pro)",
+  "main": "index.html",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/valide.js"
+  },
+  "keywords": [
+    "ushl",
+    "fhl",
+    "maple-leafs",
+    "hockey"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

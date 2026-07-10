@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maple Leafs de Toronto — Tableau de bord du DG</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%2300205B%22/><text x=%2250%22 y=%2268%22 font-size=%2256%22 text-anchor=%22middle%22>🍁</text></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bleu:#1a4fa3; --bleu-fonce:#0e2f63; --bleu-nuit:#081c3d; --bleu-vif:#4d9fff;
+    --accent:#c8d3e6; --accent-vif:#ffffff;
+    --ink:#05080f; --panel:#0b111d; --panel2:#101b2e; --line:#1c2c47;
+    --txt:#e9eef7; --txt-dim:#93a5c2; --txt-faint:#5f7191;
+    --ok:#3ecf8e; --warn:#f2c14e; --bad:#e05252; --memo:#ffffff;
+    --font-display:'Bebas Neue', 'Oswald', sans-serif;
+    --font-body:'Oswald', sans-serif;
+    --font-data:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--ink); color:var(--txt); font-family:var(--font-body); font-weight:400; letter-spacing:.2px; min-height:100vh;}
+
+  /* ---------- En-tête ---------- */
+  header{
+    background:linear-gradient(115deg, #000 0%, var(--bleu-nuit) 40%, var(--bleu-fonce) 75%, var(--bleu) 100%);
+    border-bottom:3px solid var(--accent);
+    padding:22px 28px 18px; position:relative; overflow:hidden;
+  }
+  header::before{content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(-45deg, transparent 0 22px, rgba(255,255,255,.02) 22px 23px); pointer-events:none;}
+  .head-row{display:flex; align-items:center; gap:18px; flex-wrap:wrap; position:relative;}
+  .logo{width:64px; height:64px; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}
+  .head-titles h1{font-family:var(--font-display); font-size:2.3rem; letter-spacing:2px; line-height:1;}
+  .head-titles h1 em{font-style:normal; color:var(--accent-vif);}
+  .head-titles .sub{color:var(--txt-dim); font-size:.85rem; text-transform:uppercase; letter-spacing:2px;}
+  .head-meta{margin-left:auto; text-align:right; font-family:var(--font-data); font-size:.75rem; color:var(--txt-dim);}
+  .head-meta .fiche{font-size:1.05rem; color:var(--txt); font-weight:600;}
+  .memo-strip{margin-top:12px; font-family:var(--font-display); letter-spacing:3px; font-size:1rem;
+    color:var(--accent-vif); text-transform:uppercase; position:relative;}
+  .memo-strip::after{content:''; display:inline-block; width:120px; height:1px; background:var(--accent); margin-left:12px; vertical-align:middle; opacity:.6;}
+
+  /* ---------- Barre d'outils / onglets ---------- */
+  nav{display:flex; gap:0; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:50; flex-wrap:wrap;}
+  nav button{
+    font-family:var(--font-body); font-weight:600; font-size:.9rem; letter-spacing:1.5px; text-transform:uppercase;
+    background:none; border:none; color:var(--txt-dim); padding:14px 22px; cursor:pointer;
+    border-bottom:3px solid transparent; transition:color .15s, border-color .15s;
+  }
+  nav button:hover{color:var(--txt);}
+  nav button.actif{color:var(--accent-vif); border-bottom-color:var(--accent);}
+  nav .maj-zone{margin-left:auto; display:flex; align-items:center; gap:10px; padding:8px 16px;}
+  #btnMaj{
+    font-family:var(--font-body); font-weight:600; letter-spacing:1px; text-transform:uppercase; font-size:.8rem;
+    background:var(--bleu); color:#fff; border:none; padding:8px 18px; cursor:pointer; border-radius:2px;
+    transition:background .15s;
+  }
+  #btnMaj:hover{background:var(--bleu-vif);}
+  #btnMaj:disabled{background:var(--line); cursor:wait;}
+  #btnModeY21{background:transparent; border:1px solid var(--accent); color:var(--accent-vif);
+    font-family:var(--font-body); font-weight:700; font-size:.72rem; letter-spacing:1px; text-transform:uppercase;
+    padding:9px 14px; border-radius:2px; cursor:pointer;}
+  #btnModeY21:hover{background:var(--accent-vif); color:#0a1a33;}
+  #btnModeY21.actif{background:var(--accent-vif); color:#0a1a33;}
+  #btnEffacerCache{background:transparent; border:1px solid var(--line); color:var(--txt-dim);
+    font-family:var(--font-body); font-weight:700; font-size:.72rem; letter-spacing:1px; text-transform:uppercase;
+    padding:9px 14px; border-radius:2px; cursor:pointer;}
+  #btnEffacerCache:hover{border-color:var(--bleu); color:var(--bleu-vif);}
+  #bandeauY21{flex-basis:100%; margin-top:8px; padding:7px 12px; border:1px dashed var(--accent);
+    color:var(--accent-vif); font-family:var(--font-data); font-size:.68rem; letter-spacing:.5px;}
+  #etatMaj{font-family:var(--font-data); font-size:.7rem; color:var(--txt-faint); max-width:340px;}
+
+  main{max-width:1240px; margin:0 auto; padding:26px 20px 80px;}
+  section.vue{display:none;}
+  section.vue.actif{display:block;}
+  h2{font-family:var(--font-display); font-size:1.7rem; letter-spacing:2px; color:var(--txt); margin-bottom:4px;}
+  .h2-sous{color:var(--txt-dim); font-size:.85rem; margin-bottom:18px;}
+
+  /* ---------- Cartes sommaires ---------- */
+  .sommaire{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:24px;}
+  .stat-carte{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--bleu); padding:14px 16px;}
+  .stat-carte .lbl{font-size:.7rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--txt-faint);}
+  .stat-carte .val{font-family:var(--font-data); font-size:1.35rem; font-weight:600; margin-top:4px;}
+  .stat-carte .det{font-family:var(--font-data); font-size:.7rem; color:var(--txt-dim); margin-top:2px;}
+  .stat-carte.alerte{border-left-color:var(--bad);}
+  .stat-carte.orange{border-left-color:var(--accent);}
+
+  /* ---------- Tables ---------- */
+  .table-wrap{overflow-x:auto; background:var(--panel); border:1px solid var(--line);}
+  table{border-collapse:collapse; width:100%; font-family:var(--font-data); font-size:.78rem;}
+  thead th{
+    background:var(--bleu-nuit); color:var(--txt-dim); text-transform:uppercase; font-size:.65rem; letter-spacing:1px;
+    padding:9px 8px; text-align:right; white-space:nowrap; position:sticky; top:0; cursor:pointer; user-select:none;
+  }
+  thead th:first-child{text-align:left;}
+  thead th.tri-actif{color:var(--accent-vif);}
+  tbody td{padding:7px 8px; text-align:right; border-top:1px solid var(--line); white-space:nowrap;}
+  tbody td:first-child{text-align:left; font-family:var(--font-body); font-weight:500; font-size:.85rem;}
+  tbody tr:hover{background:var(--panel2);}
+  tbody tr.backup{opacity:.45;}
+  .pos-badge{display:inline-block; min-width:26px; text-align:center; font-size:.65rem; font-weight:700;
+    padding:2px 4px; border-radius:2px; background:var(--bleu-fonce); color:var(--bleu-vif); margin-right:8px;}
+  .pos-badge.g{background:#16233d; color:var(--accent-vif);}
+  .pos-badge.d{background:#132a3a; color:#6db3e8;}
+  td.cote-forte{color:var(--ok); font-weight:600;}
+  td.cote-elite{color:var(--accent-vif); font-weight:700;}
+  .profil-tag{display:inline-block; font-size:.62rem; letter-spacing:.5px; padding:2px 7px; border:1px solid var(--bleu); border-radius:10px; color:var(--bleu-vif); text-transform:uppercase;}
+  .profil-tag.d-tag{border-color:#3a6d92; color:#6db3e8;}
+  .profil-tag.g-tag{border-color:var(--accent); color:var(--accent-vif);}
+  /* Colonne Contrat : étroite et collée à droite, toujours visible sans défiler */
+  th.col-resign, td.col-resign{
+    position:sticky; right:0; z-index:2; text-align:center; width:104px; min-width:104px;
+    background:var(--panel); box-shadow:inset 1px 0 0 var(--line); padding:5px 8px;
+  }
+  thead th.col-resign{background:var(--bleu-nuit); z-index:4; cursor:default;}
+  tbody tr:hover td.col-resign{background:var(--panel2);}
+  tbody tr.resigne td.col-resign{background:#0d1830;}
+  .btn-prolong{font-family:var(--font-data); font-size:.65rem; letter-spacing:.4px; padding:5px 9px; cursor:pointer;
+    background:transparent; color:var(--bleu-vif); border:1px solid var(--bleu); border-radius:3px; white-space:nowrap;}
+  .btn-prolong:hover{background:var(--bleu-fonce); color:var(--txt);}
+  .btn-prolong.actif{border-color:var(--accent); color:var(--accent-vif); background:#14213a;}
+  .resign-tag{display:inline-block; font-size:.55rem; letter-spacing:.5px; padding:1px 5px; border-radius:8px;
+    background:#16233d; color:var(--accent-vif); text-transform:uppercase; margin-left:4px;}
+  tbody tr.resigne{background:rgba(77,159,255,.08);}
+
+  /* ---------- Fenêtre Prolongation de contrat ---------- */
+  .modal-fond{position:fixed; inset:0; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center;
+    z-index:100; padding:20px;}
+  .modal-fond[hidden]{display:none;}
+  .modal{background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--accent);
+    width:100%; max-width:440px; max-height:90vh; overflow-y:auto;}
+  .modal-tete{display:flex; align-items:center; justify-content:space-between; padding:16px 20px 12px; border-bottom:1px solid var(--line);}
+  .modal-tete h3{margin:0; font-size:.85rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--accent-vif);}
+  .modal-x{background:none; border:none; color:var(--txt-faint); font-size:1.5rem; line-height:1; cursor:pointer; padding:0 4px;}
+  .modal-x:hover{color:var(--txt);}
+  .modal-joueur{padding:14px 20px; border-bottom:1px solid var(--line);}
+  .mj-nom{display:block; font-size:1.1rem; font-weight:600; color:var(--txt);}
+  .mj-meta{display:block; font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); margin-top:3px;}
+  .modal-grille{padding:16px 20px; display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .modal-grille label{display:flex; flex-direction:column; gap:5px; font-size:.65rem; text-transform:uppercase;
+    letter-spacing:1px; color:var(--txt-faint);}
+  .modal-grille label.large{grid-column:1 / -1;}
+  .modal-grille select, .modal-grille input{font-family:var(--font-data); font-size:.85rem; background:var(--ink); color:var(--txt);
+    border:1px solid var(--line); border-radius:3px; padding:8px 9px;}
+  .modal-grille select:focus, .modal-grille input:focus{outline:none; border-color:var(--accent);}
+  .modal-min{padding:0 20px 14px; font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim);}
+  .modal-min b{color:var(--bleu-vif);}
+  .modal-impact{margin:0 20px 16px; padding:12px 14px; background:var(--panel2); border-left:3px solid var(--bleu);
+    font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); line-height:1.6;}
+  .modal-impact.alerte{border-left-color:var(--bad);}
+  .modal-impact b{color:var(--txt);}
+  .modal-actions{display:flex; gap:8px; justify-content:flex-end; padding:0 20px 18px; flex-wrap:wrap;}
+  .modal-actions button{font-family:var(--font-data); font-size:.72rem; letter-spacing:.5px; padding:9px 16px; cursor:pointer;
+    border-radius:3px; border:1px solid var(--bleu); background:var(--bleu); color:#fff;}
+  .modal-actions button.secondaire{background:transparent; color:var(--txt-dim); border-color:var(--line);}
+  .modal-actions button.secondaire:hover{color:var(--txt); border-color:var(--txt-faint);}
+  .modal-actions button.danger{background:transparent; color:var(--bad); border-color:var(--bad); margin-right:auto;}
+  .modal-actions button.danger:hover{background:var(--bad); color:#fff;}
+
+  /* ---------- Progression ---------- */
+  .filtres{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+  .filtres button{
+    font-family:var(--font-body); font-size:.75rem; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+    background:var(--panel); border:1px solid var(--line); color:var(--txt-dim); padding:6px 14px; cursor:pointer; border-radius:2px;
+  }
+  .filtres button.actif{border-color:var(--accent); color:var(--accent-vif);}
+  .prog-grille{display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px;}
+  .joueur-carte{background:var(--panel); border:1px solid var(--line); padding:0; overflow:hidden;}
+  .jc-tete{display:flex; align-items:baseline; gap:10px; padding:13px 16px 10px;
+    background:linear-gradient(100deg, var(--bleu-nuit), var(--panel)); border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .jc-nom{font-family:var(--font-body); font-weight:600; font-size:1.02rem;}
+  .jc-meta{font-family:var(--font-data); font-size:.68rem; color:var(--txt-dim); margin-left:auto; text-align:right;}
+  .jc-corps{padding:12px 16px 14px;}
+  .stat-ligne{margin-bottom:11px;}
+  .stat-ligne:last-child{margin-bottom:0;}
+  .sl-tete{display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; font-family:var(--font-data); font-size:.7rem; margin-bottom:4px;}
+  .sl-tete .nom-stat{color:var(--txt-dim); text-transform:uppercase; letter-spacing:1px; display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; row-gap:3px; min-width:0;}
+  .sl-tete .valeurs{color:var(--txt); display:inline-flex; align-items:center; gap:4px; white-space:nowrap; margin-left:auto;}
+  .sl-tete .valeurs .att{color:var(--txt-faint);}
+  .barre{position:relative; height:12px; background:var(--bleu-nuit); border-radius:2px; overflow:visible;}
+  .barre .rempli{position:absolute; left:0; top:0; bottom:0; background:var(--bleu); border-radius:2px 0 0 2px; transition:width .5s;}
+  .barre .rempli.memo{background:linear-gradient(90deg, var(--bleu), var(--accent-vif));}
+  .barre .seuil{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--accent-vif); box-shadow:0 0 4px rgba(255,255,255,.75);}
+  .badge-etat{font-family:var(--font-body); font-size:.6rem; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+    padding:2px 8px; border-radius:2px; white-space:nowrap; vertical-align:middle;}
+  .badge-etat.memorable{background:linear-gradient(90deg, var(--bleu), var(--accent-vif)); color:#0a1a33; font-weight:800;}
+  .badge-etat.excellente{background:var(--bleu); color:#fff;}
+  .badge-etat.satisfaisante{background:transparent; border:1px solid var(--bleu); color:var(--bleu-vif);}
+  .badge-etat.correcte{background:transparent; border:1px solid var(--txt-faint); color:var(--txt);}
+  .badge-etat.decevante{background:transparent; border:1px solid var(--bad); color:var(--bad);}
+  .badge-etat.oublier{background:var(--bad); color:#fff;}
+  .badge-etat.sousmemo{background:transparent; border:1px solid var(--accent); color:var(--accent-vif);}
+  .badge-etat.indef{background:transparent; border:1px solid var(--txt-faint); color:var(--txt-faint);}
+  .barre .jalon{position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--txt-faint); opacity:.55;}
+  .barre .jalon.memo{width:2px; background:var(--accent-vif); opacity:1; box-shadow:0 0 4px rgba(255,255,255,.75);}
+  .jc-mods{font-size:.68rem; color:var(--bleu-vif); padding:6px 16px 0; font-family:var(--font-data);}
+  .jc-mods b{color:var(--accent-vif); font-weight:700;}
+  .att-input{width:64px; background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.7rem; padding:2px 5px; border-radius:2px; text-align:right;}
+  .att-input:focus{border-color:var(--accent); outline:none;}
+  .jc-note{font-size:.68rem; color:var(--txt-faint); padding:8px 16px 12px; border-top:1px dashed var(--line);}
+
+  /* ---------- OV détaillé ---------- */
+  .ovd-panneau{background:var(--panel); border:1px solid var(--line); padding:18px 20px; margin-bottom:18px;}
+  .ovd-ligne{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;}
+  .ovd-ligne label{display:flex; flex-direction:column; gap:5px; font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-faint);}
+  .ovd-ligne select{background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt); font-family:var(--font-data);
+    font-size:.82rem; padding:7px 10px; border-radius:2px; min-width:230px;}
+  .ovd-ligne select:focus{outline:none; border-color:var(--accent);}
+  .ovd-grille{display:grid; grid-template-columns:repeat(auto-fit,minmax(82px,1fr)); gap:10px; margin-bottom:16px;}
+  .ovd-cote{display:flex; flex-direction:column; gap:4px;}
+  .ovd-cote span{font-size:.66rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--txt-faint); text-align:center;}
+  .ovd-cote input{font-family:var(--font-data); font-size:.95rem; text-align:center; background:var(--ink); color:var(--txt);
+    border:1px solid var(--line); border-radius:2px; padding:7px 4px; width:100%;}
+  .ovd-cote input:focus{outline:none; border-color:var(--accent);}
+  .ovd-resultat{display:flex; gap:14px; flex-wrap:wrap; align-items:stretch;}
+  .ovd-badge{background:var(--bleu-nuit); border:1px solid var(--bleu); padding:12px 22px; text-align:center; min-width:150px;}
+  .ovd-badge .val{font-family:var(--font-data); font-size:2rem; color:var(--accent-vif); display:block;}
+  .ovd-badge .lib{font-size:.64rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--txt-faint);}
+  .ovd-note{font-size:.78rem; color:var(--txt-dim); align-self:center; max-width:460px; line-height:1.55;}
+
+  /* ---------- Réglages ---------- */
+  .regl-bloc{background:var(--panel); border:1px solid var(--line); padding:18px 20px; margin-bottom:18px;}
+  .regl-bloc h3{font-family:var(--font-body); font-weight:600; text-transform:uppercase; letter-spacing:1.5px; font-size:.85rem; color:var(--accent-vif); margin-bottom:10px;}
+  .regl-bloc p{font-size:.82rem; color:var(--txt-dim); margin-bottom:10px; max-width:820px; line-height:1.55;}
+  .regl-bloc label{font-size:.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-faint); margin-right:8px;}
+  .regl-bloc select, .regl-bloc textarea{
+    background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt); font-family:var(--font-data);
+    font-size:.78rem; padding:6px 10px; border-radius:2px;}
+  .regl-bloc textarea{width:100%; min-height:140px; margin-top:8px;}
+  .regl-actions{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
+  .regl-actions button{
+    font-family:var(--font-body); font-weight:600; font-size:.75rem; letter-spacing:1px; text-transform:uppercase;
+    background:var(--bleu); color:#fff; border:none; padding:8px 16px; cursor:pointer; border-radius:2px;}
+  .regl-actions button.secondaire{background:transparent; border:1px solid var(--line); color:var(--txt-dim);}
+  .regl-actions button:hover{filter:brightness(1.15);}
+  table.matrice input{width:58px; background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.72rem; padding:3px 5px; text-align:right; border-radius:2px;}
+  table.matrice input:focus{border-color:var(--accent); outline:none;}
+  table.matrice td, table.matrice th{padding:5px 7px;}
+
+  /* ---------- Outils de l'alignement (recherche + export) ---------- */
+  .align-outils{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
+  .align-outils input[type=search]{
+    flex:1; min-width:220px; max-width:420px; background:var(--panel); border:1px solid var(--line);
+    color:var(--txt); font-family:var(--font-data); font-size:.8rem; padding:8px 12px; border-radius:2px;}
+  .align-outils input[type=search]:focus{outline:none; border-color:var(--bleu-vif);}
+  .align-outils button{
+    font-family:var(--font-body); font-weight:600; font-size:.72rem; letter-spacing:1px; text-transform:uppercase;
+    background:transparent; border:1px solid var(--line); color:var(--txt-dim); padding:8px 14px; cursor:pointer; border-radius:2px;}
+  .align-outils button:hover{border-color:var(--bleu); color:var(--bleu-vif);}
+
+  /* ---------- Comparateur ---------- */
+  .comp-choix{display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px;}
+  .comp-choix label{display:flex; flex-direction:column; gap:5px; font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-faint);}
+  .comp-choix select{background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt); font-family:var(--font-data);
+    font-size:.82rem; padding:7px 10px; border-radius:2px; min-width:240px;}
+  .comp-choix select:focus{outline:none; border-color:var(--bleu-vif);}
+  .comp-vs{font-family:var(--font-display); font-size:1.4rem; color:var(--accent-vif); letter-spacing:2px; padding-bottom:4px;}
+  .comp-grille{display:grid; grid-template-columns:1fr auto 1fr; gap:6px 14px; background:var(--panel);
+    border:1px solid var(--line); padding:18px 20px; align-items:center; max-width:860px;}
+  .comp-tete{display:flex; flex-direction:column; gap:3px;}
+  .comp-tete .nom{font-family:var(--font-body); font-weight:600; font-size:1.05rem;}
+  .comp-tete .meta{font-family:var(--font-data); font-size:.68rem; color:var(--txt-dim);}
+  .comp-tete.droite{text-align:right; align-items:flex-end;}
+  .comp-ov{font-family:var(--font-data); font-size:1.6rem; color:var(--accent-vif); font-weight:700;}
+  .comp-mid{font-size:.62rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--txt-faint); text-align:center; white-space:nowrap;}
+  .comp-val{font-family:var(--font-data); font-size:.78rem; display:flex; align-items:center; gap:8px;}
+  .comp-val.droite{justify-content:flex-end;}
+  .comp-val b{min-width:26px;}
+  .comp-val.gagne b{color:var(--bleu-vif);}
+  .comp-barre{height:8px; border-radius:2px; background:var(--bleu-nuit); position:relative; flex:1; max-width:220px; overflow:hidden;}
+  .comp-barre .r{position:absolute; top:0; bottom:0; background:var(--line); border-radius:2px;}
+  .comp-barre.gauche .r{right:0;}
+  .comp-barre.droite .r{left:0;}
+  .comp-barre .r.gagne{background:var(--bleu);}
+  .comp-pied{grid-column:1 / -1; border-top:1px dashed var(--line); margin-top:8px; padding-top:10px;
+    font-family:var(--font-data); font-size:.7rem; color:var(--txt-dim); line-height:1.7;}
+
+  /* ---------- Plafond ---------- */
+  #tablePlafond td:first-child{font-family:var(--font-data);}
+  #tablePlafond td.exp{ text-align:left; white-space:normal; font-size:.72rem; color:var(--txt-dim); max-width:420px;}
+  #tablePlafond tr.depasse td{color:var(--bad);}
+  .plafond-note{margin-top:12px; font-size:.75rem; color:var(--txt-faint); max-width:760px; line-height:1.6;}
+
+  .msg-flash{position:fixed; bottom:20px; right:20px; background:var(--bleu); color:#fff; padding:10px 18px;
+    font-size:.8rem; border-radius:2px; box-shadow:0 4px 16px rgba(0,0,0,.5); opacity:0; transition:opacity .3s; pointer-events:none; z-index:99;}
+  .msg-flash.visible{opacity:1;}
+
+  @media (max-width:700px){
+    .head-meta{margin-left:0; text-align:left;}
+    .prog-grille{grid-template-columns:1fr;}
+    nav .maj-zone{width:100%; justify-content:flex-start;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <img class="logo" src="https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/logos/toronto.png" alt="Maple Leafs de Toronto" onerror="this.style.display='none'">
+    <div class="head-titles">
+      <h1>MAPLE LEAFS DE TORONTO <em>· POSTE DU DG</em></h1>
+      <div class="sub">USHL Pro — Formation, production et progression</div>
+    </div>
+    <div class="head-meta">
+      <div class="fiche" id="ficheEquipe">—</div>
+      <div id="sourceInfo">données locales</div>
+    </div>
+  </div>
+  <div class="memo-strip">Seul le mémorable compte</div>
+</header>
+
+<nav>
+  <button class="actif" data-vue="alignement">Alignement</button>
+  <button data-vue="production">Production</button>
+  <button data-vue="progression">Progression</button>
+  <button data-vue="comparateur">Comparateur</button>
+  <button data-vue="plafond">Plafond</button>
+  <button data-vue="ovdetail">OV détaillé</button>
+  <button data-vue="reglages">Réglages</button>
+  <div class="maj-zone">
+    <button id="btnMaj">Actualiser depuis ushl.ca</button>
+    <button id="btnModeY21" class="secondaire" title="Affiche l'interface avec les totaux complets de la saison Y21 (archive XtraStats téléchargée) pour vérifier le moteur des attentes">Vérifier avec la Y21</button>
+    <button id="btnEffacerCache" title="Efface les données mises en cache (formation, production, XtraStats, limites) puis actualise depuis ushl.ca">Effacer la cache</button>
+    <span id="etatMaj"></span>
+    <div id="bandeauY21" style="display:none">MODE VÉRIFICATION — SAISON Y21 · totaux complets de la saison · l'interface revient à la saison en cours à chaque ouverture</div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ================= ALIGNEMENT ================= -->
+  <section class="vue actif" id="vue-alignement">
+    <h2>Alignement professionnel</h2>
+    <div class="h2-sous" id="alignSous">Cotes, salaires et contrats — source : TeamRosters.php (TORONTO)</div>
+    <div class="sommaire" id="alignSommaire"></div>
+    <div class="align-outils">
+      <input type="search" id="rechercheAlign" placeholder="Filtrer par nom, position ou profil…" aria-label="Filtrer l'alignement">
+      <button id="btnExportCSV" title="Télécharge l'alignement affiché en CSV (séparateur point-virgule, compatible Excel)">Exporter en CSV</button>
+    </div>
+    <div class="table-wrap"><table id="tableAlignement"></table></div>
+  </section>
+
+  <!-- ================= PRODUCTION ================= -->
+  <section class="vue" id="vue-production">
+    <h2>Production — saison en cours</h2>
+    <div class="h2-sous" id="prodSous">Pointage de la saison actuelle (TeamScoring.php) enrichi de XtraStats (minutes, mises en échec)</div>
+    <div class="sommaire" id="prodSommaire"></div>
+    <div class="table-wrap"><table id="tableProduction"></table></div>
+  </section>
+
+  <!-- ================= PROGRESSION ================= -->
+  <section class="vue" id="vue-progression">
+    <h2>Charte de progression</h2>
+    <div class="h2-sous">Seuils des matrices officielles (article 6.2.6, recote été 2022) selon le profil et l'overall. Un degré est acquis en <em>dépassant strictement</em> son seuil — le <strong style="color:var(--accent-vif)">Mémorable</strong> (ModS +60) exige de faire mieux que le seuil, pas de l'égaler (tableau 18).</div>
+    <div class="filtres" id="progFiltres">
+      <button class="actif" data-f="tous">Tous</button>
+      <button data-f="av">Attaquants</button>
+      <button data-f="d">Défenseurs</button>
+      <button data-f="g">Gardiens</button>
+      <button data-f="memo">Mémorables</button>
+      <button data-f="difficulte">En difficulté</button>
+    </div>
+    <div class="prog-grille" id="progGrille"></div>
+  </section>
+
+  <!-- ================= COMPARATEUR ================= -->
+  <section class="vue" id="vue-comparateur">
+    <h2>Comparateur de joueurs</h2>
+    <div class="h2-sous">Deux joueurs de l'alignement côte à côte : cotes, profil, contrat et modificateurs. La barre pleine marque le plus fort des deux sur chaque cote.</div>
+    <div class="comp-choix">
+      <label>Joueur A <select id="compA"></select></label>
+      <span class="comp-vs">VS</span>
+      <label>Joueur B <select id="compB"></select></label>
+    </div>
+    <div id="compZone"></div>
+  </section>
+
+  <!-- ================= PLAFOND ================= -->
+  <section class="vue" id="vue-plafond">
+    <h2>Projection du plafond salarial</h2>
+    <div class="h2-sous">Masse engagée saison par saison selon les contrats actuels (et les prolongations enregistrées pour les contrats échus). Plafond de la ligue : 104 M$. Un contrat de CT&nbsp;= N couvre les N prochaines saisons.</div>
+    <div class="sommaire" id="plafondSommaire"></div>
+    <div class="table-wrap"><table id="tablePlafond"></table></div>
+    <p class="plafond-note">Hypothèses : plafond constant à 104 M$, aucun rachat ni échange. Les joueurs dont le contrat expire doivent être re-signés à la charte (voir la colonne Re-signer de l'alignement) ou remplacés.</p>
+  </section>
+
+  <!-- ================= OV DÉTAILLÉ ================= -->
+  <section class="vue" id="vue-ovdetail">
+    <h2>Calculateur d'OV détaillé</h2>
+    <div class="h2-sous">Reproduit au centième l'overall du simulateur à partir des 13 cotes, comme la fonction <em>overall()</em> du classeur Excel. Pondérations calibrées sur les rosters complets de la ligue (8 juillet 2026) : validées au centième sur les 17 OV détaillés de référence du classeur et sur l'arrondi des 697 patineurs de la ligue. Gardiens exclus — leur formule est distincte.</div>
+    <div class="ovd-panneau">
+      <div class="ovd-ligne">
+        <label>Joueur de l'alignement
+          <select id="ovdJoueur"><option value="">— saisie manuelle —</option></select>
+        </label>
+        <label>Groupe
+          <select id="ovdGroupe">
+            <option value="F">Attaquant</option>
+            <option value="D">Défenseur</option>
+          </select>
+        </label>
+      </div>
+      <div class="ovd-grille" id="ovdGrille"></div>
+      <div class="ovd-resultat">
+        <div class="ovd-badge"><span class="val" id="ovdValeur">—</span><span class="lib">OV détaillé</span></div>
+        <div class="ovd-badge"><span class="val" id="ovdArrondi">—</span><span class="lib">OV affiché (arrondi)</span></div>
+        <div class="ovd-note" id="ovdNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= RÉGLAGES ================= -->
+  <section class="vue" id="vue-reglages">
+    <h2>Réglages</h2>
+    <div class="h2-sous">Matrices d'attentes, sauvegarde et sources de données</div>
+
+    <div class="regl-bloc">
+      <h3>Matrices des profils (article 6.2.6)</h3>
+      <p>Les matrices sont préremplies avec les valeurs officielles de la recote de l'été 2022 (Y17), transcrites du document
+      «&nbsp;Attentes.docx&nbsp;». La ligue précise qu'elles sont fournies à titre indicatif et réévaluées à chaque saison :
+      toute cellule modifiée ici remplace la valeur Y17 (conservé dans ce navigateur, exportable en JSON).
+      Colonnes = seuils à <em>dépasser strictement</em> pour chaque degré ; la colonne Satisfaisante correspond à l'attente de base (100&nbsp;%).</p>
+      <div>
+        <label>Matrice (profil)</label>
+        <select id="selMatrice"></select>
+        <label style="margin-left:14px">Statistique</label>
+        <select id="selStat"></select>
+      </div>
+      <div class="table-wrap" style="margin-top:12px"><table class="matrice" id="tableMatrice"></table></div>
+      <div class="regl-actions">
+        <button id="btnExportMat">Exporter les matrices (JSON)</button>
+        <button id="btnImportMat" class="secondaire">Importer un JSON</button>
+        <button id="btnViderMat" class="secondaire">Revenir aux valeurs Y17</button>
+      </div>
+      <textarea id="zoneJson" placeholder="Colle ici un JSON de matrices puis clique «Importer un JSON». L'export apparaît aussi ici."></textarea>
+    </div>
+
+    <div class="regl-bloc">
+      <h3>Cibles Mémorable individuelles (surcharges)</h3>
+      <p>Sur chaque carte de l'onglet Progression, le champ de saisie fixe un seuil <strong>Mémorable</strong> propre au joueur,
+      qui remplace celui de la matrice (les cinq autres degrés restent ceux de la matrice). Le bouton ci-dessous efface toutes ces surcharges.</p>
+      <div class="regl-actions">
+        <button id="btnViderOverrides" class="secondaire">Effacer les attentes individuelles</button>
+      </div>
+    </div>
+
+    <div class="regl-bloc">
+      <h3>Sources et actualisation</h3>
+      <p id="sourcesTexte"></p>
+      <p>Les pages de la USHL n'autorisent pas les requêtes directes entre sites : l'interface passe par une chaîne de relais publics (le premier qui répond est conservé). Si l'actualisation échoue, les données intégrées du <span id="dateSecours"></span> demeurent affichées. Les données récupérées sont mises en cache (formation : 12 h · production : 30 min).</p>
+      <div class="regl-actions">
+        <button id="btnViderCache" class="secondaire">Vider le cache de données</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="msg-flash" id="flash"></div>
+
+<script>
+/* =====================================================================
+   MAPLE LEAFS DE TORONTO — TABLEAU DE BORD DU DG (USHL)
+   Monofichier vanilla HTML/CSS/JS — aucune dépendance, aucun build.
+   Sources en direct : TeamRosters.php, TeamScoring.php, USHLxtrastats.html
+   ===================================================================== */
+'use strict';
+
+/* ------------------ CONFIGURATION ------------------ */
+const CONFIG = {
+  equipe: 'TORONTO',
+  urls: {
+    roster:  'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamRosters.php?team=TORONTO',
+    scoring: 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamScoring.php?team=TORONTO',
+    xtra:    'https://ushl.ca/ushl/menu_sim/USHL-pro/USHLxtrastats.html'
+  },
+  proxys: [
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+    u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+    u => 'https://proxy.cors.sh/' + u,
+    u => 'https://thingproxy.freeboard.io/fetch/' + u
+  ],
+  // limites d'utilisation des gardiens (projet gestiongardiens, généré depuis ushl.ca)
+  urlLimites: 'https://merciermathieu5.github.io/gestiongardiens/limites.json',
+  ttl: { roster: 12*3600*1000, scoring: 30*60*1000, xtra: 3600*1000, limites: 3600*1000 },
+  matchsSaison: 82
+};
+
+const CLES_LS = {
+  matrices: 'tml_matrices_v1',
+  overrides: 'tml_attentes_joueurs_v1',
+  proxy: 'tml_proxy_prefere_v1',
+  cache: 'tml_cache_v1',
+  resign: 'tml_resignatures_v1'
+};
+
+/* ------------------ DÉFINITION DES STATS ------------------ */
+const STATS_DEF = {
+  goals:     {nom:'Buts',        court:'B',    rythme:true },
+  gwg:       {nom:'Buts gagnants', court:'GW', rythme:true },
+  ppg:       {nom:'Buts en AN',  court:'PP',   rythme:true },
+  assists:   {nom:'Passes',      court:'A',    rythme:true },
+  pts:       {nom:'Points',      court:'PTS',  rythme:true },
+  hits:      {nom:'Mises en échec', court:'MEÉ', rythme:true },
+  shots:     {nom:'Tirs au but', court:'T',    rythme:true },
+  shotpct:   {nom:'% de tirs (PCTG)', court:'%T', rythme:false, decimales:2 },
+  pmrang:    {nom:'Rang +/- au club', court:'+/- rang', rythme:false, decimales:2 },
+  hits20:    {nom:'MEÉ / 20 min', court:'MEÉ/20', rythme:false, decimales:2 },
+  shots20:   {nom:'Tirs / 20 min', court:'T/20', rythme:false, decimales:2 },
+  mg:        {nom:'Minutes / match', court:'MIN/M', rythme:false, decimales:1 },
+  mp:        {nom:'Minutes jouées', court:'MIN', rythme:true },
+  hs:        {nom:'HS (« head stand »)', court:'HS', rythme:true },
+  qggp:      {nom:'DQ / match',  court:'DQ/M', rythme:false, decimales:2 },
+  ming:      {nom:'Parties / max permis', court:'MJ/max', rythme:false, decimales:2 },
+  psv:       {nom:'Psv (%A × 1000)', court:'Psv', rythme:false, decimales:0 },
+  plusminus: {nom:'Différentiel',court:'+/-',  rythme:true, signe:true },
+  w:         {nom:'Victoires',   court:'V',    rythme:true },
+  avg:       {nom:'Moyenne (GAA)', court:'MOY', rythme:false, decimales:2, inverse:true },
+  svpct:     {nom:'% d\'arrêts', court:'%A',   rythme:false, decimales:3 },
+  qs:        {nom:'Départs de qualité', court:'DQ', rythme:true }
+};
+
+/* Statistiques évaluées par matrice de profil (règlements USHL, tableau 20). */
+const STATS_PAR_MATRICE = {
+  ELITE:    ['shotpct','gwg','ppg','pts','pmrang'],
+  PLAYMAKER:['assists','pts'],
+  POWERFWD: ['goals','ppg','hits','shots'],
+  TWOWAY:   ['pts','pmrang'],
+  SNIPER:   ['goals','gwg','ppg','shots20'],
+  GRINDER:  ['hits20'],
+  DEFFWD:   ['pmrang','mp'],
+  DEPTHFWD: ['mp'],
+  DELITEQB: ['ppg','shots','pts'],
+  DELITESD: ['hits','pts'],
+  DOFF:     ['shots20','pts','mg'],
+  DDEF:     ['pmrang','hits20','mg'],
+  DDEPTH:   ['mp'],
+  STARTER:  ['hs','svpct','qggp','ming'],
+  BACKUP:   ['mp','qggp','psv']
+};
+const NOMS_MATRICES = {
+  ELITE:'Elite', PLAYMAKER:'Playmaker', POWERFWD:'Power Forward', TWOWAY:'Two-Way Forward',
+  SNIPER:'Sniper', GRINDER:'Grinder', DEFFWD:'Defensive Forward', DEPTHFWD:'Depth Forward',
+  DELITEQB:'DElite QB', DELITESD:'DElite Shutdown', DOFF:'DOffensive', DDEF:'DDefensive',
+  DDEPTH:'DDepth Defense', STARTER:'Starter Goalie', BACKUP:'Backup Goalie'
+};
+
+/* ------------------ PROFILS (règlements USHL, tableaux 10-11-12) ------------------
+   Chaque profil : conditions (fonction sur les cotes) et stats évaluées.
+   Cotes disponibles : it, sp, st, en, du, di, sk, pa, pc, df, sc, ex, ld, ov      */
+const PROFILS = {
+  junior: {
+    avants: [
+      {id:'Junior Elite',       cond:c=>c.sp+c.sk>=135 && c.pa+c.pc+c.sc>=209 && c.sc>=69 && c.ov>=72, mat:'ELITE'},
+      {id:'Junior Playmaker',   cond:c=>c.sp+c.sk>=132 && c.pa+c.pc>=132, mat:'PLAYMAKER'},
+      {id:'Junior Power Forward', cond:c=>c.it+c.st>=135 && c.sc>=65, mat:'POWERFWD'},
+      {id:'Junior Two-Way',     cond:c=>c.sp+c.en>=130 && c.pa+c.sc>=130 && c.df>=58, mat:'TWOWAY'},
+      {id:'Junior Sniper',      cond:c=>c.sp+c.sk>=128 && c.sc>=65, mat:'SNIPER'},
+      {id:'Junior Grinder',     cond:c=>c.it+c.st>=130 && c.df>=56, mat:'GRINDER'},
+      {id:'Junior Defensive',   cond:c=>c.df>=60, mat:'DEFFWD'},
+      {id:'Junior Depth Forward', cond:()=>true, mat:'DEPTHFWD'}
+    ],
+    defenseurs: [
+      {id:'Junior DEliteQB',    cond:c=>c.sp+c.en+c.sk+c.pc>=270 && c.pa+c.sc>=135 && c.ov>=72, mat:'DELITEQB'},
+      {id:'Junior DEliteShutdown', cond:c=>c.it+c.en+c.sk+c.pc>=270 && c.st+c.df>=140 && c.ov>=72, mat:'DELITESD'},
+      {id:'Junior DOffensive',  cond:c=>(c.pa+c.sc)-(c.st+c.df)>=5, mat:'DOFF'},
+      {id:'Junior DDefensive',  cond:c=>(c.st+c.df)-(c.pa+c.sc)>=5, mat:'DDEF'},
+      {id:'Junior DTwo-Way',    cond:()=>true, mat:'DDEPTH'}
+    ],
+    gardiens: [] /* règle 6.2.5 : les gardiens du PRO sont Starter ou Backup selon l'overall, sans étiquette d'âge */
+  },
+  prospect: {
+    avants: [
+      {id:'Prospect Elite',     cond:c=>c.sp+c.sk>=150 && c.pa+c.pc+c.sc>=225 && c.sc>=74 && c.ov>=76, mat:'ELITE'},
+      {id:'Prospect Playmaker', cond:c=>c.sp+c.sk>=140 && c.pa+c.pc>=150, mat:'PLAYMAKER'},
+      {id:'Prospect Power Forward', cond:c=>c.it+c.st>=150 && c.sc>=72, mat:'POWERFWD'},
+      {id:'Prospect Two-Way Forward', cond:c=>c.sp+c.en>=140 && c.pa+c.sc>=140 && c.df>=62, mat:'TWOWAY'},
+      {id:'Prospect Sniper',    cond:c=>c.sp+c.sk>=132 && c.sc>=74, mat:'SNIPER'},
+      {id:'Prospect Grinder',   cond:c=>c.it+c.st>=140 && c.df>=60, mat:'GRINDER'},
+      {id:'Prospect Defensive', cond:c=>c.df>=65, mat:'DEFFWD'},
+      {id:'Prospect Depth Forward', cond:()=>true, mat:'DEPTHFWD'}
+    ],
+    defenseurs: [
+      {id:'Prospect DEliteQB',  cond:c=>c.sp+c.en+c.sk+c.pc>=280 && c.pa+c.sc>=142 && c.ov>=76, mat:'DELITEQB'},
+      {id:'Prospect DEliteShutdown', cond:c=>c.it+c.en+c.sk+c.pc>=280 && c.st+c.df>=148 && c.ov>=76, mat:'DELITESD'},
+      {id:'Prospect DOffensive', cond:c=>(c.pa+c.sc)-(c.st+c.df)>=5, mat:'DOFF'},
+      {id:'Prospect DDefensive', cond:c=>(c.st+c.df)-(c.pa+c.sc)>=5, mat:'DDEF'},
+      {id:'Prospect DTwo-Way',  cond:()=>true, mat:'DDEPTH'}
+    ],
+    gardiens: []
+  },
+  pro: {
+    avants: [
+      {id:'Elite',              cond:c=>c.sp+c.sk>=157 && c.pa+c.pc+c.sc>=240 && c.sc>=78 && c.ov>=80, mat:'ELITE'},
+      {id:'Playmaker',          cond:c=>c.sp+c.sk>=150 && c.pa+c.pc>=157, mat:'PLAYMAKER'},
+      {id:'Power Forward',      cond:c=>c.it+c.st>=155 && c.sc>=76, mat:'POWERFWD'},
+      {id:'Two-Way Forward',    cond:c=>c.sp+c.en>=150 && c.pa+c.sc>=150 && c.df>=65, mat:'TWOWAY'},
+      {id:'Sniper',             cond:c=>c.sp+c.sk>=140 && c.sc>=78, mat:'SNIPER'},
+      {id:'Grinder',            cond:c=>c.it+c.st>=150 && c.it>=74 && c.df>=63, mat:'GRINDER'},
+      {id:'Defensive',          cond:c=>c.df>=70, mat:'DEFFWD'},
+      {id:'Depth Forward',      cond:()=>true, mat:'DEPTHFWD'}
+    ],
+    defenseurs: [
+      {id:'DEliteQB',           cond:c=>c.sp+c.en+c.sk+c.pc>=302 && c.pa+c.sc>=155 && c.ov>=80, mat:'DELITEQB'},
+      {id:'DEliteShutdown',     cond:c=>c.it+c.en+c.sk+c.pc>=302 && c.st+c.df>=159 && c.ov>=80, mat:'DELITESD'},
+      {id:'DOffensive',         cond:c=>(c.pa+c.sc)-(c.st+c.df)>=5, mat:'DOFF'},
+      {id:'DDefensive',         cond:c=>(c.st+c.df)-(c.pa+c.sc)>=5, mat:'DDEF'},
+      {id:'DTwo-Way',           cond:()=>true, mat:'DDEPTH'}
+    ],
+    gardiens: [
+      {id:'Starter Goalie',     cond:c=>c.ov>=80, mat:'STARTER'},
+      {id:'Backup Goalie',      cond:()=>true,   mat:'BACKUP'}
+    ]
+  }
+};
+
+/* ------------------ TABLEAUX RÉGLEMENTAIRES (section 6.2) ------------------ */
+/* Tableau 18 : degrés de satisfaction et modificateur statistique (ModS). */
+const NIVEAUX = [
+  {cle:'memorable',     nom:'Mémorable',     mods: 60},
+  {cle:'excellente',    nom:'Excellente',    mods: 30},
+  {cle:'satisfaisante', nom:'Satisfaisante', mods: 10},
+  {cle:'correcte',      nom:'Correcte',      mods:  0},
+  {cle:'decevante',     nom:'Décevante',     mods:-20},
+  {cle:'oublier',       nom:'À oublier',     mods:-40}
+];
+const MODS_PAR_STATUT = Object.fromEntries(NIVEAUX.map(n=>[n.cle,n.mods]));
+
+/* Tableau 17 : modificateur d'âge (ModA). */
+const MODA_PATINEURS = {18:25,19:25,20:25,21:20,22:20,23:10,24:10,25:5,26:5,27:0,28:0,
+  29:-5,30:-5,31:-10,32:-10,33:-20,34:-20,35:-25,36:-30,37:-35,38:-40,39:-45,40:-50};
+const MODA_GARDIENS  = {18:20,19:20,20:20,21:15,22:15,23:15,24:10,25:10,26:10,27:5,28:5,
+  29:5,30:-5,31:-5,32:-10,33:-10,34:-15,35:-15,36:-25,37:-25,38:-35,39:-35,40:-50};
+function modA(j){
+  const t = j.po==='G' ? MODA_GARDIENS : MODA_PATINEURS;
+  return t[Math.max(18, Math.min(40, j.age))] ?? 0;
+}
+
+/* Tableau 19 : conversion du jet de progression en variation de cote.
+   Règle de la ligue : la recote est plafonnée à +3 (et peut descendre à -5). */
+const CONVERSION = [[146,4],[136,3],[121,2],[101,1],[71,0],[51,-1],[26,-2],[11,-3],[-19,-4]];
+function convertirJet(total){
+  for (const [seuil, prog] of CONVERSION){ if (total >= seuil) return Math.min(3, prog); }
+  return -5;
+}
+
+/* Fourchette de recote des cotes-clés : base 60 + ModA + ModS, aléa Kcheck 1 à 40. */
+function fourchetteRecote(j, mods){
+  const base = 60 + modA(j) + (mods ?? 0);
+  return {base, min: convertirJet(base + 1), max: convertirJet(base + 40)};
+}
+
+/* ------------------ MATRICES DES PROFILS (article 6.2.6, recote été 2022 / Y17) ------------------
+   Transcrites du document «Attentes.docx». Colonnes : seuils Mémorable, Excellente,
+   Satisfaisante (= l'attente de base, surlignée dans le document), Correcte, Décevante, À oublier.
+   Un niveau est acquis si la valeur DÉPASSE STRICTEMENT son seuil (cohérent avec le
+   tableau 18 : Mémorable = 131 % et plus quand le seuil Mémorable est fixé à 130 %). */
+const OV_MIN = 73, OV_MAX = 90;
+const MATRICES = {
+  ELITE: {
+    shotpct: { titre:'PCTG', mode:'abs', ecarts:[2.00,1.00,null,-1.00,-2.00,-20.00], rangs:[
+      [75,[12.5,11.5,10.5,9.5,8.5,-9.5]],
+      [77,[14,13,12,11,10,-8]],
+      [79,[14.5,13.5,12.5,11.5,10.5,-7.5]],
+      [81,[15.5,14.5,13.5,12.5,11.5,-6.5]],
+      [83,[16,15,14,13,12,-6]],
+      [85,[16.5,15.5,14.5,13.5,12.5,-5.5]],
+      [90,[17,16,15,14,13,-5]]
+    ]},
+    gwg: { titre:'buts gagnants', mode:'abs', ecarts:[2.00,1.00,null,-1.00,-2.00,-10.00], rangs:[
+      [75,[2,1,0,-1,-2,-10]],
+      [77,[3,2,1,0,-1,-9]],
+      [81,[4,3,2,1,0,-8]],
+      [83,[5,4,3,2,1,-7]],
+      [85,[6,5,4,3,2,-6]],
+      [90,[7,6,5,4,3,-5]]
+    ]},
+    ppg: { titre:'nombre but en PP', mode:'abs', ecarts:[2.00,0.50,null,-0.50,-2.00,-10.00], rangs:[
+      [75,[3.0,1.5,1.0,0.5,-1,-9]],
+      [77,[4.0,2.5,2.0,1.5,0,-8]],
+      [81,[5.0,3.5,3.0,2.5,1,-7]],
+      [83,[6.0,4.5,4.0,3.5,2,-6]],
+      [85,[7.0,5.5,5.0,4.5,3,-5]],
+      [90,[8.0,6.5,6.0,5.5,4,-4]]
+    ]},
+    pts: { titre:'points', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[23,20,17,15,9,-1]],
+      [77,[42,37,32,28,16,-1]],
+      [79,[63,56,48,41,24,-1]],
+      [81,[81,72,62,53,31,-1]],
+      [83,[97,86,74,63,37,-1]],
+      [85,[111,98,85,73,43,-1]],
+      [90,[117,104,90,77,45,-1]]
+    ]},
+    pmrang: { titre:'rang +/- dans le club', mode:'abs', ecarts:[0.35,0.20,null,-0.20,-0.35,-1.00], rangs:[
+      [75,[0.65,0.50,0.3,0.10,-0.05,-1]],
+      [77,[0.7,0.55,0.35,0.15,0,-1]],
+      [79,[0.75,0.6,0.4,0.2,0.05,-1]],
+      [81,[0.8,0.65,0.45,0.25,0.1,-1]],
+      [83,[0.85,0.7,0.5,0.3,0.15,-1]],
+      [85,[0.9,0.75,0.55,0.35,0.2,-1]],
+      [90,[0.94,0.8,0.6,0.4,0.25,-1]]
+    ]}
+  },
+  PLAYMAKER: {
+    assists: { titre:'passes accumulées', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[13,12,10,9,5,-1]],
+      [77,[24,21,18,16,9,-1]],
+      [79,[36,32,27,23,14,-1]],
+      [81,[46,41,35,30,18,-1]],
+      [83,[54,48,41,35,21,-1]],
+      [85,[62,55,47,40,24,-1]],
+      [86,[65,58,50,43,25,-1]],
+      [87,[65,58,50,43,25,0]],
+      [88,[65,58,50,43,25,1]],
+      [89,[65,58,50,43,25,2]],
+      [90,[65,58,50,43,25,3]]
+    ]},
+    pts: { titre:'points accumulées', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[20,18,15,13,8,-1]],
+      [77,[38,34,29,25,15,-1]],
+      [79,[56,50,43,37,22,-1]],
+      [81,[73,65,56,48,28,-1]],
+      [83,[88,78,67,57,34,-1]],
+      [85,[101,89,77,66,39,-1]],
+      [86,[106,94,81,69,41,-1]],
+      [87,[106,94,81,69,41,0]],
+      [88,[106,94,81,69,41,1]],
+      [89,[106,94,81,69,41,2]],
+      [90,[106,94,81,69,41,3]]
+    ]}
+  },
+  POWERFWD: {
+    goals: { titre:'but comptés', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[3,3,2,2,1,-1]],
+      [77,[11,10,8,7,4,-1]],
+      [79,[19,17,14,12,7,-1]],
+      [81,[24,21,18,16,9,-1]],
+      [83,[32,28,24,21,12,-1]],
+      [85,[37,33,28,24,14,-1]],
+      [86,[38,34,29,25,15,-1]],
+      [87,[38,34,29,25,15,0]],
+      [88,[38,34,29,25,15,1]],
+      [89,[38,34,29,25,15,2]],
+      [90,[38,34,29,25,15,3]]
+    ]},
+    ppg: { titre:'nombre but en PP', mode:'abs', ecarts:[1.50,0.50,null,-0.50,-1.50,-5.00], rangs:[
+      [75,[2,1,0,-0.5,-2,-5]],
+      [77,[2,1,1,0.0,-1,-5]],
+      [83,[3,2,2,1.0,0,-4]],
+      [90,[5,4,4,3.0,2,-2]]
+    ]},
+    hits: { titre:'mises en échecs complétées', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[34,30,26,23,13,-1]],
+      [77,[89,79,68,58,34,-1]],
+      [79,[129,114,99,85,50,-1]],
+      [81,[177,157,136,116,68,-1]],
+      [83,[219,194,168,143,84,-1]],
+      [85,[259,229,199,170,100,-1]],
+      [86,[301,266,231,197,116,-1]],
+      [87,[301,266,231,197,116,0]],
+      [88,[301,266,231,197,116,1]],
+      [89,[301,266,231,197,116,2]],
+      [90,[301,266,231,197,116,3]]
+    ]},
+    shots: { titre:'tirs au but effectués', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[29,26,22,19,11,-1]],
+      [77,[94,83,72,62,36,-1]],
+      [79,[138,122,106,91,53,-1]],
+      [81,[189,167,145,124,73,-1]],
+      [83,[221,196,170,145,85,-1]],
+      [85,[247,219,190,162,95,-1]],
+      [90,[267,236,205,175,103,-1]]
+    ]}
+  },
+  TWOWAY: {
+    pts: { titre:'points accumulés', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[16,14,12,11,6,-1]],
+      [77,[30,27,23,20,11,-1]],
+      [79,[45,40,34,29,16,-1]],
+      [81,[58,51,44,38,20,-1]],
+      [83,[68,60,52,45,24,-1]],
+      [85,[78,69,60,51,27,-1]],
+      [86,[82,73,63,54,29,-1]],
+      [87,[82,73,63,54,29,0]],
+      [88,[82,73,63,54,29,1]],
+      [89,[82,73,63,54,29,2]],
+      [90,[82,73,63,54,29,3]]
+    ]},
+    pmrang: { titre:'rang +/- dans le club', mode:'pct', ecarts:[150,125,100,75,50,0], rangs:[
+      [75,[0.45,0.375,0.3,0.225,0.15,-40]],
+      [77,[0.525,0.4375,0.35,0.2625,0.175,-40]],
+      [79,[0.6,0.5,0.4,0.3,0.2,-40]],
+      [81,[0.675,0.5625,0.45,0.3375,0.225,-40]],
+      [83,[0.75,0.625,0.5,0.375,0.25,-40]],
+      [85,[0.825,0.6875,0.55,0.4125,0.275,-40]],
+      [86,[0.9,0.75,0.6,0.45,0.3,-40]],
+      [87,[0.9,0.75,0.6,0.45,0.3,-39]],
+      [88,[0.9,0.75,0.6,0.45,0.3,-38]],
+      [89,[0.9,0.75,0.6,0.45,0.3,-37]],
+      [90,[0.9,0.75,0.6,0.45,0.3,-36]]
+    ]}
+  },
+  SNIPER: {
+    goals: { titre:'but accumulés', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[10,9,7,6,4,-1]],
+      [77,[19,17,14,12,7,-1]],
+      [79,[28,25,21,18,10,-1]],
+      [81,[36,32,27,23,13,-1]],
+      [83,[43,38,33,29,15,-1]],
+      [85,[50,44,38,33,18,-1]],
+      [86,[52,46,40,34,18,-1]],
+      [87,[52,46,40,34,18,0]],
+      [88,[52,46,40,34,18,1]],
+      [89,[52,46,40,34,18,2]],
+      [90,[52,46,40,34,18,3]]
+    ]},
+    gwg: { titre:'buts gagants', mode:'abs', ecarts:[1.50,0.50,null,-0.50,-1.50,-5.00], rangs:[
+      [75,[2,1,0,-1,-2,-5]],
+      [77,[3,2,1,1,-1,-4]],
+      [81,[4,3,2,2,1,-3]],
+      [83,[5,4,3,3,2,-2]],
+      [85,[6,5,4,4,3,-1]],
+      [90,[7,6,5,5,4,0]]
+    ]},
+    ppg: { titre:'nombre but en PP', mode:'abs', ecarts:[1.50,0.50,null,-0.50,-1.50,-10.00], rangs:[
+      [75,[2.50,1.50,1,0.50,-0.50,-9]],
+      [77,[3.50,2.50,2,1.50,0.50,-8]],
+      [81,[4.50,3.50,3,2.50,1.50,-7]],
+      [83,[5.50,4.50,4,3.50,2.50,-6]],
+      [85,[6.50,5.50,5,4.50,3.50,-5]],
+      [90,[7.50,6.50,6,5.50,4.50,-4]]
+    ]},
+    shots20: { titre:'tirs au but par tranche de 20 minutes', mode:'abs', ecarts:[0.20,0.10,null,-0.10,-0.20,-5], rangs:[
+      [75,[2.36,2.26,2.16,2.06,1.96,-2.84]],
+      [77,[2.47,2.37,2.27,2.17,2.07,-2.73]],
+      [79,[2.53,2.43,2.33,2.23,2.13,-2.67]],
+      [81,[2.59,2.49,2.39,2.29,2.19,-2.61]],
+      [83,[2.64,2.54,2.44,2.34,2.24,-2.56]],
+      [85,[2.68,2.58,2.48,2.38,2.28,-2.52]],
+      [90,[2.74,2.64,2.54,2.44,2.34,-2.46]]
+    ]}
+  },
+  GRINDER: {
+    hits20: { titre:'mises en échecs complétées', mode:'abs', ecarts:[0.40,0.20,null,-0.20,-0.40,-1], rangs:[
+      [75,[2.35,2.15,1.95,1.75,1.55,-1]],
+      [77,[2.55,2.35,2.15,1.95,1.75,-1]],
+      [79,[2.68,2.48,2.28,2.08,1.88,-1]],
+      [81,[2.78,2.58,2.38,2.18,1.98,-1]],
+      [83,[2.87,2.67,2.47,2.27,2.07,-1]],
+      [85,[2.91,2.71,2.51,2.31,2.11,-1]],
+      [86,[2.95,2.75,2.55,2.35,2.15,-1]],
+      [87,[2.95,2.75,2.55,2.35,2.15,0]],
+      [88,[2.95,2.75,2.55,2.35,2.15,1]],
+      [89,[2.95,2.75,2.55,2.35,2.15,2]],
+      [90,[2.95,2.75,2.55,2.35,2.15,3]]
+    ]}
+  },
+  DEFFWD: {
+    pmrang: { titre:'rang +/- dans le club', mode:'pct', ecarts:[150,125,100,75,50,0], rangs:[
+      [75,[0.45,0.375,0.3,0.225,0.15,-1]],
+      [77,[0.525,0.4375,0.35,0.2625,0.175,-1]],
+      [79,[0.6,0.5,0.4,0.3,0.2,-1]],
+      [81,[0.675,0.5625,0.45,0.3375,0.225,-1]],
+      [83,[0.75,0.625,0.5,0.375,0.25,-1]],
+      [85,[0.825,0.6875,0.55,0.4125,0.275,-1]],
+      [90,[0.9,0.75,0.6,0.45,0.3,-1]]
+    ]},
+    mp: { titre:'minutes jouées', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[263,232,202,172,91,0]],
+      [77,[612,542,471,400,212,0]],
+      [79,[963,852,741,630,333,0]],
+      [81,[1487,1316,1144,972,515,0]],
+      [85,[1663,1471,1279,1087,576,0]],
+      [86,[1838,1626,1414,1202,636,0]],
+      [87,[1838,1626,1414,1202,636,1]],
+      [88,[1838,1626,1414,1202,636,2]],
+      [89,[1838,1626,1414,1202,636,3]],
+      [90,[1838,1626,1414,1202,636,4]]
+    ]}
+  },
+  DEPTHFWD: {
+    mp: { titre:'minutes jouées', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[171,151,131.3,112,59,0]],
+      [77,[398,352,306.15,260,138,0]],
+      [79,[626,554,481.65,409,217,0]],
+      [81,[967,855,743.6,632,335,0]],
+      [85,[1081,956,831.35,707,374,0]],
+      [90,[1195,1057,919.1,781,414,0]]
+    ]}
+  },
+  DELITEQB: {
+    pts: { titre:'nombre points', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[16,14,12,11,6,-1]],
+      [77,[26,23,20,17,9,-1]],
+      [79,[38,34,29,25,14,-1]],
+      [81,[50,44,38,33,18,-1]],
+      [83,[55,49,42,36,19,-1]],
+      [85,[63,56,48,41,22,-1]],
+      [86,[68,60,52,45,24,-1]],
+      [87,[68,60,52,45,24,0]],
+      [88,[68,60,52,45,24,1]],
+      [89,[68,60,52,45,24,2]],
+      [90,[68,60,52,45,24,3]]
+    ]},
+    ppg: { titre:'PP', mode:'abs', ecarts:[2,1,null,-1,-2,-5], rangs:[
+      [77,[2,1,0,-1,-2,-5]],
+      [83,[3,2,1,0,-1,-5]],
+      [90,[4,3,2,1,0,-5]]
+    ]},
+    shots: { titre:'nombre tirs au but', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[46,41,35,30,16,-1]],
+      [77,[98,87,75,64,34,-1]],
+      [79,[143,127,110,94,50,-1]],
+      [81,[169,150,130,111,59,-1]],
+      [83,[189,167,145,124,66,-1]],
+      [85,[208,184,160,136,72,-1]],
+      [90,[228,202,175,149,79,-1]]
+    ]}
+  },
+  DELITESD: {
+    hits: { titre:'mises en échecs complétées', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[37,33,28,24,14,-1]],
+      [77,[94,83,72,62,36,-1]],
+      [79,[136,120,104,89,52,-1]],
+      [81,[186,165,143,122,72,-1]],
+      [83,[231,204,177,151,89,-1]],
+      [85,[272,241,209,178,105,-1]],
+      [86,[316,280,243,207,122,-1]],
+      [87,[316,280,243,207,122,0]],
+      [88,[316,280,243,207,122,1]],
+      [89,[316,280,243,207,122,2]],
+      [90,[316,280,243,207,122,3]]
+    ]},
+    pts: { titre:'points accumulés', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[12,11,9,8,5,-1]],
+      [77,[19,17,14,12,7,-1]],
+      [79,[28,25,21,18,11,-1]],
+      [81,[36,32,27,23,14,-1]],
+      [83,[39,35,30,26,15,-1]],
+      [85,[45,40,34,29,17,-1]],
+      [86,[49,43,37,32,19,-1]],
+      [87,[49,43,37,32,19,0]],
+      [88,[49,43,37,32,19,1]],
+      [89,[49,43,37,32,19,2]],
+      [90,[49,43,37,32,19,3]]
+    ]}
+  },
+  DOFF: {
+    shots20: { titre:'tirs au but par tranche de 20 minutes', mode:'abs', ecarts:[0.2,0.1,null,-0.1,-0.2,-5], rangs:[
+      [75,[1.71,1.61,1.51,1.41,1.31,-3.49]],
+      [77,[1.79,1.69,1.59,1.49,1.39,-3.41]],
+      [79,[1.83,1.73,1.63,1.53,1.43,-3.37]],
+      [81,[1.87,1.77,1.67,1.57,1.47,-3.33]],
+      [83,[1.91,1.81,1.71,1.61,1.51,-3.29]],
+      [85,[1.94,1.84,1.74,1.64,1.54,-3.26]],
+      [90,[1.98,1.88,1.78,1.68,1.58,-3.22]]
+    ]},
+    pts: { titre:'points accumulés', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[13,12,10,9,5,-1]],
+      [77,[21,19,16,14,8,-1]],
+      [79,[32,28,24,21,11,-1]],
+      [81,[41,36,31,27,14,-1]],
+      [83,[45,40,34,29,16,-1]],
+      [85,[51,45,39,34,18,-1]],
+      [86,[55,49,42,36,19,-1]],
+      [87,[55,49,42,36,19,0]],
+      [88,[55,49,42,36,19,1]],
+      [89,[55,49,42,36,19,2]],
+      [90,[55,49,42,36,19,3]]
+    ]},
+    mg: { titre:'minutes par match joués', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[12.0,11.0,9.5,8.0,4.0,-1.0]],
+      [77,[14.0,13.0,11.0,9.0,5.0,-1.0]],
+      [79,[18.0,16.0,14.0,12.0,6.0,-1.0]],
+      [81,[23.0,20.0,17.5,15.0,8.0,-1.0]],
+      [83,[25.0,22.0,19.5,17.0,9.0,-1.0]],
+      [85,[28.0,25.0,21.5,18.0,10.0,-1.0]],
+      [86,[31.0,27.0,23.5,20.0,11.0,-1.0]],
+      [87,[31.0,27.0,23.5,20.0,11.0,0.0]],
+      [88,[31.0,27.0,23.5,20.0,11.0,1.0]],
+      [89,[31.0,27.0,23.5,20.0,11.0,2.0]],
+      [90,[31.0,27.0,23.5,20.0,11.0,3.0]]
+    ]}
+  },
+  DDEF: {
+    pmrang: { titre:'rang +/- dans le club', mode:'pct', ecarts:[150,125,100,75,50,0], rangs:[
+      [75,[0.54,0.45,0.36,0.27,0.18,-1]],
+      [77,[0.63,0.525,0.42,0.315,0.21,-1]],
+      [79,[0.72,0.6,0.48,0.36,0.24,-1]],
+      [81,[0.81,0.675,0.54,0.405,0.27,-1]],
+      [83,[0.9,0.75,0.6,0.45,0.3,-1]],
+      [85,[0.94,0.825,0.66,0.495,0.33,-1]],
+      [90,[0.94,0.9,0.72,0.54,0.36,-1]]
+    ]},
+    hits20: { titre:'mises en échecs complétées par tranche de 20 minutes', mode:'abs', ecarts:[0.2,0.1,null,-0.1,-0.2,-1], rangs:[
+      [75,[1.70,1.60,1.5015,1.40,1.30,-1]],
+      [77,[1.86,1.76,1.6555,1.56,1.46,-1]],
+      [79,[1.96,1.86,1.7556,1.66,1.56,-1]],
+      [81,[2.03,1.93,1.8326,1.73,1.63,-1]],
+      [83,[2.10,2.00,1.9019,1.80,1.70,-1]],
+      [85,[2.13,2.03,1.9327,1.83,1.73,-1]],
+      [90,[2.16,2.06,1.9635,1.86,1.76,-1]]
+    ]},
+    mg: { titre:'minutes par matchs joués', mode:'pct', ecarts:[130,115,100,85,50,0], rangs:[
+      [75,[12,11,8.835,8,5,-1]],
+      [77,[14,12,10.23,9,6,-1]],
+      [79,[17,15,13.02,12,7,-1]],
+      [81,[22,19,16.275,14,9,-1]],
+      [83,[24,21,18.135,16,10,-1]],
+      [85,[26,23,19.995,17,10,-1]],
+      [86,[29,26,21.855,19,11,-1]],
+      [87,[29,26,21.855,19,11,0]],
+      [88,[29,26,21.855,19,11,1]],
+      [89,[29,26,21.855,19,11,2]],
+      [90,[29,26,21.855,19,11,3]]
+    ]}
+  },
+  DDEPTH: {
+    mp: { titre:'Minutes jouées', mode:'pct', ecarts:[130,115,100,85,45,0], rangs:[
+      [75,[384,340,295.425,251,133,-1]],
+      [77,[895,792,688.8375,586,310,-1]],
+      [79,[1409,1246,1083.7125,921,488,-1]],
+      [81,[2175,1924,1673.1,1422,753,-1]],
+      [85,[2432,2151,1870.5375,1590,842,-1]],
+      [90,[2688,2378,2067.975,1758,931,-1]]
+    ]}
+  },
+  STARTER: {
+    hs: { titre:'head stand', mode:'abs', ecarts:[1.5,0.5,null,-0.5,-1.5,-5], rangs:[
+      [77,[2.0,1.0,0.5,0.0,-1.0,-4.5]],
+      [81,[3.0,2.0,1.5,1.0,0.0,-3.5]],
+      [83,[4.0,3.0,2.5,2.0,1.0,-2.5]],
+      [85,[5.0,4.0,3.5,3.0,2.0,-1.5]],
+      [90,[6.0,5.0,4.5,4.0,3.0,-0.5]]
+    ]},
+    svpct: { titre:"pourcentage d'arrêt cumulé", mode:'pct', ecarts:[101,100.5,100,99.5,99,1], rangs:[
+      [75,[0.870,0.866,0.861,0.857,0.853,-1.000]],
+      [77,[0.881,0.877,0.872,0.868,0.863,-1.000]],
+      [79,[0.886,0.882,0.877,0.873,0.868,-1.000]],
+      [81,[0.889,0.885,0.880,0.876,0.871,-1.000]],
+      [83,[0.891,0.887,0.882,0.878,0.874,-1.000]],
+      [86,[0.896,0.892,0.887,0.883,0.878,-1.000]],
+      [90,[0.901,0.897,0.892,0.888,0.883,-1.000]]
+    ]},
+    qggp: { titre:'ratio nombre parties qualités par parties jouées', mode:'abs', ecarts:[0.10,0.05,null,-0.05,-0.10,-5.00], rangs:[
+      [75,[0.36,0.31,0.26,0.21,0.16,-4.74]],
+      [77,[0.40,0.35,0.30,0.25,0.20,-4.70]],
+      [79,[0.43,0.38,0.33,0.28,0.23,-4.67]],
+      [81,[0.48,0.43,0.38,0.33,0.28,-4.62]],
+      [83,[0.51,0.46,0.41,0.36,0.31,-4.59]],
+      [85,[0.53,0.48,0.43,0.38,0.33,-4.57]],
+      [90,[0.55,0.50,0.45,0.40,0.35,-4.55]]
+    ]},
+    ming: { titre:'parties jouées sur maximum de parties permises', mode:'abs', ecarts:[0.14,0.07,null,-0.07,-0.20,null], rangs:[
+      [90,[0.98,0.91,0.84,0.77,0.64,-1]]
+    ]}
+  },
+  BACKUP: {
+    mp: { titre:'minutes jouées', mode:'pct', ecarts:[200,150,100,75,50,1], rangs:[
+      [75,[199,149,99,74,50,-1]],
+      [77,[547,410,273,205,137,-1]],
+      [79,[991,743,495,372,248,-1]]
+    ]},
+    qggp: { titre:'nombre de parties de qualité', mode:'pct', ecarts:[200,150,100,75,50,1], rangs:[
+      [75,[0.5,0.4,0.26,0.2,0.1,-1]],
+      [77,[0.6,0.5,0.30,0.2,0.2,-1]],
+      [79,[0.7,0.5,0.33,0.2,0.2,-1]]
+    ]},
+    psv: { titre:'statistiques de persévérance', mode:'pct', ecarts:[102,101,100,99,98,1], rangs:[
+      [75,[883,875,866,857,849,-1]],
+      [77,[899,890,881,872,863,-1]],
+      [79,[908,899,890,881,872,-1]]
+    ]}
+  }
+};
+
+function seuilsMatrice(matCle, statCle, ov){
+  const m = MATRICES?.[matCle]?.[statCle];
+  if (!m) return null;
+  const o = Math.max(OV_MIN, Math.min(OV_MAX, ov));
+  for (const [ovMax, v] of m.rangs){ if (o <= ovMax) return v; }
+  return null;
+}
+
+/* ------------------ DONNÉES DE SECOURS ------------------
+   Alignement TORONTO extrait des fichiers officiels du simulateur FHL de la
+   ligue (USHL21.ros, recote Y22 — dépôt FHL-analyse, juillet 2026). Sert de
+   base hors-ligne et de fixture de tests. L'OV des patineurs est calculé au
+   centième par la formule calibrée du calculateur (voir ovDetaille) ; l'OV
+   des gardiens est une ESTIMATION (formule des gardiens non couverte),
+   remplacée par la valeur réelle dès la première actualisation ushl.ca. */
+const DATE_SECOURS = '10 juillet 2026';
+const SECOURS_ROSTER = [
+ {nom:'Barrett Hayton', po:'C', hd:'G', no:22, it:71,sp:86,st:81,en:87,du:81,di:77,sk:82,pa:80,pc:79,df:64,sc:79,ex:62,ld:43,ov:82,age:25,salaire:7250000,ct:3},
+ {nom:'Connor Bedard', po:'C', hd:'D', no:98, it:71,sp:75,st:69,en:79,du:76,di:77,sk:83,pa:79,pc:81,df:62,sc:84,ex:41,ld:45,ov:80,age:20,salaire:975000,ct:1},
+ {nom:'Evan Rodrigues', po:'C', hd:'D', no:17, it:75,sp:75,st:71,en:79,du:77,di:78,sk:74,pa:77,pc:75,df:66,sc:74,ex:72,ld:74,ov:78,age:32,salaire:800000,ct:1},
+ {nom:'Rutger McGroarty', po:'C', hd:'G', no:4, it:79,sp:73,st:77,en:75,du:81,di:69,sk:66,pa:71,pc:70,df:69,sc:75,ex:42,ld:43,ov:76,age:21,salaire:900000,ct:2},
+ {nom:'Filip Zadina', po:'AG', hd:'G', no:11, it:63,sp:89,st:76,en:92,du:80,di:84,sk:91,pa:78,pc:78,df:55,sc:87,ex:69,ld:59,ov:83,age:26,salaire:8500000,ct:1},
+ {nom:'Vassili Zaitsev', po:'AG', hd:'G', no:70, it:70,sp:85,st:65,en:89,du:80,di:86,sk:83,pa:76,pc:79,df:58,sc:81,ex:57,ld:47,ov:80,age:24,salaire:4750000,ct:1},
+ {nom:'Lawson Crouse', po:'AG', hd:'G', no:52, it:80,sp:74,st:79,en:79,du:79,di:72,sk:72,pa:73,pc:71,df:66,sc:74,ex:71,ld:53,ov:78,age:28,salaire:1900000,ct:1},
+ {nom:'Ondrej Palat', po:'AG', hd:'G', no:18, it:74,sp:76,st:70,en:74,du:72,di:74,sk:78,pa:73,pc:74,df:65,sc:75,ex:90,ld:83,ov:78,age:34,salaire:800000,ct:1},
+ {nom:'Filip Mesar', po:'AG', hd:'D', no:16, it:63,sp:78,st:64,en:71,du:70,di:75,sk:79,pa:74,pc:76,df:58,sc:72,ex:44,ld:41,ov:75,age:21,salaire:900000,ct:2},
+ {nom:'Tyson Jost', po:'AD', hd:'G', no:75, it:72,sp:82,st:73,en:81,du:81,di:91,sk:81,pa:81,pc:66,df:73,sc:81,ex:60,ld:64,ov:81,age:27,salaire:4750000,ct:1},
+ {nom:'Matvei Michkov', po:'AD', hd:'G', no:7, it:67,sp:73,st:62,en:80,du:65,di:72,sk:81,pa:81,pc:82,df:62,sc:84,ex:45,ld:43,ov:79,age:21,salaire:975000,ct:1},
+ {nom:'Ivan Miroshnichenko', po:'AD', hd:'D', no:13, it:69,sp:75,st:73,en:73,du:70,di:75,sk:75,pa:72,pc:74,df:59,sc:83,ex:47,ld:43,ov:77,age:21,salaire:900000,ct:2},
+ {nom:'Paul Cotter', po:'AD', hd:'G', no:45, it:78,sp:70,st:81,en:80,du:88,di:83,sk:74,pa:64,pc:67,df:72,sc:67,ex:64,ld:53,ov:76,age:26,salaire:850000,ct:1},
+ {nom:'Chris Bigras', po:'D', hd:'G', no:10, it:96,sp:79,st:85,en:99,du:92,di:94,sk:87,pa:78,pc:81,df:86,sc:53,ex:70,ld:84,ov:88,age:30,salaire:11000000,ct:1},
+ {nom:'Travis Sanheim', po:'D', hd:'G', no:6, it:88,sp:78,st:84,en:86,du:88,di:79,sk:85,pa:64,pc:76,df:84,sc:62,ex:71,ld:65,ov:84,age:29,salaire:9750000,ct:1},
+ {nom:'Darnell Nurse', po:'D', hd:'G', no:25, it:84,sp:77,st:85,en:92,du:83,di:72,sk:78,pa:75,pc:71,df:79,sc:69,ex:77,ld:84,ov:83,age:30,salaire:7250000,ct:1},
+ {nom:'Ryan Merkley', po:'D', hd:'D', no:42, it:55,sp:89,st:66,en:87,du:82,di:71,sk:89,pa:84,pc:79,df:53,sc:81,ex:61,ld:65,ov:83,age:25,salaire:7250000,ct:3},
+ {nom:'Rasmus Ristolainen', po:'D', hd:'D', no:55, it:76,sp:72,st:82,en:79,du:68,di:78,sk:72,pa:70,pc:71,df:77,sc:58,ex:80,ld:70,ov:78,age:31,salaire:1133000,ct:2},
+ {nom:'Eamon Powell', po:'D', hd:'D', no:43, it:61,sp:81,st:65,en:82,du:72,di:78,sk:77,pa:74,pc:75,df:68,sc:69,ex:52,ld:44,ov:77,age:23,salaire:1500000,ct:2},
+ {nom:'Lian Bichsel', po:'D', hd:'G', no:20, it:81,sp:73,st:83,en:76,du:78,di:61,sk:70,pa:63,pc:62,df:80,sc:54,ex:47,ld:34,ov:77,age:21,salaire:900000,ct:2},
+ {nom:'Rasmus Sandin', po:'D', hd:'G', no:37, it:64,sp:81,st:67,en:86,du:81,di:90,sk:78,pa:71,pc:70,df:73,sc:65,ex:55,ld:38,ov:76,age:25,salaire:1125000,ct:1},
+ {nom:'Guillaume Richard', po:'D', hd:'G', no:12, it:69,sp:72,st:75,en:72,du:76,di:74,sk:74,pa:65,pc:62,df:72,sc:61,ex:49,ld:40,ov:74,age:22,salaire:75000,ct:1},
+ {nom:'Chris Gibson', po:'G', hd:'G', no:41, it:84,sp:91,st:92,en:89,du:83,di:79,sk:91,pa:66,pc:88,df:null,sc:null,ex:86,ld:66,ov:82,age:33,salaire:6750000,ct:2, ovEstime:true},
+ {nom:'Kevin Lankinen', po:'G', hd:'G', no:32, it:85,sp:84,st:80,en:82,du:82,di:85,sk:87,pa:75,pc:80,df:null,sc:null,ex:60,ld:60,ov:79,age:30,salaire:888666,ct:2, ovEstime:true},
+ {nom:'Scott Wedgewood', po:'G', hd:'G', no:44, it:84,sp:84,st:82,en:80,du:78,di:82,sk:81,pa:73,pc:87,df:null,sc:null,ex:60,ld:60,ov:78,age:33,salaire:1700000,ct:1, ovEstime:true},
+];
+
+/* Saison de référence Y21 : aucun total Y21 n'est intégré pour TORONTO (les
+   compteurs des fichiers de la ligue sont remis à zéro au passage à la Y22).
+   L'archive XtraStats téléchargée à l'actualisation sert de référence Y21. */
+const SECOURS_Y21 = [];
+</script>
+<script>
+/* =====================================================================
+   MOTEUR : parseurs, profils, attentes, état
+   ===================================================================== */
+
+/* ---------- Utilitaires ---------- */
+function normaliserNom(s){
+  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[_\s]+/g,' ').trim().toLowerCase();
+}
+/* Échappe un texte avant interpolation dans du HTML (les noms viennent de pages
+   externes : défense en profondeur). */
+function echap(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function nombre(s){
+  if (s===null || s===undefined) return null;
+  const t = String(s).replace(/\u00a0/g,' ').replace(/[$\s]/g,'').replace(',','.');
+  if (t==='' || t==='NA' || t==='-') return null;
+  const n = Number(t);
+  return isFinite(n) ? n : null;
+}
+function fmtArgent(n){
+  if (n===null || n===undefined) return '—';
+  return n.toLocaleString('fr-CA').replace(/,/g,' ') + ' $';
+}
+/* Format compact pour les champs de re-signature : 8 500 000 → «8,5 M», 900 000 → «900 k». */
+function fmtArgentCourt(n){
+  if (n===null || n===undefined) return '—';
+  if (n >= 1000000){
+    const m = n/1000000;
+    return (Math.abs(m%1)<1e-9 ? String(m) : m.toFixed(1).replace('.',',')) + ' M';
+  }
+  return Math.round(n/1000) + ' k';
+}
+/* Interprète un montant saisi : «8,5 M», «8.5M», «900 k», «900000», «8 500 000». */
+function parseArgent(txt){
+  if (typeof txt !== 'string') return null;
+  let s = txt.trim().toLowerCase().replace(/\$/g,'').replace(/\u00a0/g,' ');
+  const mMatch = s.match(/^([\d.,\s]+)\s*m$/);
+  const kMatch = s.match(/^([\d.,\s]+)\s*k$/);
+  if (mMatch){ const v = parseFloat(mMatch[1].replace(/\s/g,'').replace(',','.')); return isFinite(v)?Math.round(v*1000000):null; }
+  if (kMatch){ const v = parseFloat(kMatch[1].replace(/\s/g,'').replace(',','.')); return isFinite(v)?Math.round(v*1000):null; }
+  const brut = parseFloat(s.replace(/\s/g,'').replace(',','.'));
+  return isFinite(brut) ? Math.round(brut) : null;
+}
+function fmtStat(cle, v){
+  if (v===null || v===undefined || !isFinite(v)) return '—';
+  const def = STATS_DEF[cle] || {};
+  if (def.decimales!==undefined) return v.toFixed(def.decimales);
+  const r = Math.round(v*10)/10;
+  const txt = (Math.abs(r % 1) < 1e-9) ? String(Math.round(r)) : r.toFixed(1);
+  return (def.signe && v>0 ? '+' : '') + txt;
+}
+
+/* ---------- Parseur : formation (TeamRosters.php) ----------
+   Repère la table dont l'en-tête contient OV, Age et Salary, puis lit
+   chaque rangée par position de colonne (en-têtes courts, sans chiffres). */
+function parseRoster(html, doc){
+  const d = doc || new DOMParser().parseFromString(html, 'text/html');
+  const tables = Array.from(d.querySelectorAll('table'));
+  const attendu = ['PO','HD','IN','SP','ST','EN','DU','DI','SK','PA','PC','DF','OF','EX','LD','OV'];
+  let joueurs = [];
+  for (const table of tables){
+    const lignes = Array.from(table.querySelectorAll('tr'));
+    if (!lignes.length) continue;
+    const entetes = Array.from(lignes[0].querySelectorAll('th,td'))
+      .map(c => c.textContent.trim().toUpperCase());
+    // en-têtes valides : courts et sans chiffres (leçon du projet gardiens)
+    const valides = entetes.every(h => h.length<=8 && !/\d/.test(h));
+    const score = attendu.filter(h => entetes.includes(h)).length;
+    if (!valides || score < 12 || !entetes.includes('OV') || !entetes.includes('AGE')) continue;
+    const idx = {};
+    entetes.forEach((h,i)=>{ idx[h]=i; });
+    const col = h => idx[h]!==undefined ? idx[h] : -1;
+    for (let i=1;i<lignes.length;i++){
+      const cel = Array.from(lignes[i].querySelectorAll('td,th')).map(c=>c.textContent.trim());
+      if (cel.length < entetes.length-2) continue;
+      const nomBrut = (cel[0]||'').replace(/\s+/g,' ').trim();
+      if (!nomBrut) continue; // rangée des moyennes
+      const j = {
+        nom: nomBrut.replace(/\\_/g,'_'),
+        po: cel[col('PO')]||'', hd: cel[col('HD')]||'',
+        it: nombre(cel[col('IN')]), sp: nombre(cel[col('SP')]), st: nombre(cel[col('ST')]),
+        en: nombre(cel[col('EN')]), du: nombre(cel[col('DU')]), di: nombre(cel[col('DI')]),
+        sk: nombre(cel[col('SK')]), pa: nombre(cel[col('PA')]), pc: nombre(cel[col('PC')]),
+        df: nombre(cel[col('DF')]), sc: nombre(cel[col('OF')]),
+        ex: nombre(cel[col('EX')]), ld: nombre(cel[col('LD')]),
+        ov: nombre(cel[col('OV')]), age: nombre(cel[col('AGE')]),
+        salaire: nombre(cel[col('SALARY')]), ct: nombre(cel[col('CT')])
+      };
+      if (j.ov===null || j.age===null) continue;
+      j.backup = /^backup/i.test(j.nom.replace(/[\s_]/g,'')) || /^back ?up/i.test(j.nom);
+      joueurs.push(j);
+    }
+    if (joueurs.length) break; // première table valide = formation PRO
+  }
+  return joueurs;
+}
+
+/* ---------- Parseur : pointage (TeamScoring.php) ----------
+   Table à en-têtes variables ; on mappe par nom d'en-tête reconnu. */
+const ENTETES_SCORING = {
+  gp:['GP','PJ','MJ'], goals:['G','B','BUTS'], assists:['A','P','PASSES'],
+  pts:['PTS','P','POINTS'], plusminus:['+/-','+-','DIFF'],
+  pim:['PIM','PUN','MIN PUN'], ppg:['PP','PPG','BAN'], gwg:['GW','GWG','BG'],
+  shots:['S','SH','SHOTS','T','TIRS'], shotpct:['PCT','%','S%','%T'],
+  w:['W','V'], l:['L','D'], t:['T','N','OTL'], avg:['AVG','GAA','MOY'],
+  svpct:['SV%','SVPCT','%A','SPCT'], so:['SO','BL'], qs:['QS','DQ'], hs:['HS']
+};
+function trouverColonne(entetes, candidats){
+  for (const c of candidats){
+    const i = entetes.indexOf(c);
+    if (i>=0) return i;
+  }
+  return -1;
+}
+function parseScoring(html, doc){
+  const d = doc || new DOMParser().parseFromString(html, 'text/html');
+  const tables = Array.from(d.querySelectorAll('table'));
+  const patineurs = [], gardiens = [];
+  for (const table of tables){
+    const lignes = Array.from(table.querySelectorAll('tr'));
+    if (lignes.length < 2) continue;
+    const entetes = Array.from(lignes[0].querySelectorAll('th,td'))
+      .map(c=>c.textContent.trim().toUpperCase());
+    const valides = entetes.every(h=>h.length<=10 && !/\d/.test(h));
+    if (!valides) continue;
+    const iGP = trouverColonne(entetes, ENTETES_SCORING.gp);
+    if (iGP < 0) continue;
+    const estGardien = trouverColonne(entetes, ENTETES_SCORING.svpct)>=0
+                    || trouverColonne(entetes, ENTETES_SCORING.avg)>=0;
+    const map = {};
+    for (const cle of Object.keys(ENTETES_SCORING)){
+      map[cle] = trouverColonne(entetes, ENTETES_SCORING[cle]);
+    }
+    // Attention : 'A' peut vouloir dire assists, 'P' points... on résout les conflits :
+    if (map.assists === map.pts && map.assists>=0){
+      // si 'P' a servi aux deux, points = colonne suivante d'assists si PTS absent
+      map.pts = trouverColonne(entetes, ['PTS','POINTS']);
+    }
+    for (let i=1;i<lignes.length;i++){
+      const cel = Array.from(lignes[i].querySelectorAll('td,th')).map(c=>c.textContent.trim());
+      if (!cel[0] || cel.length < 3) continue;
+      const rec = { nom: cel[0].replace(/\s+/g,' ').trim() };
+      for (const cle of Object.keys(map)){
+        if (map[cle]>=0 && map[cle]<cel.length) rec[cle] = nombre(cel[map[cle]]);
+      }
+      if (rec.gp===null || rec.gp===undefined) continue;
+      (estGardien ? gardiens : patineurs).push(rec);
+    }
+  }
+  return {patineurs, gardiens};
+}
+
+/* ---------- Parseur : XtraStats (texte préformaté) ----------
+   Colonnes fixes : Player Team POS GP G A P Sh PiM MP H ...
+   On filtre l'équipe demandée. */
+function parseXtra(texte, equipe){
+  const resultat = [];
+  const lignes = texte.split(/\r?\n/);
+  const re = new RegExp('^\\s*\\*?\\s*(.+?)\\s+' + equipe + '\\s+(C|LW|RW|D|G)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)');
+  for (const l of lignes){
+    // retirer la syntaxe markdown de liens éventuelle [Nom](url)
+    const propre = l.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const m = propre.match(re);
+    if (!m) continue;
+    resultat.push({
+      nom: m[1].trim(), pos: m[2],
+      gp: +m[3], goals: +m[4], assists: +m[5], pts: +m[6],
+      shots: +m[7], pim: +m[8], mp: +m[9], hits: +m[10]
+    });
+  }
+  return resultat;
+}
+
+/* ---------- Profils ---------- */
+function categorieAge(age){
+  if (age<=20) return 'junior';
+  if (age<=24) return 'prospect';
+  return 'pro';
+}
+function groupePosition(po){
+  if (po==='G') return 'gardiens';
+  if (po==='D') return 'defenseurs';
+  return 'avants';
+}
+function determinerProfil(j){
+  const grp = groupePosition(j.po);
+  // Règle 6.2.5 : au PRO, les gardiens sont Starter ou Backup selon l'overall, peu importe l'âge.
+  const cat = grp==='gardiens' ? 'pro' : categorieAge(j.age);
+  const liste = PROFILS[cat][grp];
+  const c = j;
+  for (const p of liste){
+    try { if (p.cond(c)) return {categorie:cat, groupe:grp, profil:p.id, mat:p.mat, stats:STATS_PAR_MATRICE[p.mat]}; }
+    catch(e){ /* cotes manquantes (gardiens) */ }
+  }
+  const dernier = liste[liste.length-1];
+  return {categorie:cat, groupe:grp, profil:dernier.id, mat:dernier.mat, stats:STATS_PAR_MATRICE[dernier.mat]};
+}
+
+/* ---------- Attentes ---------- */
+function chargerMatrices(){
+  try { return JSON.parse(localStorage.getItem(CLES_LS.matrices)) || {}; }
+  catch(e){ return {}; }
+}
+function sauverMatrices(m){ localStorage.setItem(CLES_LS.matrices, JSON.stringify(m)); }
+function chargerOverrides(){
+  try { return JSON.parse(localStorage.getItem(CLES_LS.overrides)) || {}; }
+  catch(e){ return {}; }
+}
+function sauverOverrides(o){ localStorage.setItem(CLES_LS.overrides, JSON.stringify(o)); }
+
+/* Seuils applicables à un joueur pour une statistique :
+   rangée personnalisée (Réglages) > matrice Y17 ; la surcharge individuelle
+   sur la carte du joueur remplace le seuil Mémorable seulement. */
+function seuilsPour(j, statCle, matricesPerso, overrides){
+  const matCle = j._profil.mat;
+  const o = Math.max(OV_MIN, Math.min(OV_MAX, j.ov));
+  let seuils = null, source = null;
+  const perso = matricesPerso?.[matCle]?.[statCle]?.[o];
+  if (Array.isArray(perso) && perso.length===6){
+    seuils = perso.map(x=> (x===null||x===''||x===undefined) ? null : Number(x));
+    source = 'personnalisée';
+  } else {
+    const d = seuilsMatrice(matCle, statCle, j.ov);
+    if (d){ seuils = d.slice(); source = 'Y17'; }
+  }
+  const ov = overrides?.[normaliserNom(j.nom)]?.[statCle];
+  if (ov!==undefined && ov!==null && ov!==''){
+    if (!seuils) seuils = [null,null,null,null,null,null];
+    seuils[0] = Number(ov);
+    source = source ? source + ' + Mémorable individuel' : 'Mémorable individuel';
+  }
+  return seuils ? {seuils, source} : {seuils:null, source:null};
+}
+
+/* Statut selon les seuils : un niveau est acquis si la valeur DÉPASSE
+   STRICTEMENT son seuil (tableau 18 et règle maison sur le Mémorable). */
+function statutSelonSeuils(v, seuils){
+  if (v===null || v===undefined || !isFinite(v)) return 'indef';
+  if (!seuils) return 'indef';
+  const [memo, exc, sat, corr, dec] = seuils;
+  if (memo!==null && v > memo) return 'memorable';
+  if ([exc,sat,corr,dec].every(x=>x===null)) return 'sousmemo'; // seule la cible Mémorable est connue
+  if (exc !==null && v > exc ) return 'excellente';
+  if (sat !==null && v > sat ) return 'satisfaisante';
+  if (corr!==null && v > corr) return 'correcte';
+  if (dec !==null && v > dec ) return 'decevante';
+  return 'oublier';
+}
+
+/* Évaluation d'une stat : les totaux courants sont évalués tels quels.
+   Aucune projection sur la saison — le facteur karma de la ligue rend
+   toute extrapolation trompeuse. */
+function evaluerStat(statCle, valeur, seuils){
+  const statut = statutSelonSeuils(valeur, seuils);
+  const mods = MODS_PAR_STATUT[statut] ?? null;
+  return {valeur, seuils, statut, mods};
+}
+
+/* Valeur (dérivée au besoin) d'une statistique évaluée. ctx : {pmRangs, limites, matchsEquipe} */
+function valeurStat(j, prod, statCle, ctx){
+  if (!prod) return null;
+  const ok = v => (v===null||v===undefined) ? null : v;
+  switch (statCle){
+    case 'shotpct': return (ok(prod.goals)!==null && prod.shots) ? prod.goals/prod.shots*100 : null;
+    case 'hits20':  return (ok(prod.hits)!==null && prod.mp)     ? prod.hits /(prod.mp/20)   : null;
+    case 'shots20': return (ok(prod.shots)!==null && prod.mp)    ? prod.shots/(prod.mp/20)   : null;
+    case 'mg':      return (ok(prod.mp)!==null && prod.gp)       ? prod.mp/prod.gp           : null;
+    case 'qggp':    return (ok(prod.qs)!==null && prod.gp)       ? prod.qs/prod.gp           : null;
+    case 'psv':     return (ok(prod.svpct)!==null)               ? prod.svpct*1000           : null;
+    case 'pmrang': { const r = ctx?.pmRangs?.get(normaliserNom(j.nom)); return r ? r.prop : null; }
+    case 'ming': {
+      const lim = ctx?.limites?.get(normaliserNom(j.nom));
+      if (!lim || ok(prod.gp)===null) return null;
+      return prod.gp / lim;
+    }
+    default: return ok(prod[statCle]);
+  }
+}
+
+/* Rang du différentiel dans le club (tableau 20 : «son rang est déterminé puis
+   converti en pourcentage»). Calculé automatiquement dès que la production de la
+   saison fournit les +/- des patineurs du club (GP > 0).
+   Retourne nom → {prop (1 = meilleur, 0 = dernier), rang, total, pm}. */
+function calculerPmRangs(patineurs){
+  const ps = (patineurs||[]).filter(p=>p.gp>0 && p.plusminus!==undefined && p.plusminus!==null);
+  const tri = [...ps].sort((a,b)=>b.plusminus-a.plusminus);
+  const n = tri.length, map = new Map();
+  tri.forEach((p,i)=>{
+    map.set(normaliserNom(p.nom), {prop: n>1 ? (n-1-i)/(n-1) : 1, rang: i+1, total: n, pm: p.plusminus});
+  });
+  return map;
+}
+
+/* ModS estimé : moyenne des modificateurs des statistiques évaluées (tableau 18). */
+function modsEstime(evals){
+  const avec = evals.filter(e=>e.ev && e.ev.mods!==null && e.ev.mods!==undefined);
+  if (!avec.length) return null;
+  return Math.round(avec.reduce((a,e)=>a+e.ev.mods,0)/avec.length);
+}
+
+/* ---------- État global ---------- */
+const ETAT = {
+  roster: SECOURS_ROSTER.map(j=>({...j})),
+  scoring: {patineurs:[], gardiens:[]},
+  xtra: SECOURS_Y21.map(x=>({...x})),
+  xtraEstY21: true,
+  xtraDate: null,
+  modeY21: false,   // mode vérification : jamais conservé, retour à la saison courante à l'ouverture
+  fiche: 'TORONTO 0-0-0',
+  source: 'données intégrées (' + DATE_SECOURS + ')',
+  filtreProg: 'tous',
+  rechercheAlign: '',  // filtre texte de la table d'alignement
+  limites: new Map()   // limites d'utilisation des gardiens (gestiongardiens)
+};
+function matchsEquipe(){
+  const m = ETAT.fiche.match(/(\d+)-(\d+)-(\d+)/);
+  return m ? Number(m[1])+Number(m[2])+Number(m[3]) : 0;
+}
+function preparerRoster(){
+  for (const j of ETAT.roster){ j._profil = determinerProfil(j); }
+}
+</script>
+<script>
+/* =====================================================================
+   COUCHE RÉSEAU : relais anti-CORS avec relais «collant» et cache local
+   ===================================================================== */
+function litCache(){ try{ return JSON.parse(localStorage.getItem(CLES_LS.cache))||{}; }catch(e){ return {}; } }
+function ecritCache(c){ try{ localStorage.setItem(CLES_LS.cache, JSON.stringify(c)); }catch(e){ /* quota */ } }
+
+async function chercherViaProxy(url, {timeout=15000}={}){
+  const prefere = Number(localStorage.getItem(CLES_LS.proxy));
+  const ordre = [...CONFIG.proxys.keys()];
+  if (!isNaN(prefere) && ordre.includes(prefere)){
+    ordre.splice(ordre.indexOf(prefere),1); ordre.unshift(prefere);
+  }
+  let derniereErreur = null;
+  for (const i of ordre){
+    const cible = CONFIG.proxys[i](url);
+    try{
+      const ctl = new AbortController();
+      const t = setTimeout(()=>ctl.abort(), timeout);
+      const rep = await fetch(cible, {signal:ctl.signal});
+      clearTimeout(t);
+      if (!rep.ok) throw new Error('HTTP '+rep.status);
+      const texte = await rep.text();
+      if (texte.length < 500) throw new Error('réponse trop courte');
+      localStorage.setItem(CLES_LS.proxy, String(i));
+      return texte;
+    }catch(e){
+      derniereErreur = e;
+      await new Promise(r=>setTimeout(r, 400)); // espacement anti rate-limit
+    }
+  }
+  throw derniereErreur || new Error('aucun relais disponible');
+}
+
+/* Le serveur de la ligue conserve une session par visiteur : la première
+   requête vers une page d'équipe retombe parfois sur la DERNIÈRE équipe
+   consultée (par soi ou par un autre usager du même relais anti-CORS).
+   Chaque page reçue est donc validée : la fiche du club («ÉQUIPE W-L-T»)
+   doit s'y trouver. Page d'une autre équipe → réessai (la session s'aligne
+   dès la requête suivante), jamais de mise en cache d'une page invalide,
+   et purge du cache s'il a déjà été pollué. */
+function validerPageEquipe(texte){ return extraireFiche(texte) !== null; }
+
+async function chercherSource(cle, valider){
+  const cache = litCache();
+  const maintenant = Date.now();
+  const c = cache[cle];
+  if (c && (maintenant - c.t) < CONFIG.ttl[cle]){
+    if (!valider || valider(c.v)) return {texte:c.v, duCache:true};
+    delete cache[cle]; ecritCache(cache); // cache pollué par une autre équipe
+  }
+  let texte = null, essais = 0;
+  for (essais = 1; essais <= 3; essais++){
+    const t = await chercherViaProxy(CONFIG.urls[cle]);
+    if (!valider || valider(t)){ texte = t; break; }
+    await new Promise(r=>setTimeout(r, 600)); // la session du serveur s'aligne au 2e essai
+  }
+  if (texte === null) throw new Error('le serveur de la ligue sert une autre équipe (session des relais) — réessaie dans un instant');
+  cache[cle] = {t:maintenant, v:texte};
+  ecritCache(cache);
+  return {texte, duCache:false, essais};
+}
+
+/* Limites d'utilisation des gardiens : JSON public du projet gestiongardiens
+   (GitHub Pages autorise les requêtes directes, pas besoin de relais). */
+async function chargerLimites(forcer){
+  const cache = litCache();
+  const c = cache.limites;
+  if (!forcer && c && (Date.now()-c.t) < CONFIG.ttl.limites){
+    ETAT.limites = new Map(c.v.map(x=>[normaliserNom(x.nom), x.limite]));
+    return ETAT.limites.size;
+  }
+  const rep = await fetch(CONFIG.urlLimites, {cache:'no-store'});
+  if (!rep.ok) throw new Error('HTTP '+rep.status);
+  const data = await rep.json();
+  const liste = Array.isArray(data?.limites) ? data.limites : [];
+  ETAT.limites = new Map(liste.map(x=>[normaliserNom(x.nom), x.limite]));
+  cache.limites = {t:Date.now(), v:liste};
+  ecritCache(cache);
+  return ETAT.limites.size;
+}
+
+/* XtraStats : archive de la saison précédente ou saison en cours ?
+   Si le club n'a disputé aucun match, c'est forcément l'archive (Y21).
+   Sinon, on compare le maximum de parties jouées des patineurs du club
+   dans XtraStats au nombre de matchs de l'équipe : s'il le dépasse
+   nettement, la page est encore l'archive de la saison complète. */
+function xtraEstArchive(xtra, matchsEq){
+  if (!matchsEq || matchsEq <= 0) return true;
+  const maxGP = Math.max(0, ...xtra.map(p => p.gp || 0));
+  return maxGP > matchsEq + 2;
+}
+
+function extraireFiche(html){
+  const m = html.match(new RegExp(CONFIG.equipe + '\\s+(\\d+)-(\\d+)-(\\d+)'));
+  return m ? `${CONFIG.equipe} ${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+async function actualiserTout(){
+  const btn = document.getElementById('btnMaj');
+  const etat = document.getElementById('etatMaj');
+  btn.disabled = true;
+  const rapport = [];
+  // 1) Formation
+  etat.textContent = 'formation…';
+  try{
+    const {texte, essais} = await chercherSource('roster', validerPageEquipe);
+    const joueurs = parseRoster(texte);
+    if (joueurs.length >= 10){
+      ETAT.roster = joueurs; preparerRoster();
+      const f = extraireFiche(texte); if (f) ETAT.fiche = f;
+      ETAT.source = 'ushl.ca — ' + new Date().toLocaleString('fr-CA');
+      rapport.push('formation ✓ ('+joueurs.length+' joueurs'+((essais||1)>1?', bonne équipe obtenue après réessai':'')+')');
+    } else rapport.push('formation : table introuvable, données locales conservées');
+  }catch(e){ rapport.push('formation ✗ ('+e.message+')'); }
+  // 2) Pointage
+  etat.textContent = 'production…';
+  try{
+    const {texte, essais} = await chercherSource('scoring', validerPageEquipe);
+    const s = parseScoring(texte);
+    if ((essais||1) > 1) rapport.push('production : bonne équipe obtenue après réessai');
+    if (s.patineurs.length || s.gardiens.length){
+      ETAT.scoring = s;
+      rapport.push('production ✓ ('+s.patineurs.length+' patineurs)');
+    } else {
+      const f = extraireFiche(texte);
+      if (f) ETAT.fiche = f;
+      rapport.push('production : aucun match disputé pour le moment');
+    }
+  }catch(e){ rapport.push('production ✗ ('+e.message+')'); }
+  // 3) XtraStats
+  etat.textContent = 'XtraStats…';
+  try{
+    const {texte} = await chercherSource('xtra');
+    const x = parseXtra(texte, CONFIG.equipe);
+    if (x.length >= 5){
+      ETAT.xtra = x;
+      const mDate = texte.match(/As of\s+([0-9\/]+)/i);
+      ETAT.xtraDate = mDate ? mDate[1] : null;
+      ETAT.xtraEstY21 = xtraEstArchive(x, matchsEquipe());
+      if (!ETAT.xtraEstY21 && !ETAT.scoring.patineurs.length){
+        rapport.push('XtraStats ✓ ('+x.length+' patineurs — sert de production, TeamScoring indisponible)');
+      } else {
+        rapport.push('XtraStats ✓ ('+x.length+' patineurs'+(ETAT.xtraEstY21?', archive Y21':'')+')');
+      }
+    } else rapport.push('XtraStats : rien trouvé pour '+CONFIG.equipe);
+  }catch(e){ rapport.push('XtraStats ✗ ('+e.message+')'); }
+  // 4) Limites d'utilisation des gardiens (GitHub Pages : requête directe permise)
+  etat.textContent = 'limites gardiens…';
+  try{
+    const n = await chargerLimites(true);
+    rapport.push(n>0 ? 'limites gardiens ✓ ('+n+')' : 'limites gardiens : fichier vide');
+  }catch(e){ rapport.push('limites gardiens ✗ ('+e.message+')'); }
+
+  etat.textContent = rapport.join(' · ');
+  btn.disabled = false;
+  toutRendre();
+}
+
+/* =====================================================================
+   FUSION DES DONNÉES PAR JOUEUR
+   ===================================================================== */
+function indexParNom(liste){
+  const m = new Map();
+  for (const x of liste) m.set(normaliserNom(x.nom), x);
+  return m;
+}
+/* production consolidée d'un joueur : scoring courant + xtra (MEÉ, MIN) */
+function productionDe(j){
+  const cle = normaliserNom(j.nom);
+  if (ETAT.modeY21){
+    // Mode vérification : totaux complets de la Y21, aucune projection.
+    // Source : données intégrées, sinon l'archive XtraStats téléchargée à l'actualisation.
+    const sourceY21 = SECOURS_Y21.length ? SECOURS_Y21 : (ETAT.xtraEstY21 ? ETAT.xtra : []);
+    const y = indexParNom(sourceY21).get(cle) || null;
+    if (!y) return null;
+    const out = {
+      gp: y.gp ?? null, goals: y.goals ?? null, assists: y.assists ?? null, pts: y.pts ?? null,
+      shots: y.shots ?? null, pim: y.pim ?? null, mp: y.mp ?? null, hits: y.hits ?? null,
+      plusminus: null, ppg: null, gwg: null, w: null, avg: null, svpct: null, qs: null, hs: null,
+      _reference: false, _xtraSource: false, _modeY21: true
+    };
+    out.shotpct = (out.goals!==null && out.shots) ? (out.goals/out.shots*100) : null;
+    return out;
+  }
+  const sc = indexParNom(j.po==='G' ? ETAT.scoring.gardiens : ETAT.scoring.patineurs).get(cle) || null;
+  const xt = indexParNom(ETAT.xtra).get(cle) || null;
+  const saisonCourante = !!sc;
+  const base = sc || (ETAT.xtraEstY21 ? null : xt);
+  const ref = (!saisonCourante && ETAT.xtraEstY21) ? xt : null; // Y21 comme référence
+  const src = base || ref;
+  if (!src) return null;
+  const xtraCommeSource = !sc && base === xt;
+  const out = {
+    gp: src.gp ?? null,
+    goals: src.goals ?? null, assists: src.assists ?? null, pts: src.pts ?? null,
+    plusminus: (sc && sc.plusminus!==undefined) ? sc.plusminus : null,
+    ppg: sc?.ppg ?? null, gwg: sc?.gwg ?? null,
+    shots: src.shots ?? null, pim: src.pim ?? null,
+    mp: (sc?.mp ?? xt?.mp) ?? null,
+    hits: (xt?.hits ?? sc?.hits) ?? null,
+    w: sc?.w ?? null, avg: sc?.avg ?? null, svpct: sc?.svpct ?? null, qs: sc?.qs ?? null,
+    hs: sc?.hs ?? sc?.so ?? null,
+    _reference: !saisonCourante && !!ref,
+    _xtraSource: xtraCommeSource
+  };
+  if (out.svpct!==null && out.svpct!==undefined && out.svpct>1) out.svpct = out.svpct/100; // «90.5» → 0.905
+  out.shotpct = (out.goals!==null && out.shots) ? (out.goals/out.shots*100) : null;
+  return out;
+}
+
+/* =====================================================================
+   RENDU
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+function flash(msg){
+  const f = $('#flash'); f.textContent = msg; f.classList.add('visible');
+  setTimeout(()=>f.classList.remove('visible'), 2600);
+}
+
+/* ---------- Charte salariale des re-signatures (CHARTE OFFICIELLE Y22, cap 104 M) ----------
+   Salaires MINIMUMS en dollars, indexés sur l'OV (74- à 87+). Quatre chartes selon
+   le statut, avec sous-colonnes d'âge pour les UFA. Valeurs transcrites de la charte
+   fournie (exprimées en milliers dans le document : 700 $ = 700 000 $).
+   - RFA (6.4.1)          : 28 ans et -, durée 1 à 7 ans, une seule colonne
+   - UFA (6.4.2)          : durée 1 à 4 ans, colonnes «34-» et «35+»
+   - UFA Ronde 2 (6.4.3)  : durée 1 à 2 ans, colonnes «34-» et «35+»
+   - Sans contrat (6.4.4) : durée 1 an, colonnes «34-» et «35+»
+   Index de ligne : 0→OV 74 et moins, 1→75, … 12→OV 87 et plus (clamp aux bornes). */
+const CHARTE_OV_MIN = 74, CHARTE_OV_MAX = 87;
+const CHARTE_SALAIRE = {
+  //                 OV:  74-    75     76     77     78     79     80     81     82      83      84      85      86      87+
+  RFA:              [  700,  775,  825,  950, 2250, 3750, 5750, 7500, 8750, 10500, 12250, 13750, 15500, 17500],
+  UFA_34:           [  900,  950, 1150, 1500, 2250, 3500, 5000, 6250, 7500,  8750, 10250, 12000, 13500, 15500],
+  UFA_35:           [  900,  900, 1000, 1100, 1750, 2250, 3250, 4250, 5000,  6000,  7250,  8750, 10000, 11500],
+  UFAR2_34:         [  900,  900,  950, 1150, 1500, 2500, 3500, 5000, 6250,  7500,  8750, 10250, 12000, 13500],
+  UFAR2_35:         [  900,  900,  900, 1000, 1100, 1750, 2250, 3250, 4250,  5000,  6000,  7250,  8750, 10000],
+  SANS_34:          [  900,  900,  900,  950, 1150, 1500, 2500, 3500, 5000,  6250,  7500,  8750, 10250, 12000],
+  SANS_35:          [  900,  900,  900, 1000, 1000, 1100, 1750, 2250, 3250,  4250,  5000,  6000,  7250,  9000]
+};
+
+/* Statut de re-signature déduit de l'âge (règle simple retenue) :
+   28 ans et moins → RFA ; 29 ans et plus → UFA. Les variantes Ronde 2 et Sans
+   contrat existent dans la charte et peuvent être choisies manuellement. */
+function statutResignature(j){ return j.age <= 28 ? 'RFA' : 'UFA'; }
+
+/* Clé de charte à partir du statut et de l'âge (tranche 34- / 35+ pour les UFA). */
+function cleCharte(statut, age){
+  if (statut === 'RFA') return 'RFA';
+  const tranche = age >= 35 ? '35' : '34';
+  if (statut === 'UFA')   return 'UFA_' + tranche;
+  if (statut === 'UFAR2') return 'UFAR2_' + tranche;
+  if (statut === 'SANS')  return 'SANS_' + tranche;
+  return 'UFA_' + tranche;
+}
+
+/* Échelon OV effectif :
+   - règle RFA : le DG peut donner 1 à 7 saisons, mais chaque année au-delà de 3
+     monte l'échelon de 1 (4 ans → OV+1, … 7 ans → OV+4);
+   - règle des gardiens : un gardien signe UN ÉCHELON PLUS BAS que son OV (−1),
+     peu importe le statut. Les deux règles se cumulent. */
+function echelonEffectif(ov, statut, duree, po){
+  const bonusRFA = (statut === 'RFA' && (duree || 1) > 3) ? (duree - 3) : 0;
+  const malusGardien = (po === 'G') ? -1 : 0;
+  return Math.round(ov) + bonusRFA + malusGardien;
+}
+
+/* Salaire minimum de la charte pour un OV, un statut, un âge, une durée et une
+   position (en dollars). La durée n'influence que les RFA; la position ne joue
+   que pour les gardiens (échelon −1). */
+function salaireMinimum(ov, statut, age, duree, po){
+  const cle = cleCharte(statut, age);
+  const table = CHARTE_SALAIRE[cle];
+  if (!table) return null;
+  const ovEff = echelonEffectif(ov, statut, duree, po);
+  const i = Math.max(0, Math.min(CHARTE_OV_MAX - CHARTE_OV_MIN, ovEff - CHARTE_OV_MIN));
+  return table[i] * 1000;
+}
+
+/* Éligibilité : seuls les joueurs dont le contrat est échu (0 an) se prolongent.
+   Les joueurs déjà sous contrat ne sont pas prolongeables. */
+function peutProlonger(j){ return !j.backup && j.ct === 0; }
+
+/* Durée maximale permise par la charte selon le statut. */
+function dureeMaxCharte(statut){
+  return statut==='RFA' ? 7 : statut==='UFA' ? 4 : statut==='UFAR2' ? 2 : 1;
+}
+
+/* État des re-signatures (persisté). Clé = nom normalisé du joueur →
+   {statut, salaire}. Le joueur re-signé est réintégré au calcul de la masse. */
+function litResignatures(){
+  try { return JSON.parse(localStorage.getItem(CLES_LS.resign) || '{}'); }
+  catch { return {}; }
+}
+function ecritResignatures(o){ localStorage.setItem(CLES_LS.resign, JSON.stringify(o)); }
+
+/* Plafond salarial de la ligue (Y22). */
+const PLAFOND = 104000000;
+
+/* Masse salariale pour un état de prolongations donné.
+   Exclut les backups et les joueurs sans contrat actif (0 an) NON prolongés.
+   Un joueur prolongé compte au plafond avec son salaire de prolongation. */
+function calculerMasse(resignMap){
+  const r = resignMap || litResignatures();
+  const actifs = ETAT.roster.filter(j=>!j.backup);
+  let masse = 0;
+  for (const j of actifs){
+    const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null; // prolongation valable pour les contrats échus seulement
+    if (sig) masse += sig.salaire;
+    else if (j.ct > 0) masse += (j.salaire || 0);
+  }
+  return {masse, cap: PLAFOND};
+}
+
+/* ---------- Alignement ---------- */
+let triAlign = {col:'ov', desc:true};
+function rendreAlignement(){
+  $('#ficheEquipe').textContent = ETAT.fiche;
+  $('#sourceInfo').textContent = ETAT.source;
+  const actifs = ETAT.roster.filter(j=>!j.backup);
+  const resign = litResignatures();
+  const {masse, cap} = calculerMasse(resign);
+  const nbResignes = actifs.filter(j=>peutProlonger(j) && resign[normaliserNom(j.nom)]).length;
+  const moyOV = actifs.length ? (actifs.reduce((s,j)=>s+j.ov,0)/actifs.length) : 0;
+  const vedettes = actifs.filter(j=>j.ov>=80).length;
+  const expirants = actifs.filter(j=>j.ct===1).length;
+  const sansContrat = actifs.filter(j=>j.ct===0 && !resign[normaliserNom(j.nom)]).length; // ct=0 non prolongés, exclus du plafond
+  $('#alignSommaire').innerHTML = `
+    <div class="stat-carte ${masse>cap?'alerte':''}">
+      <div class="lbl">Masse salariale</div>
+      <div class="val">${fmtArgent(masse)}</div>
+      <div class="det">plafond ${fmtArgent(cap)} · marge ${fmtArgent(cap-masse)}${sansContrat?` · ${sansContrat} contrat${sansContrat>1?'s':''} à 0 an exclu${sansContrat>1?'s':''}`:''}${nbResignes?` · ${nbResignes} prolongé${nbResignes>1?'s':''}`:''}</div>
+    </div>
+    <div class="stat-carte"><div class="lbl">Joueurs actifs</div><div class="val">${actifs.length}</div>
+      <div class="det">${actifs.filter(j=>j.po!=='G'&&j.po!=='D').length} av · ${actifs.filter(j=>j.po==='D').length} déf · ${actifs.filter(j=>j.po==='G').length} gar</div></div>
+    <div class="stat-carte orange"><div class="lbl">Vedettes (80+ OV)</div><div class="val">${vedettes}</div>
+      <div class="det">OV moyen ${moyOV.toFixed(1)}</div></div>
+    <div class="stat-carte"><div class="lbl">Contrats qui expirent</div><div class="val">${expirants}</div>
+      <div class="det">CT = 1 an</div></div>`;
+
+  const cols = [
+    ['nom','Nom'],['no','No'],['po','PO'],['age','Âge'],['it','IT'],['sp','SP'],['st','ST'],['en','EN'],
+    ['du','DU'],['di','DI'],['sk','SK'],['pa','PA'],['pc','PC'],['df','DF'],['sc','SC'],
+    ['ex','EX'],['ld','LD'],['ov','OV'],['profil','Profil'],['salaire','Salaire'],['ct','CT'],
+    ['resign','Re-signer']
+  ];
+  const filtre = normaliserNom(ETAT.rechercheAlign || '');
+  const liste = [...ETAT.roster].filter(j => !filtre
+      || normaliserNom(j.nom).includes(filtre)
+      || normaliserNom(j.po).includes(filtre)
+      || normaliserNom(j._profil.profil).includes(filtre)
+    ).sort((a,b)=>{
+    const c = triAlign.col;
+    const va = c==='profil' ? a._profil.profil : a[c];
+    const vb = c==='profil' ? b._profil.profil : b[c];
+    if (va===vb) return 0;
+    if (va===null||va===undefined) return 1;
+    if (vb===null||vb===undefined) return -1;
+    const r = (typeof va==='string') ? va.localeCompare(vb) : va-vb;
+    return triAlign.desc ? -r : r;
+  });
+  let html = '<thead><tr>' + cols.map(([c,l])=>
+    c==='resign'
+      ? `<th class="col-resign">${l}</th>`
+      : `<th data-col="${c}" class="${triAlign.col===c?'tri-actif':''}">${l}${triAlign.col===c?(triAlign.desc?' ▾':' ▴'):''}</th>`).join('') + '</tr></thead><tbody>';
+  for (const j of liste){
+    const p = j._profil;
+    const badge = j.po==='G' ? 'g' : (j.po==='D' ? 'd' : '');
+    const tag = j.po==='G' ? 'g-tag' : (j.po==='D' ? 'd-tag' : '');
+    html += `<tr class="${j.backup?'backup':''}${peutProlonger(j) && resign[normaliserNom(j.nom)]?' resigne':''}">`;
+    html += `<td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>`;
+    html += `<td>${j.no??'—'}</td><td>${j.po}</td><td>${j.age}</td>`;
+    for (const c of ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld']){
+      const v = j[c];
+      const cls = v===null?'':(v>=85?'cote-elite':(v>=78?'cote-forte':''));
+      html += `<td class="${cls}">${v===null?'—':v}</td>`;
+    }
+    const ovAff = j.ovEstime ? `<span title="OV estimé (formule des gardiens non publiée) — remplacé par la valeur réelle à la première actualisation ushl.ca">~${j.ov}</span>` : j.ov;
+    html += `<td class="${j.ov>=82?'cote-elite':(j.ov>=78?'cote-forte':'')}"><strong>${ovAff}</strong></td>`;
+    html += `<td style="text-align:left"><span class="profil-tag ${tag}">${p.profil}</span></td>`;
+    const eligible = peutProlonger(j);
+    const rSig = eligible ? resign[normaliserNom(j.nom)] : null; // prolongation valable pour les contrats échus seulement
+    const salAff = rSig ? rSig.salaire : j.salaire;
+    html += `<td>${fmtArgent(salAff)}${rSig?' <span class="resign-tag">prolongé</span>':''}</td>`;
+    const dSig = rSig ? (rSig.duree || dureeMaxCharte(rSig.statut)) : null;
+    html += `<td>${rSig ? dSig + ' an' + (dSig>1?'s':'') : (j.ct??'—')}</td>`;
+    // Colonne Contrat : bouton seulement pour un contrat échu (0 an) — règle de la ligue
+    if (!eligible){
+      html += `<td class="col-resign">—</td>`;
+    } else {
+      html += `<td class="col-resign">`
+        + `<button class="btn-prolong ${rSig?'actif':''}" data-nom="${j.nom.replace(/"/g,'&quot;')}">`
+        + `${rSig?'✓ Prolongé':'Prolonger'}</button></td>`;
+    }
+    html += `</tr>`;
+  }
+  html += '</tbody>';
+  const table = $('#tableAlignement');
+  table.innerHTML = html;
+  table.querySelectorAll('th[data-col]').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const c = th.dataset.col;
+      if (triAlign.col===c) triAlign.desc = !triAlign.desc;
+      else { triAlign.col = c; triAlign.desc = true; }
+      rendreAlignement();
+    });
+  });
+  attacherProlongations(table);
+}
+
+/* Le bouton de la colonne Contrat ouvre la fenêtre «Prolongation de contrat». */
+function attacherProlongations(table){
+  table.querySelectorAll('button.btn-prolong[data-nom]').forEach(b=>{
+    b.addEventListener('click', ()=> ouvrirProlongation(b.dataset.nom));
+  });
+}
+
+/* ---------- Fenêtre «Prolongation de contrat» ---------- */
+const LIBELLES_STATUT = {RFA:'RFA (28 ans et -)', UFA:'UFA', UFAR2:'UFA Ronde 2', SANS:'Joueur sans contrat'};
+
+function modalProlongation(){
+  let el = document.getElementById('modalProlong');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'modalProlong';
+  el.className = 'modal-fond';
+  el.hidden = true;
+  el.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mpTitre">
+      <div class="modal-tete">
+        <h3 id="mpTitre">Prolongation de contrat</h3>
+        <button class="modal-x" id="mpX" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="modal-joueur">
+        <span class="mj-nom" id="mpNom"></span>
+        <span class="mj-meta" id="mpMeta"></span>
+      </div>
+      <div class="modal-grille">
+        <label>Statut
+          <select id="mpStatut">
+            <option value="RFA">RFA</option>
+            <option value="UFA">UFA</option>
+            <option value="UFAR2">UFA Ronde 2</option>
+            <option value="SANS">Sans contrat</option>
+          </select>
+        </label>
+        <label>Durée
+          <select id="mpDuree"></select>
+        </label>
+        <label class="large">Salaire annuel
+          <input type="text" id="mpSalaire" inputmode="numeric">
+        </label>
+      </div>
+      <div class="modal-min" id="mpMin"></div>
+      <div class="modal-impact" id="mpImpact"></div>
+      <div class="modal-actions">
+        <button class="danger" id="mpRetirer">Retirer la prolongation</button>
+        <button class="secondaire" id="mpAnnuler">Annuler</button>
+        <button id="mpOk">Prolonger</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e=>{ if (e.target === el) fermerProlongation(); });
+  el.querySelector('#mpX').addEventListener('click', fermerProlongation);
+  el.querySelector('#mpAnnuler').addEventListener('click', fermerProlongation);
+  document.addEventListener('keydown', e=>{ if (e.key === 'Escape' && !el.hidden) fermerProlongation(); });
+  return el;
+}
+
+function fermerProlongation(){
+  const el = document.getElementById('modalProlong');
+  if (el) el.hidden = true;
+}
+
+/* Remplit la liste des durées permises pour un statut (charte : RFA 7, UFA 4, R2 2, sans contrat 1). */
+function remplirDurees(sel, statut, choisie){
+  const max = dureeMaxCharte(statut);
+  sel.innerHTML = '';
+  for (let d = 1; d <= max; d++){
+    const o = document.createElement('option');
+    o.value = String(d);
+    o.textContent = d + (d > 1 ? ' ans' : ' an');
+    sel.appendChild(o);
+  }
+  sel.value = String(Math.min(choisie || 1, max));
+}
+
+function ouvrirProlongation(nom){
+  const j = ETAT.roster.find(x => x.nom === nom);
+  if (!j || !peutProlonger(j)) return; // seuls les contrats échus (0 an) se prolongent
+  const el = modalProlongation();
+  const cle = normaliserNom(j.nom);
+  const dejaSigne = litResignatures()[cle] || null;
+
+  const selStatut = el.querySelector('#mpStatut');
+  const selDuree  = el.querySelector('#mpDuree');
+  const inSal     = el.querySelector('#mpSalaire');
+  const divMin    = el.querySelector('#mpMin');
+  const divImpact = el.querySelector('#mpImpact');
+  const btnRetirer= el.querySelector('#mpRetirer');
+  const btnOk     = el.querySelector('#mpOk');
+
+  el.querySelector('#mpNom').textContent = j.nom;
+  el.querySelector('#mpMeta').textContent =
+    `${j.po} · ${j.age} ans · OV ${j.ov} · ${j._profil.profil} · salaire actuel ${fmtArgent(j.salaire)} · CT ${j.ct ?? '—'}`;
+
+  const statutInit = dejaSigne ? dejaSigne.statut : statutResignature(j);
+  selStatut.value = statutInit;
+  // durée proposée : celle déjà signée, sinon 3 ans pour un RFA (dernier palier
+  // sans hausse d'échelon), sinon la durée max du statut
+  const dureeInit = dejaSigne ? dejaSigne.duree : (statutInit === 'RFA' ? 3 : dureeMaxCharte(statutInit));
+  remplirDurees(selDuree, statutInit, dureeInit);
+  const minInit = salaireMinimum(j.ov, statutInit, j.age, +selDuree.value, j.po);
+  inSal.value = fmtArgent(dejaSigne ? dejaSigne.salaire : minInit);
+
+  btnRetirer.style.display = dejaSigne ? '' : 'none';
+  btnOk.textContent = dejaSigne ? 'Mettre à jour' : 'Prolonger';
+
+  // Rafraîchit minimum, bornage du salaire et aperçu d'impact sur la masse.
+  const rafraichir = (clamper)=>{
+    const st = selStatut.value;
+    const duree = +selDuree.value;
+    const min = salaireMinimum(j.ov, st, j.age, duree, j.po);
+    const ovEff = echelonEffectif(j.ov, st, duree, j.po);
+    let noteEch = '';
+    if (ovEff !== j.ov){
+      const parts = [];
+      if (st === 'RFA' && duree > 3) parts.push(`+${duree-3} : ${duree} ans de RFA (+1 par année après 3)`);
+      if (j.po === 'G') parts.push('−1 : gardien (un échelon plus bas)');
+      noteEch = ` · échelon <b>OV ${Math.max(CHARTE_OV_MIN, Math.min(ovEff, CHARTE_OV_MAX))}${ovEff>CHARTE_OV_MAX?'+':(ovEff<CHARTE_OV_MIN?'-':'')}</b> (${parts.join(' · ')})`;
+    }
+    divMin.innerHTML = `Minimum de la charte (${LIBELLES_STATUT[st]}, OV ${j.ov}, ${j.age} ans) : <b>${fmtArgent(min)}</b>${noteEch}`;
+    let sal = parseArgent(inSal.value);
+    if (clamper || sal === null || sal < min){
+      if (sal === null || sal < min) sal = min;
+      inSal.value = fmtArgent(sal);
+    }
+    // aperçu : masse recalculée en incluant cette prolongation
+    const simule = {...litResignatures()};
+    simule[cle] = {statut: st, duree: +selDuree.value, salaire: sal};
+    const {masse, cap} = calculerMasse(simule);
+    const depasse = masse > cap;
+    divImpact.classList.toggle('alerte', depasse);
+    divImpact.innerHTML =
+      `Masse projetée : <b>${fmtArgent(masse)}</b><br>`
+      + `Plafond ${fmtArgent(cap)} · ${depasse ? 'dépassement de <b>'+fmtArgent(masse-cap)+'</b>' : 'marge <b>'+fmtArgent(cap-masse)+'</b>'}<br>`
+      + `Contrat : ${selDuree.value} an${+selDuree.value>1?'s':''} × ${fmtArgent(sal)}`;
+    return sal;
+  };
+
+  selStatut.onchange = ()=>{ remplirDurees(selDuree, selStatut.value, +selDuree.value); rafraichir(true); };
+  selDuree.onchange  = ()=> rafraichir(true);   // le minimum dépend de la durée (règle RFA)
+  inSal.onchange     = ()=> rafraichir(true);
+  inSal.onblur       = ()=> rafraichir(true);
+
+  btnOk.onclick = ()=>{
+    const sal = rafraichir(true);
+    const r = litResignatures();
+    r[cle] = {statut: selStatut.value, duree: +selDuree.value, salaire: sal};
+    ecritResignatures(r);
+    fermerProlongation();
+    rendreAlignement();
+  };
+  btnRetirer.onclick = ()=>{
+    const r = litResignatures();
+    delete r[cle];
+    ecritResignatures(r);
+    fermerProlongation();
+    rendreAlignement();
+  };
+
+  rafraichir(false);
+  el.hidden = false;
+  inSal.focus();
+}
+
+/* ---------- Export CSV de l'alignement ----------
+   Séparateur point-virgule et BOM UTF-8 : s'ouvre proprement dans Excel
+   configuré en français. Retourne la chaîne (testable), le bouton la télécharge. */
+function exporterCSV(){
+  const entetes = ['Nom','No','PO','HD','Age','IT','SP','ST','EN','DU','DI','SK','PA','PC','DF','SC','EX','LD','OV','Profil','Salaire','CT'];
+  const champ = v => {
+    const t = (v===null||v===undefined) ? '' : String(v);
+    return /[;"\n]/.test(t) ? '"'+t.replace(/"/g,'""')+'"' : t;
+  };
+  const lignes = [entetes.join(';')];
+  for (const j of ETAT.roster){
+    if (j.backup) continue;
+    lignes.push([j.nom, j.no, j.po, j.hd, j.age, j.it, j.sp, j.st, j.en, j.du, j.di, j.sk,
+      j.pa, j.pc, j.df, j.sc, j.ex, j.ld, j.ov, j._profil.profil, j.salaire, j.ct]
+      .map(champ).join(';'));
+  }
+  return lignes.join('\n');
+}
+function telechargerCSV(){
+  const blob = new Blob(['﻿' + exporterCSV()], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = CONFIG.equipe.toLowerCase() + '-alignement.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  flash('Alignement exporté en CSV');
+}
+
+/* ---------- Projection du plafond salarial ----------
+   Pour chaque saison à venir : masse engagée par les contrats en cours
+   (un contrat CT = N couvre les N prochaines saisons) et, pour les contrats
+   échus, par la prolongation enregistrée (salaire × durée). Retourne des
+   rangées {saison, engages, masse, marge, expirants} — pur et testable. */
+function projectionPlafond(nbSaisons, resignMap){
+  const r = resignMap || litResignatures();
+  const contrats = ETAT.roster.filter(j=>!j.backup).map(j=>{
+    const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
+    return sig ? {nom:j.nom, salaire:sig.salaire, annees:sig.duree || dureeMaxCharte(sig.statut), prolonge:true}
+               : {nom:j.nom, salaire:j.salaire || 0, annees:j.ct || 0, prolonge:false};
+  });
+  const rangees = [];
+  for (let k = 0; k < (nbSaisons || 5); k++){
+    const couverts = contrats.filter(c=>c.annees > k);
+    const masse = couverts.reduce((s,c)=>s+c.salaire, 0);
+    rangees.push({
+      saison: 'Y' + (22 + k),
+      engages: couverts.length,
+      masse,
+      marge: PLAFOND - masse,
+      expirants: contrats.filter(c=>c.annees === k+1).map(c=>c.nom)
+    });
+  }
+  return rangees;
+}
+function rendrePlafond(){
+  const rangees = projectionPlafond(5);
+  const y0 = rangees[0];
+  document.getElementById('plafondSommaire').innerHTML = `
+    <div class="stat-carte ${y0.masse>PLAFOND?'alerte':''}">
+      <div class="lbl">Masse ${y0.saison}</div><div class="val">${fmtArgent(y0.masse)}</div>
+      <div class="det">marge ${fmtArgent(y0.marge)}</div></div>
+    <div class="stat-carte"><div class="lbl">Sous contrat ${y0.saison}</div><div class="val">${y0.engages}</div>
+      <div class="det">joueurs couverts par un contrat</div></div>
+    <div class="stat-carte orange"><div class="lbl">Expirent après ${y0.saison}</div><div class="val">${y0.expirants.length}</div>
+      <div class="det">à re-signer à la charte ou à remplacer</div></div>`;
+  let html = `<thead><tr><th>Saison</th><th>Sous contrat</th><th>Masse engagée</th><th>Marge sous 104 M$</th>
+    <th style="text-align:left">Contrats qui expirent à la fin de la saison</th></tr></thead><tbody>`;
+  for (const rg of rangees){
+    html += `<tr class="${rg.masse>PLAFOND?'depasse':''}">
+      <td><strong>${rg.saison}</strong></td><td>${rg.engages}</td>
+      <td>${fmtArgent(rg.masse)}</td><td>${fmtArgent(rg.marge)}</td>
+      <td class="exp">${rg.expirants.length ? rg.expirants.map(echap).join(', ') : '—'}</td></tr>`;
+  }
+  document.getElementById('tablePlafond').innerHTML = html + '</tbody>';
+}
+
+/* ---------- Comparateur de joueurs ---------- */
+const COTES_COMPARATEUR = [['it','IT — intensité'],['sp','SP — vitesse'],['st','ST — force'],
+  ['en','EN — endurance'],['du','DU — robustesse'],['di','DI — discipline'],['sk','SK — coup de patin'],
+  ['pa','PA — passes'],['pc','PC — contrôle'],['df','DF — jeu défensif'],['sc','SC — tir (OF)'],
+  ['ex','EX — expérience'],['ld','LD — leadership'],['ov','OV — overall']];
+function peuplerComparateur(){
+  const selA = document.getElementById('compA'), selB = document.getElementById('compB');
+  if (!selA) return;
+  const joueurs = ETAT.roster.filter(j=>!j.backup);
+  const options = joueurs.map(j=>`<option value="${echap(j.nom)}">${echap(j.nom)} (${j.po} · OV ${j.ov})</option>`).join('');
+  const avA = selA.value, avB = selB.value;
+  selA.innerHTML = options; selB.innerHTML = options;
+  const tri = [...joueurs].sort((a,b)=>b.ov-a.ov);
+  selA.value = joueurs.some(j=>j.nom===avA) ? avA : tri[0]?.nom;
+  selB.value = joueurs.some(j=>j.nom===avB) ? avB : (tri[1]?.nom ?? tri[0]?.nom);
+}
+function rendreComparateur(){
+  const zone = document.getElementById('compZone');
+  if (!zone) return;
+  const a = ETAT.roster.find(j=>j.nom===document.getElementById('compA').value);
+  const b = ETAT.roster.find(j=>j.nom===document.getElementById('compB').value);
+  if (!a || !b){ zone.innerHTML = ''; return; }
+  const tete = (j, cote) => `
+    <div class="comp-tete ${cote}">
+      <span class="nom">${echap(j.nom)}</span>
+      <span class="comp-ov"${j.ovEstime?' title="OV estimé"':''}>${j.ovEstime?'~':''}${j.ov}</span>
+      <span class="meta">${j.po} · ${j.age} ans · ${j._profil.profil}</span>
+      <span class="meta">${fmtArgent(j.salaire)} · CT ${j.ct ?? '—'} · ModA ${fmtMod(modA(j))}</span>
+    </div>`;
+  let html = `<div class="comp-grille">${tete(a,'gauche')}<div class="comp-mid">·</div>${tete(b,'droite')}`;
+  for (const [cle, libelle] of COTES_COMPARATEUR){
+    const va = a[cle], vb = b[cle];
+    const gagneA = va!==null && (vb===null || va>=vb), gagneB = vb!==null && (va===null || vb>=va);
+    const largeur = v => v===null ? 0 : Math.max(4, Math.min(100, (v-30)/(99-30)*100));
+    html += `
+      <div class="comp-val droite ${va!==null&&vb!==null&&va>vb?'gagne':''}">
+        <div class="comp-barre gauche"><div class="r ${gagneA?'gagne':''}" style="width:${largeur(va).toFixed(1)}%"></div></div>
+        <b>${va??'—'}</b>
+      </div>
+      <div class="comp-mid">${libelle}</div>
+      <div class="comp-val ${va!==null&&vb!==null&&vb>va?'gagne':''}">
+        <b>${vb??'—'}</b>
+        <div class="comp-barre droite"><div class="r ${gagneB?'gagne':''}" style="width:${largeur(vb).toFixed(1)}%"></div></div>
+      </div>`;
+  }
+  const statsDe = j => (j._profil.stats||[]).map(cle=>STATS_DEF[cle].nom).join(', ');
+  html += `<div class="comp-pied">
+    Statistiques évaluées — ${echap(a.nom)} (${a._profil.profil}) : ${statsDe(a)}<br>
+    Statistiques évaluées — ${echap(b.nom)} (${b._profil.profil}) : ${statsDe(b)}</div></div>`;
+  zone.innerHTML = html;
+}
+
+/* ---------- Production ---------- */
+function rendreProduction(){
+  const enCours = ETAT.scoring.patineurs.length > 0;
+  const lignes = [];
+  for (const j of ETAT.roster){
+    if (j.backup) continue;
+    const p = productionDe(j);
+    lignes.push({j, p});
+  }
+  const avecDonnees = lignes.filter(l=>l.p);
+  $('#prodSous').textContent = enCours
+    ? 'Pointage de la saison actuelle (TeamScoring.php) enrichi de XtraStats (minutes, mises en échec)'
+    : 'Aucun match Y22 pour le moment — la référence Y21 (archive XtraStats) s\'affiche après la première actualisation depuis ushl.ca';
+  const totPts = avecDonnees.reduce((s,l)=>s+(l.p.pts||0),0);
+  const totB = avecDonnees.reduce((s,l)=>s+(l.p.goals||0),0);
+  const totH = avecDonnees.reduce((s,l)=>s+(l.p.hits||0),0);
+  $('#prodSommaire').innerHTML = `
+    <div class="stat-carte"><div class="lbl">${enCours?'Saison en cours':'Référence Y21'}</div>
+      <div class="val">${ETAT.fiche}</div><div class="det">${enCours?'données en direct':'en attente des premiers matchs Y22'}</div></div>
+    <div class="stat-carte"><div class="lbl">Buts</div><div class="val">${totB}</div></div>
+    <div class="stat-carte"><div class="lbl">Points</div><div class="val">${totPts}</div></div>
+    <div class="stat-carte orange"><div class="lbl">Mises en échec</div><div class="val">${totH}</div></div>`;
+
+  let html = `<thead><tr><th>Nom</th><th>PJ</th><th>B</th><th>P</th><th>PTS</th><th>+/-</th>
+    <th>BAN</th><th>BG</th><th>T</th><th>%T</th><th>MEÉ</th><th>MIN</th><th>MIN/PJ</th></tr></thead><tbody>`;
+  avecDonnees.sort((a,b)=>(b.p.pts||0)-(a.p.pts||0));
+  for (const {j,p} of avecDonnees){
+    if (j.po==='G') continue;
+    const badge = j.po==='D' ? 'd' : '';
+    html += `<tr><td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>
+      <td>${p.gp??'—'}</td><td>${p.goals??'—'}</td><td>${p.assists??'—'}</td>
+      <td><strong>${p.pts??'—'}</strong></td><td>${fmtStat('plusminus',p.plusminus)}</td>
+      <td>${p.ppg??'—'}</td><td>${p.gwg??'—'}</td><td>${p.shots??'—'}</td>
+      <td>${p.shotpct!==null?p.shotpct.toFixed(1):'—'}</td>
+      <td>${p.hits??'—'}</td><td>${p.mp??'—'}</td>
+      <td>${(p.mp&&p.gp)?(p.mp/p.gp).toFixed(1):'—'}</td></tr>`;
+  }
+  // gardiens
+  const gardiens = lignes.filter(l=>l.j.po==='G');
+  if (gardiens.length){
+    html += `<tr><td colspan="13" style="text-align:left;color:var(--txt-faint);background:var(--bleu-nuit);
+      text-transform:uppercase;font-size:.65rem;letter-spacing:1px">Gardiens ${enCours?'(saison en cours)':'(matchs Y21)'}</td></tr>`;
+    for (const {j,p} of gardiens){
+      html += `<tr><td><span class="pos-badge g">G</span>${echap(j.nom)}</td>
+        <td>${p?.gp??'—'}</td><td colspan="3">V ${p?.w??'—'} · MOY ${p?.avg!==null&&p?.avg!==undefined?p.avg:'—'} · %A ${p?.svpct??'—'}</td>
+        <td colspan="8" style="text-align:left;color:var(--txt-faint)">DQ ${p?.qs??'—'} · MIN ${p?.mp??'—'}</td></tr>`;
+    }
+  }
+  html += '</tbody>';
+  $('#tableProduction').innerHTML = html;
+}
+
+/* ---------- Progression ---------- */
+const BADGES_NIVEAUX = {
+  memorable:'<span class="badge-etat memorable">Mémorable</span>',
+  excellente:'<span class="badge-etat excellente">Excellente</span>',
+  satisfaisante:'<span class="badge-etat satisfaisante">Satisfaisante</span>',
+  correcte:'<span class="badge-etat correcte">Correcte</span>',
+  decevante:'<span class="badge-etat decevante">Décevante</span>',
+  oublier:'<span class="badge-etat oublier">À oublier</span>',
+  sousmemo:'<span class="badge-etat sousmemo">Sous le Mémorable</span>',
+  indef:'<span class="badge-etat indef">à définir</span>'
+};
+function fmtMod(v){ return v===null||v===undefined ? '—' : (v>0?'+':'')+v; }
+function rendreProgression(){
+  const matrices = chargerMatrices();
+  const overrides = chargerOverrides();
+  const grille = $('#progGrille');
+  const ctx = {
+    pmRangs: calculerPmRangs(ETAT.scoring.patineurs),
+    limites: ETAT.limites
+  };
+  let html = '';
+  for (const j of ETAT.roster){
+    if (j.backup) continue;
+    const p = j._profil;
+    const prod = productionDe(j);
+    const grpF = j.po==='G'?'g':(j.po==='D'?'d':'av');
+    const evals = p.stats.map(cle=>{
+      const brute = valeurStat(j, prod, cle, ctx);
+      const s = seuilsPour(j, cle, matrices, overrides);
+      const ev = evaluerStat(cle, brute, s.seuils);
+      return {cle, ev, source:s.source};
+    });
+    const nbMemo = evals.filter(e=>e.ev.statut==='memorable').length;
+    const nbDiff = evals.filter(e=>e.ev.statut==='decevante'||e.ev.statut==='oublier').length;
+    const f = ETAT.filtreProg;
+    if (f==='av'&&grpF!=='av') continue;
+    if (f==='d'&&grpF!=='d') continue;
+    if (f==='g'&&grpF!=='g') continue;
+    if (f==='memo'&&nbMemo===0) continue;
+    if (f==='difficulte'&&nbDiff===0) continue;
+
+    const mods = modsEstime(evals);
+    const four = fourchetteRecote(j, mods);
+    const tag = j.po==='G' ? 'g-tag' : (j.po==='D' ? 'd-tag' : '');
+    html += `<div class="joueur-carte" data-grp="${grpF}">
+      <div class="jc-tete">
+        <span class="jc-nom">${echap(j.nom)}</span>
+        <span class="profil-tag ${tag}">${p.profil}</span>
+        <span class="jc-meta">${j.age} ans · OV ${j.ov}<br>${fmtArgent(j.salaire)} · ${j.ct} an${j.ct>1?'s':''}</span>
+      </div>
+      <div class="jc-mods">ModA ${fmtMod(modA(j))} · ModS estimé <b>${fmtMod(mods)}</b>${mods!==null?` · Recote probable des cotes-clés : <b>${fmtMod(four.min)}</b> à <b>${fmtMod(four.max)}</b>`:''}</div>
+      <div class="jc-corps">`;
+    for (const {cle, ev} of evals){
+      const def = STATS_DEF[cle];
+      const cleJoueur = normaliserNom(j.nom);
+      const seuils = ev.seuils;
+      const memoSeuil = seuils ? seuils[0] : null;
+      // barre : échelle linéaire de Décevante (10 %) à Mémorable (90 %)
+      let pctBarre = 0, jalons = '';
+      if (seuils && ev.valeur!==null && isFinite(ev.valeur)
+          && memoSeuil!==null && seuils[4]!==null && memoSeuil>seuils[4]){
+        const dec = seuils[4], memo = memoSeuil;
+        const pos = v => 10 + 80*Math.max(0, Math.min(1, (v-dec)/(memo-dec)));
+        pctBarre = pos(ev.valeur);
+        jalons = [1,2,3].map(i=> seuils[i]!==null?`<div class="jalon" style="left:${pos(seuils[i]).toFixed(1)}%" title="${NIVEAUX[i].nom} : ${fmtStat(cle,seuils[i])}"></div>`:'').join('')
+               + `<div class="jalon memo" style="left:90%" title="Mémorable : ${fmtStat(cle,memo)}"></div>`;
+      } else if (ev.valeur!==null && memoSeuil!==null && memoSeuil>0){
+        pctBarre = Math.max(0, Math.min(100, ev.valeur/memoSeuil*90));
+        jalons = `<div class="jalon memo" style="left:90%" title="Mémorable : ${fmtStat(cle,memoSeuil)}"></div>`;
+      }
+      let detailRang = '';
+      if (cle==='pmrang'){
+        const r = ctx.pmRangs.get(normaliserNom(j.nom));
+        if (r) detailRang = ` <span class="att">(${r.rang}ᵉ/${r.total} · ${r.pm>0?'+':''}${r.pm})</span>`;
+      }
+      html += `<div class="stat-ligne">
+        <div class="sl-tete">
+          <span class="nom-stat">${def.nom}${BADGES_NIVEAUX[ev.statut]||''}</span>
+          <span class="valeurs">
+            ${ev.valeur!==null?fmtStat(cle,ev.valeur):'—'}${detailRang}
+            <span class="att"> / Mémorable </span>
+            <input class="att-input" type="number" step="any" data-joueur="${cleJoueur}" data-stat="${cle}"
+              value="${memoSeuil!==null?memoSeuil:''}" placeholder="—" title="Seuil Mémorable ${def.nom} — modifiable (à dépasser strictement)">
+          </span>
+        </div>
+        <div class="barre">
+          ${jalons}
+          <div class="rempli ${ev.statut==='memorable'?'memo':''}" style="width:${pctBarre.toFixed(1)}%"></div>
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+    if (prod && prod._modeY21){
+      html += `<div class="jc-note">Mode vérification Y21 : totaux de la saison complète évalués tels quels. Buts gagnants, buts en avantage numérique, différentiel et production des gardiens ne figurent pas dans les données Y21 intégrées.</div>`;
+    }
+    if (prod && prod._reference && !ETAT.modeY21){
+      html += `<div class="jc-note">Repère : saison Y21 complète (aucun match Y22 encore disputé). Les barres reflètent la Y21 face aux seuils actuels.</div>`;
+    }
+    if (prod && prod._xtraSource && !ETAT.modeY21){
+      html += `<div class="jc-note">Production tirée de XtraStats${ETAT.xtraDate?` (en date du ${ETAT.xtraDate})`:''} — TeamScoring indisponible. Les buts gagnants, buts en avantage numérique et le différentiel n'y figurent pas.</div>`;
+    }
+    if (!prod){
+      html += `<div class="jc-note">Aucune production disponible pour ce joueur.</div>`;
+    }
+    html += `</div>`;
+  }
+  grille.innerHTML = html || '<p style="color:var(--txt-faint)">Aucun joueur ne correspond au filtre.</p>';
+  grille.querySelectorAll('.att-input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const o = chargerOverrides();
+      const cleJ = inp.dataset.joueur, cleS = inp.dataset.stat;
+      if (!o[cleJ]) o[cleJ] = {};
+      if (inp.value==='') delete o[cleJ][cleS];
+      else o[cleJ][cleS] = Number(inp.value);
+      sauverOverrides(o);
+      flash('Cible Mémorable enregistrée');
+      rendreProgression();
+    });
+  });
+}
+
+/* ---------- Réglages : éditeur de matrices (rangées OV 73-90 × six degrés) ---------- */
+function rendreSelectMatrice(){
+  const sel = $('#selMatrice');
+  sel.innerHTML = Object.keys(MATRICES).map(k=>`<option value="${k}">${NOMS_MATRICES[k]||k}</option>`).join('');
+  rendreSelectStat();
+}
+function rendreSelectStat(){
+  const matCle = $('#selMatrice').value;
+  const sel = $('#selStat');
+  const stats = Object.keys(MATRICES[matCle]||{});
+  sel.innerHTML = stats.map(s=>`<option value="${s}">${STATS_DEF[s].nom} — «${MATRICES[matCle][s].titre}»</option>`).join('');
+}
+function rendreMatrice(){
+  const matCle = $('#selMatrice').value;
+  const statCle = $('#selStat').value;
+  const table = $('#tableMatrice');
+  const def = MATRICES?.[matCle]?.[statCle];
+  if (!def){ table.innerHTML = ''; return; }
+  const perso = chargerMatrices();
+  let html = '<thead><tr><th>Overall</th>' + NIVEAUX.map(n=>`<th>${n.nom}</th>`).join('') + '</tr></thead><tbody>';
+  const ovFin = def.rangs[def.rangs.length-1][0];
+  for (let ov=OV_MIN; ov<=ovFin; ov++){
+    const p = perso?.[matCle]?.[statCle]?.[ov];
+    const base = Array.isArray(p) && p.length===6 ? p : seuilsMatrice(matCle, statCle, ov);
+    const modif = Array.isArray(p) && p.length===6;
+    html += `<tr><td${modif?' style="color:var(--accent-vif)" title="rangée personnalisée"':''}>${ov}</td>`;
+    for (let i=0;i<6;i++){
+      const v = base ? base[i] : null;
+      html += `<td><input type="number" step="any" data-mat="${matCle}" data-stat="${statCle}" data-ov="${ov}" data-niv="${i}" value="${v??''}"></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+  table.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const m = chargerMatrices();
+      const {mat, stat, ov, niv} = inp.dataset;
+      const o = Number(ov), i = Number(niv);
+      m[mat] = m[mat]||{}; m[mat][stat] = m[mat][stat]||{};
+      const base = (Array.isArray(m[mat][stat][o]) && m[mat][stat][o].length===6)
+        ? m[mat][stat][o] : (seuilsMatrice(mat, stat, o) || [null,null,null,null,null,null]).slice();
+      base[i] = inp.value==='' ? null : Number(inp.value);
+      m[mat][stat][o] = base;
+      sauverMatrices(m);
+      flash('Rangée personnalisée enregistrée (remplace la valeur Y17)');
+      rendreMatrice();
+      rendreProgression();
+    });
+  });
+}
+
+/* ---------- Navigation et initialisation ---------- */
+function toutRendre(){
+  rendreAlignement();
+  rendreProduction();
+  rendreProgression();
+  peuplerComparateur();
+  rendreComparateur();
+  rendrePlafond();
+}
+document.querySelectorAll('nav button[data-vue]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button[data-vue]').forEach(x=>x.classList.remove('actif'));
+    document.querySelectorAll('section.vue').forEach(x=>x.classList.remove('actif'));
+    b.classList.add('actif');
+    document.getElementById('vue-'+b.dataset.vue).classList.add('actif');
+    if (b.dataset.vue==='progression') rendreProgression();
+    if (b.dataset.vue==='comparateur'){ peuplerComparateur(); rendreComparateur(); }
+    if (b.dataset.vue==='plafond') rendrePlafond();
+    if (b.dataset.vue==='ovdetail') peuplerJoueursOvd();
+    if (b.dataset.vue==='reglages') rendreMatrice();
+  });
+});
+document.getElementById('compA').addEventListener('change', rendreComparateur);
+document.getElementById('compB').addEventListener('change', rendreComparateur);
+document.getElementById('btnExportCSV').addEventListener('click', telechargerCSV);
+document.getElementById('rechercheAlign').addEventListener('input', e=>{
+  ETAT.rechercheAlign = e.target.value;
+  rendreAlignement();
+});
+document.getElementById('progFiltres').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#progFiltres button').forEach(x=>x.classList.remove('actif'));
+  b.classList.add('actif');
+  ETAT.filtreProg = b.dataset.f;
+  rendreProgression();
+});
+$('#btnMaj').addEventListener('click', actualiserTout);
+$('#btnEffacerCache').addEventListener('click', ()=>{
+  localStorage.removeItem(CLES_LS.cache);   // données mises en cache (formation, production, XtraStats, limites)
+  localStorage.removeItem(CLES_LS.proxy);   // relais préféré : on repart de la chaîne complète
+  flash('Cache effacée — actualisation en direct…');
+  actualiserTout();
+});
+$('#btnModeY21').addEventListener('click', ()=>{
+  ETAT.modeY21 = !ETAT.modeY21;
+  const b = $('#btnModeY21');
+  b.classList.toggle('actif', ETAT.modeY21);
+  b.textContent = ETAT.modeY21 ? 'Revenir à la saison en cours' : 'Vérifier avec la Y21';
+  $('#bandeauY21').style.display = ETAT.modeY21 ? '' : 'none';
+  toutRendre();
+  flash(ETAT.modeY21 ? 'Mode vérification Y21 activé' : 'Retour à la saison en cours');
+});
+$('#selMatrice').addEventListener('change', ()=>{ rendreSelectStat(); rendreMatrice(); });
+$('#selStat').addEventListener('change', rendreMatrice);
+$('#btnExportMat').addEventListener('click', ()=>{
+  $('#zoneJson').value = JSON.stringify(chargerMatrices(), null, 2);
+  flash('Matrices exportées dans la zone de texte');
+});
+$('#btnImportMat').addEventListener('click', ()=>{
+  try{
+    const m = JSON.parse($('#zoneJson').value);
+    if (typeof m !== 'object' || m===null) throw new Error('format inattendu');
+    sauverMatrices(m); rendreMatrice(); rendreProgression();
+    flash('Matrices importées');
+  }catch(e){ flash('Import impossible : '+e.message); }
+});
+$('#btnViderMat').addEventListener('click', ()=>{
+  if (confirm('Effacer toutes les rangées personnalisées et revenir aux matrices Y17 ?')){
+    sauverMatrices({}); rendreMatrice(); rendreProgression(); flash('Retour aux matrices Y17');
+  }
+});
+$('#btnViderOverrides').addEventListener('click', ()=>{
+  if (confirm('Effacer toutes les attentes individuelles ?')){
+    sauverOverrides({}); rendreProgression(); flash('Attentes individuelles effacées');
+  }
+});
+$('#btnViderCache').addEventListener('click', ()=>{
+  localStorage.removeItem(CLES_LS.cache); flash('Cache vidé — prochaine actualisation en direct');
+});
+$('#sourcesTexte').innerHTML =
+  `Formation : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.roster}" target="_blank" rel="noopener">TeamRosters.php</a> ·
+   Production : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.scoring}" target="_blank" rel="noopener">TeamScoring.php</a> ·
+   Minutes et mises en échec : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.xtra}" target="_blank" rel="noopener">USHLxtrastats.html</a> ·
+   Limites d'utilisation des gardiens : <a style="color:var(--bleu-vif)" href="${CONFIG.urlLimites}" target="_blank" rel="noopener">limites.json</a> (projet gestiongardiens) ·
+   Profils : règlements USHL, tableaux 10-11-12 · Matrices et modificateurs : section 6.2 et «Attentes.docx» (recote été 2022, Y17).
+   <br>Données de secours : alignement TORONTO extrait des fichiers FHL officiels de la ligue (USHL21.ros, recote Y22).
+   L'OV des patineurs y est calculé par la formule du calculateur ; celui des gardiens est une <b>estimation</b>
+   remplacée par la valeur réelle à la première actualisation.`;
+$('#dateSecours').textContent = DATE_SECOURS;
+
+preparerRoster();
+rendreSelectMatrice();
+rendreMatrice();
+toutRendre();
+/* limites des gardiens : chargement silencieux au démarrage (cache 1 h) */
+chargerLimites(false).then(()=>rendreProgression()).catch(()=>{});
+
+/* ------------------ CALCULATEUR OV DÉTAILLÉ ------------------
+   Pondérations calibrées par programme linéaire sur les rosters complets de la
+   ligue (26 équipes, recote du 8 juillet 2026) et sur les 17 OV détaillés de
+   référence produits par la fonction overall() du classeur Excel.
+   Validation : 17/17 références au centième (±0,005), 697/697 arrondis de la
+   ligue du 8 juillet. L'OV des patineurs des données de secours TORONTO est
+   d'ailleurs calculé par cette même formule à partir des cotes des fichiers
+   FHL de la ligue. Les défenseurs utilisent deux pondérations :
+   offensive lorsque PA + SC ≥ DF + ST, défensive sinon. Les gardiens ont une
+   formule distincte (50 partout → 48, contre 55 chez les patineurs) qui n'est
+   pas couverte ici. Ordre des cotes : IN SP ST EN DU DI SK PA PC DF OF EX LD. */
+const OV_ORDRE = ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld'];
+const OV_POIDS = {
+  F:     {w:[0.073423,0.072584,0.102613,0.043094,0.015318,0.014931,0.090409,0.147233,0.116690,0.102606,0.191218,0.014681,0.014822], cst:4.530845},
+  D_OFF: {w:[0.071201,0.160040,0.065793,0.050580,-0.001963,-0.003945,0.095153,0.168552,0.122700,0.086797,0.158935,0.013673,0.018993], cst:4.177806},
+  D_DEF: {w:[0.118770,0.077492,0.147627,0.043248,0.014035,0.015385,0.087341,0.118938,0.088093,0.193175,0.073577,0.015078,0.013870], cst:4.016048}
+};
+function ovDetaille(cotes, groupe){
+  /* cotes : objet portant it, sp, st, en, du, di, sk, pa, pc, df, sc, ex, ld.
+     groupe : 'F' (attaquant) ou 'D' (défenseur).
+     Retourne {valeur, arrondi, formule} ou null si une cote est absente
+     ou non numérique (cas des gardiens : df et sc à null). */
+  if (OV_ORDRE.some(k => cotes[k] === null || cotes[k] === undefined || isNaN(cotes[k]))) return null;
+  let jeu, formule;
+  if (groupe === 'D'){
+    const offensif = (cotes.pa + cotes.sc) >= (cotes.df + cotes.st);
+    jeu = offensif ? OV_POIDS.D_OFF : OV_POIDS.D_DEF;
+    formule = offensif ? 'défenseur offensif (PA + OF ≥ DF + ST)'
+                       : 'défenseur défensif (PA + OF < DF + ST)';
+  } else {
+    jeu = OV_POIDS.F;
+    formule = 'attaquant';
+  }
+  const valeur = OV_ORDRE.reduce((s,k,i) => s + jeu.w[i]*cotes[k], jeu.cst);
+  return {valeur, arrondi: Math.round(valeur), formule};
+}
+
+const OVD_LIBELLES = {it:'IN', sp:'SP', st:'ST', en:'EN', du:'DU', di:'DI', sk:'SK',
+                      pa:'PA', pc:'PC', df:'DF', sc:'OF', ex:'EX', ld:'LD'};
+function peuplerJoueursOvd(){
+  const sel = document.getElementById('ovdJoueur');
+  if (!sel) return;
+  const courant = sel.value;
+  const patineurs = ETAT.roster.filter(j => j.po !== 'G');
+  sel.innerHTML = '<option value="">— saisie manuelle —</option>' +
+    patineurs.map(j => `<option value="${echap(j.nom)}">${echap(j.nom)} (${j.po} · OV ${j.ov})</option>`).join('');
+  if (courant && patineurs.some(j => j.nom === courant)) sel.value = courant;
+}
+function chargerJoueurOvd(){
+  const nom = document.getElementById('ovdJoueur').value;
+  if (!nom) return;
+  const j = ETAT.roster.find(x => x.nom === nom);
+  if (!j) return;
+  document.getElementById('ovdGroupe').value = (j.po === 'D') ? 'D' : 'F';
+  OV_ORDRE.forEach(k => { document.getElementById('ovd_' + k).value = j[k]; });
+  calculerOvd();
+}
+function calculerOvd(){
+  const cotes = {};
+  OV_ORDRE.forEach(k => { cotes[k] = parseFloat(document.getElementById('ovd_' + k).value); });
+  const r = ovDetaille(cotes, document.getElementById('ovdGroupe').value);
+  const elV = document.getElementById('ovdValeur');
+  const elA = document.getElementById('ovdArrondi');
+  const elN = document.getElementById('ovdNote');
+  if (!r){
+    elV.textContent = '—'; elA.textContent = '—';
+    elN.textContent = 'Complète les 13 cotes (valeurs numériques) pour obtenir l\'OV détaillé.';
+    return;
+  }
+  elV.textContent = r.valeur.toFixed(2).replace('.', ',');
+  elA.textContent = String(r.arrondi);
+  elN.textContent = 'Formule ' + r.formule + '. L\'OV affiché sur ushl.ca est l\'arrondi au plus proche de l\'OV détaillé.';
+}
+function construireOvd(){
+  const grille = document.getElementById('ovdGrille');
+  if (!grille) return;
+  grille.innerHTML = OV_ORDRE.map(k =>
+    `<div class="ovd-cote"><span>${OVD_LIBELLES[k]}</span>
+     <input type="number" min="1" max="99" step="1" id="ovd_${k}" value="75"></div>`).join('');
+  OV_ORDRE.forEach(k => document.getElementById('ovd_' + k).addEventListener('input', calculerOvd));
+  document.getElementById('ovdGroupe').addEventListener('change', calculerOvd);
+  document.getElementById('ovdJoueur').addEventListener('change', chargerJoueurOvd);
+  peuplerJoueursOvd();
+  calculerOvd();
+}
+construireOvd();
+
+/* exposition pour le harnais de tests (jsdom) */
+if (typeof window !== 'undefined'){
+  window.__TML__ = {parseRoster, parseScoring, parseXtra, determinerProfil, evaluerStat,
+    normaliserNom, seuilsPour, seuilsMatrice, statutSelonSeuils, valeurStat, calculerPmRangs,
+    modA, convertirJet, fourchetteRecote, modsEstime, matchsEquipe, xtraEstArchive, productionDe, ETAT,
+    extraireFiche, validerPageEquipe, CONFIG,
+    CHARTE_SALAIRE, salaireMinimum, statutResignature, cleCharte, dureeMaxCharte,
+    fmtArgentCourt, parseArgent, litResignatures, ecritResignatures,
+    ouvrirProlongation, fermerProlongation, calculerMasse, PLAFOND, echelonEffectif, peutProlonger,
+    MATRICES, STATS_PAR_MATRICE, NIVEAUX, SECOURS_ROSTER, SECOURS_Y21, PROFILS, STATS_DEF,
+    ovDetaille, OV_POIDS, OV_ORDRE, peuplerJoueursOvd, calculerOvd,
+    echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond};
+}
+</script>
+</body>
+</html>
