@@ -302,12 +302,18 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   // Salaires minimums transcrits de la charte (en dollars)
   egal(S.salaireMinimum(74, 'RFA', 25), 700000, 'RFA OV74- = 700 000 $');
   egal(S.salaireMinimum(82, 'RFA', 25), 8750000, 'RFA OV82 = 8 750 000 $');
-  egal(S.salaireMinimum(90, 'RFA', 22), 17500000, 'RFA OV87+ = 17 500 000 $ (clamp haut)');
+  egal(S.salaireMinimum(90, 'RFA', 22), 25000000, 'RFA OV90 = valeur 87+ (17,5 M) + 3 × 2,5 M (règle du 87+)');
   egal(S.salaireMinimum(80, 'UFA', 30), 5000000, 'UFA OV80 34- = 5 000 000 $');
   egal(S.salaireMinimum(80, 'UFA', 36), 3250000, 'UFA OV80 35+ = 3 250 000 $ (tranche d\'âge)');
   egal(S.salaireMinimum(83, 'UFAR2', 32), 7500000, 'UFA Ronde 2 OV83 34- = 7 500 000 $');
   egal(S.salaireMinimum(85, 'SANS', 37), 6000000, 'Sans contrat OV85 35+ = 6 000 000 $');
   egal(S.salaireMinimum(70, 'RFA', 25), 700000, 'OV sous 74 → clamp au plancher (700 000 $)');
+  // Règle du sommet de la charte : +2,5 M par OV au-dessus de 87
+  egal(S.SURCHARGE_OV87, 2500000, 'Surcharge de 2 500 000 $ par OV au-dessus de 87');
+  egal(S.salaireMinimum(87, 'UFA', 30), 15500000, 'OV 87 : sommet de la charte, aucune surcharge');
+  egal(S.salaireMinimum(88, 'UFA', 30), 18000000, 'OV 88 UFA 34- : 15,5 M + 2,5 M');
+  egal(S.salaireMinimum(89, 'UFA', 30), 20500000, 'OV 89 : +5 M au-dessus de la valeur 87+ (cas Bigras)');
+  egal(S.salaireMinimum(88, 'UFA', 30, 1, 'G'), 15500000, 'Gardien OV 88 → échelon 87 : pas de surcharge');
   // Statut déduit de l'âge (règle retenue : 28- = RFA, sinon UFA)
   egal(S.statutResignature({age:28}), 'RFA', '28 ans → RFA');
   egal(S.statutResignature({age:29}), 'UFA', '29 ans → UFA');
@@ -329,7 +335,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(S.salaireMinimum(80, 'RFA', 25, 3), 5750000, 'RFA OV80, 3 ans = même minimum (5 750 000 $)');
   egal(S.salaireMinimum(80, 'RFA', 25, 4), 7500000, 'RFA OV80, 4 ans = échelon 81 (7 500 000 $)');
   egal(S.salaireMinimum(80, 'RFA', 25, 7), 12250000, 'RFA OV80, 7 ans = échelon 84 (12 250 000 $)');
-  egal(S.salaireMinimum(86, 'RFA', 24, 7), 17500000, 'RFA OV86, 7 ans → échelon 90, clampé à 87+ (17 500 000 $)');
+  egal(S.salaireMinimum(86, 'RFA', 24, 7), 25000000, 'RFA OV86, 7 ans → échelon 90 = 17,5 M + 3 × 2,5 M (règle du 87+)');
   egal(S.salaireMinimum(80, 'UFA', 30, 4), 5000000, 'UFA OV80, 4 ans = minimum inchangé (5 000 000 $)');
   // Règle des gardiens : un échelon plus bas à la prolongation
   egal(S.echelonEffectif(83, 'UFA', 2, 'G'), 82, 'Gardien OV83 → échelon 82 (un échelon plus bas)');
@@ -383,6 +389,28 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     'Durées offertes = 1 à la durée max du statut');
   ok(doc.getElementById('mpImpact').textContent.includes('Masse projetée'), 'Aperçu d\'impact sur la masse affiché');
   ok(doc.getElementById('mpRetirer').style.display === 'none', 'Bouton «Retirer» masqué pour un joueur non prolongé');
+  // Le salaire proposé SUIT le minimum quand la durée change — à la hausse ET à la baisse
+  {
+    const selDureeP = doc.getElementById('mpDuree'), inSalP = doc.getElementById('mpSalaire');
+    const min3 = S.salaireMinimum(jMut.ov, statutP, jMut.age, 3, jMut.po);
+    const min4 = S.salaireMinimum(jMut.ov, statutP, jMut.age, 4, jMut.po);
+    const min7 = S.salaireMinimum(jMut.ov, statutP, jMut.age, 7, jMut.po);
+    selDureeP.value = '7'; selDureeP.dispatchEvent(new W.Event('change'));
+    egal(S.parseArgent(inSalP.value), min7, 'Durée montée à 7 ans → salaire proposé monte au minimum de 7 ans');
+    selDureeP.value = '3'; selDureeP.dispatchEvent(new W.Event('change'));
+    egal(S.parseArgent(inSalP.value), min3, 'Durée redescendue à 3 ans → le salaire proposé REDESCEND au minimum (correction du bogue)');
+    // une saisie manuelle du DG est respectée quand la durée change ensuite
+    inSalP.value = '15 M'; inSalP.dispatchEvent(new W.Event('input'));
+    selDureeP.value = '4'; selDureeP.dispatchEvent(new W.Event('change'));
+    egal(S.parseArgent(inSalP.value), 15000000, 'Salaire saisi manuellement (15 M) conservé au changement de durée');
+    ok(15000000 > min4, 'Le montant manuel restait au-dessus du minimum de 4 ans');
+    // repartir d'une fenêtre fraîche pour la suite du scénario
+    doc.getElementById('mpAnnuler').click();
+    const btnRouvre = [...doc.querySelectorAll('button.btn-prolong[data-nom]')].find(b=>b.dataset.nom===jMut.nom);
+    btnRouvre.click();
+    egal(+doc.getElementById('mpDuree').value, dureeInitP, 'Fenêtre rouverte : durée proposée réinitialisée');
+    egal(S.parseArgent(doc.getElementById('mpSalaire').value), minPD, 'Fenêtre rouverte : salaire proposé réinitialisé au minimum');
+  }
   // un salaire sous le minimum est ramené au minimum à la confirmation
   doc.getElementById('mpSalaire').value = '1';
   doc.getElementById('mpOk').click();
@@ -665,6 +693,91 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     const lignes = [...zone.querySelectorAll('.comp-mid')].map(x=>x.textContent);
     ok(lignes.some(t=>t.includes('PC')), 'Ligne de la cote PC présente');
   }
+
+  console.log('— Base de données de la ligue (32 équipes, fichiers FHL)');
+  egal(S.LIGUE_EQUIPES.length, 32, '32 équipes dans la base de la ligue');
+  ok(S.LIGUE_EQUIPES.includes('TORONTO') && S.LIGUE_EQUIPES.includes('ST.LOUIS'), 'TORONTO et ST.LOUIS présents');
+  egal(Object.values(S.LIGUE).reduce((a,t)=>a+t.length,0), 821, '821 joueurs dans la ligue');
+  egal(S.joueursEquipe('TORONTO').length, 25, 'Mon club : la formation vivante (ETAT.roster) fait foi');
+  const sanjose = S.joueursEquipe('SANJOSE');
+  ok(sanjose.every(j=>!/^backup/i.test(j.nom.replace(/[\s_]/g,''))), 'Les joueurs Backup_ sont exclus du décodage');
+  const foxSJ = sanjose.find(j=>j.nom==='Adam Fox');
+  ok(!!foxSJ, 'Adam Fox trouvé chez SANJOSE');
+  egal(foxSJ.ov, 83, 'OV de Fox (SANJOSE) = 83 — recoupe l\'affichage ushl.ca');
+  egal(foxSJ._profil.profil, 'DEliteQB', 'Profil calculé pour un joueur d\'une autre équipe');
+  const kotkaSJ = sanjose.find(j=>j.nom==='Jesperi Kotkaniemi');
+  egal(kotkaSJ.salaire, 7250000, 'Salaire de Kotkaniemi (SANJOSE) recoupe les données publiées');
+  egal(kotkaSJ.ct, 3, 'Contrat de Kotkaniemi recoupé (3 ans)');
+  const georgievSJ = sanjose.find(j=>j.nom==='Alexandar Georgiev');
+  egal(georgievSJ.df, null, 'DF des gardiens décodé à null');
+  egal(georgievSJ.ovEstime, true, 'OV des gardiens des autres équipes marqué estimé');
+
+  console.log('— Comparateur inter-équipes');
+  const selEqA = doc.getElementById('compEqA'), selEqB = doc.getElementById('compEqB');
+  egal(selEqA.options.length, 32, 'Sélecteur d\'équipe A : 32 équipes');
+  egal(selEqA.value, 'TORONTO', 'Équipe A par défaut : mon club');
+  ok(selEqA.textContent.includes('(mon club)'), 'Le club est identifié dans la liste');
+  selEqB.value = 'SANJOSE'; selEqB.dispatchEvent(new W.Event('change'));
+  egal(selB.options.length, sanjose.length, 'Joueurs B = alignement SANJOSE (backups exclus)');
+  selB.value = 'Adam Fox'; selB.dispatchEvent(new W.Event('change'));
+  ok(zone.textContent.includes('Connor Bedard') && zone.textContent.includes('Adam Fox'),
+    'Comparaison Leafs vs SANJOSE rendue');
+  ok(zone.textContent.includes('SANJOSE'), 'L\'équipe du joueur B est affichée');
+  ok(zone.querySelector('.comp-pied').textContent.includes('fichiers de la ligue'),
+    'Provenance des cotes hors club indiquée');
+  // retour au club pour laisser l'état propre
+  selEqB.value = 'TORONTO'; selEqB.dispatchEvent(new W.Event('change'));
+
+  console.log('— Calculateur OV détaillé : toutes les équipes');
+  const selOvdEq = doc.getElementById('ovdEquipe');
+  egal(selOvdEq.options.length, 32, 'Sélecteur d\'équipe du calculateur : 32 équipes');
+  egal(selOvdEq.value, 'TORONTO', 'Équipe par défaut : mon club');
+  selOvdEq.value = 'SANJOSE'; selOvdEq.dispatchEvent(new W.Event('change'));
+  const nbPatineursSJ = sanjose.filter(j=>j.po!=='G').length;
+  egal(doc.getElementById('ovdJoueur').options.length, nbPatineursSJ + 1,
+    'Joueurs proposés = patineurs SANJOSE + saisie manuelle');
+  doc.getElementById('ovdJoueur').value = 'Adam Fox';
+  doc.getElementById('ovdJoueur').dispatchEvent(new W.Event('change'));
+  egal(doc.getElementById('ovdArrondi').textContent, '83', 'OV de Fox recalculé depuis ses cotes = 83');
+  ok(doc.getElementById('ovdNote').textContent.includes('offensif'), 'Formule offensive retenue pour Fox');
+  selOvdEq.value = 'TORONTO'; selOvdEq.dispatchEvent(new W.Event('change'));
+  egal(doc.getElementById('ovdJoueur').options.length, 23, 'Retour au club : 22 patineurs + saisie manuelle');
+
+  console.log('— Bâtisseur de trios');
+  W.localStorage.removeItem('tml_trios_v1');
+  doc.querySelector('nav button[data-vue="trios"]').click();
+  egal(doc.querySelectorAll('#triosZone .trio-bloc').length, 8, '8 blocs : 4 trios, 3 paires, gardiens');
+  egal(doc.querySelectorAll('#triosZone select[data-slot]').length, 20, '20 postes à combler');
+  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens',
+    'Compteur à zéro au départ');
+  S.autoTrios();
+  const t = S.litTrios();
+  egal(Object.keys(t).length, 20, 'Remplissage par OV : les 20 postes sont comblés');
+  egal(t['t1.c'], 'Barrett Hayton', 'Trio 1, centre = meilleur C par OV (Hayton)');
+  egal(t['t1.ag'], 'Filip Zadina', 'Trio 1, AG = meilleur ailier gauche (Zadina)');
+  egal(t['t1.ad'], 'Tyson Jost', 'Trio 1, AD = meilleur ailier droit (Jost)');
+  egal(t['p1.dg'], 'Chris Bigras', 'Paire 1 = meilleur défenseur (Bigras)');
+  egal(t['g.g1'], 'Chris Gibson', 'Gardien partant = meilleur OV (Gibson)');
+  egal(doc.getElementById('triosEtat').textContent, '12/12 attaquants · 6/6 défenseurs · 2/2 gardiens',
+    'Alignement complet après remplissage');
+  ok(doc.getElementById('triosZone').textContent.includes('OV moyen 82.0'),
+    'OV moyen du trio 1 affiché ((83+82+81)/3 = 82.0)');
+  egal(doc.getElementById('triosAlerte').textContent, '', 'Aucun doublon après remplissage automatique');
+  // un doublon est signalé
+  const selT4AD = doc.querySelector('#triosZone select[data-slot="t4.ad"]');
+  selT4AD.value = 'Filip Zadina'; selT4AD.dispatchEvent(new W.Event('change'));
+  ok(doc.getElementById('triosAlerte').textContent.includes('Filip Zadina'), 'Doublon signalé (Zadina utilisé deux fois)');
+  egal(doc.querySelectorAll('#triosZone select.double').length, 2, 'Les deux postes en conflit sont marqués');
+  // export texte
+  const txt = S.texteTrios();
+  ok(txt.startsWith('TORONTO — trios'), 'Export texte : en-tête du club');
+  ok(txt.includes('Trio 1 : Filip Zadina (83) — Barrett Hayton (82) — Tyson Jost (81)'), 'Export texte : trio 1 lisible');
+  ok(txt.includes('Gardiens : Chris Gibson (82) / Kevin Lankinen (79)'), 'Export texte : gardiens');
+  // persistance
+  ok(W.localStorage.getItem('tml_trios_v1').includes('Barrett Hayton'), 'Trios persistés dans le navigateur');
+  S.ecritTrios({}); S.rendreTrios();
+  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens',
+    'Vidage : compteur remis à zéro');
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);

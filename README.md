@@ -13,12 +13,13 @@ nouveaux outils et les couleurs du club (bleu `#00205B` et blanc).
 
 | Onglet | Ce qu'il fait |
 |---|---|
-| **Alignement** | Cotes, salaires, contrats et profils des 25 joueurs, triables par colonne. Filtre par nom / position / profil, export CSV, masse salariale sous le plafond de 104 M$, et bouton **Prolonger** (charte officielle des re-signatures Y22) pour les contrats échus. |
+| **Alignement** | Cotes, salaires, contrats et profils des 25 joueurs, triables par colonne. Filtre par nom / position / profil, export CSV, masse salariale sous le plafond de 104 M$, et bouton **Prolonger** (charte officielle des re-signatures Y22, incluant la règle du 87+ : +2,5 M$ par OV au-dessus du sommet de la charte) pour les contrats échus. |
 | **Production** | Pointage de la saison en cours (TeamScoring), enrichi des minutes et mises en échec de XtraStats. |
 | **Progression** | Cartes d'attentes par joueur : seuils des matrices officielles (article 6.2.6, recote été 2022) selon le profil et l'overall, statuts (Mémorable → À oublier), ModA / ModS et fourchette de recote probable. Cibles Mémorable personnalisables. |
-| **Comparateur** | *(nouveau)* Deux joueurs côte à côte : les 13 cotes + OV en barres miroir, profil, contrat, ModA, statistiques évaluées. |
+| **Trios** | *(nouveau)* Bâtisseur d'alignement : quatre trios, trois paires et le duo de gardiens, avec OV moyen par unité, remplissage automatique par OV, détection des doublons, sauvegarde locale et export texte prêt à coller. |
+| **Comparateur** | *(nouveau)* Deux joueurs de **n'importe quelles équipes de la ligue** côte à côte : les 13 cotes + OV en barres miroir, profil, contrat, ModA, statistiques évaluées. Les 32 équipes (821 joueurs) sont intégrées depuis les fichiers de la ligue. |
 | **Plafond** | *(nouveau)* Projection de la masse engagée sur 5 saisons selon les contrats en cours (et les prolongations enregistrées), avec la liste des contrats qui expirent chaque saison. |
-| **OV détaillé** | Reproduit au centième l'overall du simulateur à partir des 13 cotes (pondérations calibrées sur les 697 patineurs de la ligue). |
+| **OV détaillé** | Reproduit au centième l'overall du simulateur à partir des 13 cotes (pondérations calibrées sur les 697 patineurs de la ligue). Charge les cotes de n'importe quel patineur de n'importe quelle équipe. |
 | **Réglages** | Éditeur des matrices d'attentes (rangées personnalisées, export/import JSON), gestion du cache et sources. |
 
 ## Données
