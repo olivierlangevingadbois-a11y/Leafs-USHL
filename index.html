@@ -1214,18 +1214,28 @@ const LIGUE = {
 
 const LIGUE_EQUIPES = Object.keys(LIGUE).filter(e => LIGUE[e].length);
 
-/* Décode l'équipe demandée. Pour l'équipe du club, la formation vivante
-   (ETAT.roster, actualisable depuis ushl.ca) fait toujours foi. */
+/* Rangées fictives des alignements : joueurs Backup_ du simulateur et
+   lignes comptables de rachats ou de salaires retenus. */
+function estFictif(nom){
+  return /^(backup|rachat|retenue?)/i.test(String(nom).replace(/[\s_]/g,''));
+}
+
+/* Décode l'équipe demandée. Priorités :
+   1. le club → la formation vivante (ETAT.roster, actualisée à l'ouverture) ;
+   2. un alignement téléchargé en direct de ushl.ca (chargerEquipe) ;
+   3. sinon, l'instantané intégré des fichiers de la ligue (LIGUE_DATE). */
 function joueursEquipe(code){
-  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!j.backup);
+  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!estFictif(j.nom) && !j.backup);
+  const direct = ETAT.equipesLive.get(code);
+  if (direct) return direct;
   const cles = ['nom','po','hd','no','it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld','ov','age','salaire','ct'];
   return (LIGUE[code]||[]).map(t=>{
     const j = Object.fromEntries(cles.map((k,i)=>[k,t[i]]));
     if (j.po==='G'){ j.df = null; j.sc = null; j.ovEstime = true; }
-    j.backup = /^backup/i.test(j.nom.replace(/[\s_]/g,''));
+    j._instantane = true;
     j._profil = determinerProfil(j);
     return j;
-  }).filter(j=>!j.backup);
+  }).filter(j=>!estFictif(j.nom));
 }
 </script>
 <script>
@@ -1544,7 +1554,8 @@ const ETAT = {
   source: 'données intégrées (' + DATE_SECOURS + ')',
   filtreProg: 'tous',
   rechercheAlign: '',  // filtre texte de la table d'alignement
-  limites: new Map()   // limites d'utilisation des gardiens (gestiongardiens)
+  limites: new Map(),  // limites d'utilisation des gardiens (gestiongardiens)
+  equipesLive: new Map() // alignements des autres équipes téléchargés de ushl.ca
 };
 function matchsEquipe(){
   const m = ETAT.fiche.match(/(\d+)-(\d+)-(\d+)/);
@@ -1634,6 +1645,55 @@ async function chargerLimites(forcer){
   cache.limites = {t:Date.now(), v:liste};
   ecritCache(cache);
   return ETAT.limites.size;
+}
+
+/* ---------- Alignements des autres équipes (en direct de ushl.ca) ----------
+   L'instantané intégré (LIGUE) date des fichiers de la ligue et peut retarder
+   d'une recote. Quand une autre équipe est consultée (comparateur, calculateur
+   d'OV), son TeamRosters.php est téléchargé via les relais, validé (le serveur
+   sert parfois la dernière équipe consultée), mis en cache (TTL de la
+   formation, 12 h) et remplace l'instantané. Hors ligne, l'instantané reste. */
+function urlRosterEquipe(code){
+  return 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamRosters.php?team=' + encodeURIComponent(code);
+}
+function validerPageDe(code){
+  const re = new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s+\\d+-\\d+-\\d+');
+  return texte => re.test(texte);
+}
+async function chargerEquipe(code, forcer){
+  if (code === CONFIG.equipe) return joueursEquipe(code);
+  if (!forcer && ETAT.equipesLive.has(code)) return ETAT.equipesLive.get(code);
+  const valide = validerPageDe(code);
+  const cache = litCache();
+  const cleCache = 'equipe_' + code;
+  const c = cache[cleCache];
+  let texte = null;
+  if (!forcer && c && (Date.now() - c.t) < CONFIG.ttl.roster && valide(c.v)){
+    texte = c.v;
+  } else {
+    for (let essai = 1; essai <= 3 && texte === null; essai++){
+      const t = await chercherViaProxy(urlRosterEquipe(code));
+      if (valide(t)) texte = t;
+      else await new Promise(r=>setTimeout(r, 600)); // la session des relais s'aligne au réessai
+    }
+    if (texte === null) throw new Error('le serveur de la ligue sert une autre équipe — réessaie dans un instant');
+    cache[cleCache] = {t: Date.now(), v: texte};
+    ecritCache(cache);
+  }
+  const joueurs = parseRoster(texte).filter(j=>!estFictif(j.nom));
+  if (joueurs.length < 10) throw new Error('table de ' + code + ' introuvable');
+  joueurs.forEach(j=>{ j._profil = determinerProfil(j); });
+  ETAT.equipesLive.set(code, joueurs);
+  return joueurs;
+}
+/* Déclenche le téléchargement d'une équipe puis re-rend la vue demandeuse.
+   Silencieux en cas d'échec : l'instantané intégré demeure affiché. */
+function actualiserEquipe(code, rafraichir){
+  if (code === CONFIG.equipe || ETAT.equipesLive.has(code)) return;
+  chargerEquipe(code).then(()=>{
+    rafraichir();
+    flash('Cotes de ' + code + ' actualisées depuis ushl.ca');
+  }).catch(()=>{});
 }
 
 /* XtraStats : archive de la saison précédente ou saison en cours ?
@@ -2284,11 +2344,14 @@ function rendreComparateur(){
       </div>`;
   }
   const statsDe = j => (j._profil.stats||[]).map(cle=>STATS_DEF[cle].nom).join(', ');
-  const horsClub = [a, b].some(j => j._equipe !== CONFIG.equipe);
+  const provenances = [...new Set([a, b].filter(j=>j._equipe !== CONFIG.equipe).map(j =>
+    `${j._equipe} : ${j._instantane
+      ? `fichiers de la ligue du ${LIGUE_DATE} — actualisation ushl.ca en cours…`
+      : 'cotes en direct de ushl.ca'}`))];
   html += `<div class="comp-pied">
     Statistiques évaluées — ${echap(a.nom)} (${a._profil.profil}) : ${statsDe(a)}<br>
     Statistiques évaluées — ${echap(b.nom)} (${b._profil.profil}) : ${statsDe(b)}${
-    horsClub ? `<br>Cotes des autres équipes : fichiers de la ligue, recote Y22 du ${LIGUE_DATE}.` : ''}</div></div>`;
+    provenances.length ? '<br>' + provenances.join(' · ') : ''}</div></div>`;
   zone.innerHTML = html;
 }
 
@@ -2655,10 +2718,12 @@ document.getElementById('compB').addEventListener('change', rendreComparateur);
 document.getElementById('compEqA').addEventListener('change', ()=>{
   remplirJoueursComp(document.getElementById('compEqA').value, document.getElementById('compA'), 0);
   rendreComparateur();
+  actualiserEquipe(document.getElementById('compEqA').value, ()=>{ peuplerComparateur(); rendreComparateur(); });
 });
 document.getElementById('compEqB').addEventListener('change', ()=>{
   remplirJoueursComp(document.getElementById('compEqB').value, document.getElementById('compB'), 0);
   rendreComparateur();
+  actualiserEquipe(document.getElementById('compEqB').value, ()=>{ peuplerComparateur(); rendreComparateur(); });
 });
 document.getElementById('btnExportCSV').addEventListener('click', telechargerCSV);
 document.getElementById('btnTriosAuto').addEventListener('click', ()=>{ autoTrios(); flash('Trios remplis par OV'); });
@@ -2683,8 +2748,9 @@ document.getElementById('progFiltres').addEventListener('click', e=>{
 });
 $('#btnMaj').addEventListener('click', actualiserTout);
 $('#btnEffacerCache').addEventListener('click', ()=>{
-  localStorage.removeItem(CLES_LS.cache);   // données mises en cache (formation, production, XtraStats, limites)
+  localStorage.removeItem(CLES_LS.cache);   // données mises en cache (formation, production, XtraStats, limites, équipes)
   localStorage.removeItem(CLES_LS.proxy);   // relais préféré : on repart de la chaîne complète
+  ETAT.equipesLive.clear();                 // alignements des autres équipes : retour à l'instantané
   flash('Cache effacée — actualisation en direct…');
   actualiserTout();
 });
@@ -2839,6 +2905,7 @@ function construireOvd(){
   document.getElementById('ovdEquipe').addEventListener('change', ()=>{
     document.getElementById('ovdJoueur').value = '';
     peuplerJoueursOvd();
+    actualiserEquipe(document.getElementById('ovdEquipe').value, ()=>{ peuplerJoueursOvd(); chargerJoueurOvd(); });
   });
   peuplerJoueursOvd();
   calculerOvd();
@@ -2857,7 +2924,8 @@ if (typeof window !== 'undefined'){
     MATRICES, STATS_PAR_MATRICE, NIVEAUX, SECOURS_ROSTER, SECOURS_Y21, PROFILS, STATS_DEF,
     ovDetaille, OV_POIDS, OV_ORDRE, peuplerJoueursOvd, calculerOvd,
     echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond,
-    LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87};
+    LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
+    estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe};
 }
 </script>
 </body>

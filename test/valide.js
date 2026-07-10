@@ -715,6 +715,58 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const georgievSJ = sanjose.find(j=>j.nom==='Alexandar Georgiev');
   egal(georgievSJ.df, null, 'DF des gardiens décodé à null');
   egal(georgievSJ.ovEstime, true, 'OV des gardiens des autres équipes marqué estimé');
+  egal(georgievSJ._instantane, true, 'Les joueurs de l\'instantané portent le drapeau _instantane');
+  // rangées fictives : jamais dans les listes
+  egal(S.estFictif('Backup_LW_Anaheim'), true, 'Backup_ = fictif');
+  egal(S.estFictif('Rachat Dvorak'), true, 'Rachat = fictif');
+  egal(S.estFictif('Retenue Hyman'), true, 'Retenue = fictif');
+  egal(S.estFictif('Retenu Horvat'), true, 'Retenu (sans e) = fictif');
+  egal(S.estFictif('Connor Bedard'), false, 'Un vrai joueur n\'est pas fictif');
+  ok(S.joueursEquipe('ANAHEIM').every(j=>!S.estFictif(j.nom)),
+    'Rachats, retenues et backups exclus des listes (ANAHEIM)');
+
+  console.log('— Alignements des autres équipes téléchargés en direct (correction des cotes périmées)');
+  ok(S.urlRosterEquipe('SANJOSE').includes('TeamRosters.php?team=SANJOSE'), 'URL de formation par équipe');
+  ok(S.validerPageDe('SANJOSE')('bla SANJOSE 3-2-0 bla'), 'Validation : la fiche de l\'équipe demandée doit être dans la page');
+  ok(!S.validerPageDe('SANJOSE')('bla TORONTO 3-2-0 bla'), 'Page d\'une autre équipe rejetée');
+  ok(S.validerPageDe('ST.LOUIS')('… ST.LOUIS 1-0-0 …'), 'Le point de ST.LOUIS est échappé dans la validation');
+  {
+    // page TeamRosters fictive de SANJOSE : fiche + table de 12 joueurs dont Kotkaniemi RECOTÉ
+    const entetes = '<tr><th>Nom</th><th>PO</th><th>HD</th><th>CD</th><th>IJ</th><th>IN</th><th>SP</th><th>ST</th><th>EN</th><th>DU</th><th>DI</th><th>SK</th><th>PA</th><th>PC</th><th>DF</th><th>OF</th><th>EX</th><th>LD</th><th>OV</th><th>Age</th><th>Salary</th><th>CT</th><th>HT</th><th>WT</th><th>Lien</th></tr>';
+    const rangee = (nom, sp) => `<tr><td>${nom}</td><td>C</td><td>G</td><td>OK</td><td></td><td>70</td><td>${sp}</td><td>77</td><td>89</td><td>86</td><td>83</td><td>83</td><td>83</td><td>79</td><td>62</td><td>79</td><td>61</td><td>51</td><td>84</td><td>25</td><td>7 250 000 $</td><td>3</td><td>6 ' 2</td><td>198 lbs</td><td>Lien</td></tr>`;
+    let corps = rangee('Jesperi Kotkaniemi', 90) + rangee('Rachat Untel', 50);
+    for (let i=1; i<=11; i++) corps += rangee('Joueur Test'+i, 75);
+    const page = '<html><body>SANJOSE 2-1-0 <table>' + entetes + corps + '</table></body></html>' + ' '.repeat(600);
+    const fetchAvant = W.fetch;
+    W.fetch = async () => ({ok:true, status:200, text: async () => page});
+    const joueursDirect = await S.chargerEquipe('SANJOSE');
+    W.fetch = fetchAvant;
+    egal(joueursDirect.length, 12, '12 vrais joueurs extraits de la page en direct (rachat exclu)');
+    const kotkaDirect = joueursDirect.find(j=>j.nom==='Jesperi Kotkaniemi');
+    egal(kotkaDirect.sp, 90, 'Cote SP recotée lue depuis ushl.ca (90, plus l\'instantané à 83)');
+    egal(kotkaDirect.ov, 84, 'OV recoté lu depuis la page');
+    ok(!!kotkaDirect._profil, 'Profil recalculé sur les cotes en direct');
+    // joueursEquipe sert désormais l'alignement en direct, sans drapeau _instantane
+    const kotkaServi = S.joueursEquipe('SANJOSE').find(j=>j.nom==='Jesperi Kotkaniemi');
+    egal(kotkaServi.sp, 90, 'joueursEquipe sert l\'alignement en direct dès qu\'il est téléchargé');
+    ok(!kotkaServi._instantane, 'Plus de drapeau _instantane sur les cotes en direct');
+    // le comparateur affiche la provenance en direct
+    const selEqB0 = doc.getElementById('compEqB');
+    selEqB0.value = 'SANJOSE'; selEqB0.dispatchEvent(new W.Event('change'));
+    doc.getElementById('compB').value = 'Jesperi Kotkaniemi';
+    doc.getElementById('compB').dispatchEvent(new W.Event('change'));
+    ok(doc.getElementById('compZone').querySelector('.comp-pied').textContent.includes('en direct de ushl.ca'),
+      'Provenance «en direct de ushl.ca» affichée au comparateur');
+    // deuxième appel : servi de la mémoire, sans réseau
+    W.fetch = () => { throw new Error('ne doit pas être appelé'); };
+    const rejoue = await S.chargerEquipe('SANJOSE');
+    W.fetch = fetchAvant;
+    egal(rejoue.length, 12, 'Deuxième consultation servie de la mémoire (aucun réseau)');
+    // retour à l'instantané pour la suite des tests
+    S.ETAT.equipesLive.delete('SANJOSE');
+    W.localStorage.removeItem('tml_cache_v1');
+    selEqB0.value = 'TORONTO'; selEqB0.dispatchEvent(new W.Event('change'));
+  }
 
   console.log('— Comparateur inter-équipes');
   const selEqA = doc.getElementById('compEqA'), selEqB = doc.getElementById('compEqB');

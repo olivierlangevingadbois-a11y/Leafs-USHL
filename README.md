@@ -29,6 +29,11 @@ nouveaux outils et les couleurs du club (bleu `#00205B` et blanc).
   `USHLxtrastats.html` via une chaîne de relais anti-CORS, avec validation de
   l'équipe reçue (le serveur de la ligue sert parfois la dernière équipe
   consultée) et cache local (formation 12 h, production 30 min).
+- **Autres équipes** : dès qu'une équipe est consultée au comparateur ou au
+  calculateur d'OV, son `TeamRosters.php` est téléchargé en direct (validé,
+  mis en cache 12 h) et remplace l'instantané intégré — les cotes suivent
+  donc les recotes de la ligue. Hors ligne, l'instantané des fichiers FHL
+  demeure, avec sa date affichée.
 - **Hors ligne** : l'alignement de secours provient des fichiers FHL officiels
   de la ligue (`USHL21.ros`, recote Y22 — dépôt FHL-analyse). L'OV des
   patineurs y est calculé par la formule du calculateur ; celui des gardiens
