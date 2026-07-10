@@ -31,10 +31,7 @@
   header::before{content:''; position:absolute; inset:0;
     background:repeating-linear-gradient(-45deg, transparent 0 22px, rgba(255,255,255,.02) 22px 23px); pointer-events:none;}
   .head-row{display:flex; align-items:center; gap:18px; flex-wrap:wrap; position:relative;}
-  .logo{width:64px; height:64px; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}
   .head-titles h1{font-family:var(--font-display); font-size:2.3rem; letter-spacing:2px; line-height:1;}
-  .head-titles h1 em{font-style:normal; color:var(--accent-vif);}
-  .head-titles .sub{color:var(--txt-dim); font-size:.85rem; text-transform:uppercase; letter-spacing:2px;}
   .head-meta{margin-left:auto; text-align:right; font-family:var(--font-data); font-size:.75rem; color:var(--txt-dim);}
   .head-meta .fiche{font-size:1.05rem; color:var(--txt); font-weight:600;}
 
@@ -325,10 +322,8 @@
 
 <header>
   <div class="head-row">
-    <img class="logo" src="https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/logos/toronto.png" alt="Maple Leafs de Toronto" onerror="this.style.display='none'">
     <div class="head-titles">
-      <h1>MAPLE LEAFS DE TORONTO <em>· POSTE DU DG</em></h1>
-      <div class="sub">USHL Pro — Formation, production et progression</div>
+      <h1>MAPLE LEAFS DE TORONTO</h1>
     </div>
     <div class="head-meta">
       <div class="fiche" id="ficheEquipe">—</div>
@@ -2746,6 +2741,13 @@ rendreMatrice();
 toutRendre();
 /* limites des gardiens : chargement silencieux au démarrage (cache 1 h) */
 chargerLimites(false).then(()=>rendreProgression()).catch(()=>{});
+/* Actualisation automatique à l'ouverture : les données intégrées s'affichent
+   tout de suite, puis ushl.ca les remplace (le cache local — formation 12 h,
+   production 30 min — évite de marteler les relais à chaque visite).
+   Le harnais de tests désactive cet appel (aucun réseau en test). */
+if (!window.__TML_SANS_AUTO__){
+  setTimeout(actualiserTout, 50);
+}
 
 /* ------------------ CALCULATEUR OV DÉTAILLÉ ------------------
    Pondérations calibrées par programme linéaire sur les rosters complets de la

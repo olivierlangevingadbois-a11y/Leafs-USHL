@@ -18,7 +18,11 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     url: 'https://example.org/',
-    pretendToBeVisual: true
+    pretendToBeVisual: true,
+    beforeParse(window){
+      window.__TML_SANS_AUTO__ = true; // pas d'actualisation automatique en test
+      window.fetch = () => Promise.reject(new Error('réseau désactivé en test'));
+    }
   });
   // neutraliser fetch (aucun réseau pendant les tests)
   dom.window.fetch = () => Promise.reject(new Error('réseau désactivé en test'));
@@ -778,6 +782,22 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   S.ecritTrios({}); S.rendreTrios();
   egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens',
     'Vidage : compteur remis à zéro');
+
+  console.log('— Actualisation automatique à l\'ouverture');
+  {
+    let appelsUshl = 0;
+    const dom2 = new JSDOM(html, {
+      runScripts: 'dangerously', url: 'https://example.org/', pretendToBeVisual: true,
+      beforeParse(w){
+        w.fetch = (url)=>{ if (String(url).includes('ushl.ca')) appelsUshl++; return new Promise(()=>{}); };
+      }
+    });
+    await new Promise(r=>setTimeout(r, 500));
+    ok(appelsUshl > 0, 'Sans le drapeau de test, la page lance l\'actualisation ushl.ca dès l\'ouverture');
+    egal(S.ETAT.source.includes('données intégrées'), true,
+      'Harnais de tests : pas d\'actualisation automatique, les données intégrées restent affichées');
+    dom2.window.close();
+  }
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
