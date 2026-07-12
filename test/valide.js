@@ -962,6 +962,33 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     S.rendreAlertes();
   }
 
+  console.log('— Suivi des recotes (Y21 → maintenant)');
+  egal(Object.keys(S.COTES_Y21).length, 783, '783 joueurs recensés à la fin de la Y21');
+  tableauEgal(S.cotesY21De('Jesperi Kotkaniemi'), [70,83,77,89,86,83,83,82,79,62,79,61,51],
+    'Cotes Y21 de Kotkaniemi retrouvées (nom normalisé)');
+  egal(S.cotesY21De('Joueur Inconnu'), null, 'Joueur absent de la Y21 → null');
+  {
+    const recSJ = S.recotesEquipe('SANJOSE');
+    const kotka = recSJ.find(r=>r.j.nom==='Jesperi Kotkaniemi');
+    ok(!!kotka && !kotka.absent, 'Ligne de recote de Kotkaniemi construite');
+    egal(kotka.deltas.pa, 1, 'PA de Kotkaniemi : 82 → 83 = +1');
+    egal(kotka.deltas.ld, 0, 'LD inchangé = 0');
+    egal(kotka.somme, 1, 'Δ total de Kotkaniemi = +1');
+    ok(recSJ.every(r=>r.absent || typeof r.somme==='number'), 'Δ total calculé pour chaque joueur recensé');
+    const gardienSJ = recSJ.find(r=>r.j.po==='G' && !r.absent);
+    ok(!!gardienSJ && gardienSJ.ovDelta===null, 'Gardien : pas de delta d\'OV (formule non couverte), cotes comparées quand même');
+  }
+  doc.querySelector('nav button[data-vue="recotes"]').click();
+  egal(doc.getElementById('recEquipe').value, 'TORONTO', 'Équipe par défaut : mon club');
+  egal(doc.querySelectorAll('#tableRecotes tbody tr').length, 25, '25 lignes pour les Leafs');
+  ok(doc.querySelector('#tableRecotes thead').textContent.includes('OV Y21→Y22'), 'Colonne OV avant→après');
+  doc.getElementById('recEquipe').value = 'SANJOSE';
+  doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
+  ok(doc.querySelector('#tableRecotes tbody').textContent.includes('Jesperi Kotkaniemi'), 'Recotes de SANJOSE affichées');
+  ok(doc.querySelectorAll('#tableRecotes td.rec-plus').length >= 1, 'Les hausses sont marquées en vert');
+  doc.getElementById('recEquipe').value = 'TORONTO';
+  doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });
