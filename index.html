@@ -387,6 +387,7 @@
   <button data-vue="trios">Trios</button>
   <button data-vue="comparateur">Comparateur</button>
   <button data-vue="ligue">Ligue</button>
+  <button data-vue="meneurs">Meneurs</button>
   <button data-vue="echange">Échange</button>
   <button data-vue="recotes">Recotes</button>
   <button data-vue="plafond">Plafond</button>
@@ -486,6 +487,34 @@
       <span id="ligueCompte"></span>
     </div>
     <div class="table-wrap"><table id="tableLigue"></table></div>
+  </section>
+
+  <!-- ================= MENEURS ================= -->
+  <section class="vue" id="vue-meneurs">
+    <h2>Meneurs de la ligue</h2>
+    <div class="h2-sous" id="menSous">Classements des patineurs de toute la ligue, tirés de la page XtraStats téléchargée à l'actualisation. Tes Leafs sont surlignés.</div>
+    <div class="comp-choix" style="margin-bottom:14px">
+      <label>Catégorie
+        <select id="menCategorie">
+          <option value="pts">Points</option>
+          <option value="goals">Buts</option>
+          <option value="assists">Passes</option>
+          <option value="hits">Mises en échec</option>
+          <option value="shots">Tirs au but</option>
+          <option value="mp">Minutes jouées</option>
+          <option value="pim">Minutes de punition</option>
+        </select>
+      </label>
+      <label>Position
+        <select id="menPo">
+          <option value="">Toutes</option>
+          <option value="F">Attaquants</option>
+          <option value="D">Défenseurs</option>
+        </select>
+      </label>
+      <label class="lig-chk" style="align-self:flex-end; padding-bottom:8px"><input type="checkbox" id="menLeafs"> mes Leafs seulement</label>
+    </div>
+    <div class="table-wrap"><table id="tableMeneurs"></table></div>
   </section>
 
   <!-- ================= ÉCHANGE ================= -->
@@ -2317,6 +2346,24 @@ function parseXtra(texte, equipe){
   return resultat;
 }
 
+/* Version ligue entière du parseur XtraStats : capture aussi l'équipe.
+   Les codes d'équipe sont en majuscules (points et traits compris : ST.LOUIS). */
+function parseXtraLigue(texte){
+  const resultat = [];
+  const re = /^\s*\*?\s*(.+?)\s+([A-Z][A-Z._-]{2,})\s+(C|LW|RW|D|G)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/;
+  for (const l of texte.split(/\r?\n/)){
+    const propre = l.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const m = propre.match(re);
+    if (!m || estFictif(m[1])) continue;
+    resultat.push({
+      nom: m[1].trim(), equipe: m[2], pos: m[3],
+      gp: +m[4], goals: +m[5], assists: +m[6], pts: +m[7],
+      shots: +m[8], pim: +m[9], mp: +m[10], hits: +m[11]
+    });
+  }
+  return resultat;
+}
+
 /* ---------- Profils ---------- */
 function categorieAge(age){
   if (age<=20) return 'junior';
@@ -2457,7 +2504,8 @@ const ETAT = {
   filtreProg: 'tous',
   rechercheAlign: '',  // filtre texte de la table d'alignement
   limites: new Map(),  // limites d'utilisation des gardiens (gestiongardiens)
-  equipesLive: new Map() // alignements des autres équipes téléchargés de ushl.ca
+  equipesLive: new Map(), // alignements des autres équipes téléchargés de ushl.ca
+  xtraLigue: []        // XtraStats de toute la ligue (meneurs)
 };
 function matchsEquipe(){
   const m = ETAT.fiche.match(/(\d+)-(\d+)-(\d+)/);
@@ -2651,6 +2699,7 @@ async function actualiserTout(){
   try{
     const {texte} = await chercherSource('xtra');
     const x = parseXtra(texte, CONFIG.equipe);
+    ETAT.xtraLigue = parseXtraLigue(texte);
     if (x.length >= 5){
       ETAT.xtra = x;
       const mDate = texte.match(/As of\s+([0-9\/]+)/i);
@@ -3318,6 +3367,45 @@ function rendreComparateur(){
   zone.innerHTML = html;
 }
 
+/* ---------- Meneurs de la ligue (XtraStats) ---------- */
+const MENEURS_CATS = {
+  pts:'Points', goals:'Buts', assists:'Passes', hits:'Mises en échec',
+  shots:'Tirs au but', mp:'Minutes jouées', pim:'Minutes de punition'
+};
+function rendreMeneurs(){
+  const table = document.getElementById('tableMeneurs');
+  if (!table) return;
+  const cat = document.getElementById('menCategorie').value;
+  const po = document.getElementById('menPo').value;
+  const leafsSeul = document.getElementById('menLeafs').checked;
+  const sous = document.getElementById('menSous');
+  if (!ETAT.xtraLigue.length){
+    table.innerHTML = '';
+    sous.textContent = 'Aucune donnée pour le moment : clique «Actualiser depuis ushl.ca» (la page XtraStats fournit les classements de toute la ligue).';
+    return;
+  }
+  sous.textContent = 'Classements des patineurs de toute la ligue (XtraStats'
+    + (ETAT.xtraDate ? ' du ' + ETAT.xtraDate : '') + (ETAT.xtraEstY21 ? ' — archive de la saison Y21' : '')
+    + '). Tes Leafs sont surlignés.';
+  let liste = ETAT.xtraLigue.filter(x=>x.gp>0);
+  if (po==='F') liste = liste.filter(x=>x.pos!=='D' && x.pos!=='G');
+  if (po==='D') liste = liste.filter(x=>x.pos==='D');
+  if (leafsSeul) liste = liste.filter(x=>x.equipe===CONFIG.equipe);
+  liste.sort((a,b)=>(b[cat]||0)-(a[cat]||0));
+  liste = liste.slice(0, 50);
+  let html = `<thead><tr><th>Rang</th><th>Nom</th><th>Équipe</th><th>PO</th><th>PJ</th>
+    <th>${MENEURS_CATS[cat]}</th><th>B</th><th>P</th><th>PTS</th><th>MEÉ</th><th>MIN</th></tr></thead><tbody>`;
+  liste.forEach((x,i)=>{
+    const club = x.equipe===CONFIG.equipe;
+    html += `<tr${club?' style="background:rgba(77,159,255,.10)"':''}>
+      <td>${i+1}</td><td>${club?'<strong>':''}${echap(x.nom)}${club?'</strong>':''}</td>
+      <td class="${club?'eq-club':''}">${x.equipe}</td><td>${x.pos}</td><td>${x.gp}</td>
+      <td><strong>${x[cat] ?? '—'}</strong></td>
+      <td>${x.goals}</td><td>${x.assists}</td><td>${x.pts}</td><td>${x.hits}</td><td>${x.mp}</td></tr>`;
+  });
+  table.innerHTML = html + '</tbody>';
+}
+
 /* ---------- Analyseur d'échange ----------
    Brouillon en mémoire : sortants (du club) et entrants (de n'importe quelle
    équipe). L'impact réutilise la logique de la projection du plafond :
@@ -3902,6 +3990,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='trios') rendreTrios();
     if (b.dataset.vue==='comparateur'){ peuplerComparateur(); rendreComparateur(); }
     if (b.dataset.vue==='ligue') rendreLigue();
+    if (b.dataset.vue==='meneurs') rendreMeneurs();
     if (b.dataset.vue==='echange') rendreEchange();
     if (b.dataset.vue==='recotes') rendreRecotes();
     if (b.dataset.vue==='plafond') rendrePlafond();
@@ -3959,6 +4048,8 @@ document.getElementById('recEquipe').addEventListener('change', ()=>{
   rendreRecotes();
   actualiserEquipe(document.getElementById('recEquipe').value, rendreRecotes);
 });
+['menCategorie','menPo','menLeafs'].forEach(id=>
+  document.getElementById(id).addEventListener('change', rendreMeneurs));
 document.getElementById('progFiltres').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#progFiltres button').forEach(x=>x.classList.remove('actif'));
@@ -4148,7 +4239,7 @@ if (typeof window !== 'undefined'){
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
-    COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes};
+    COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs};
 }
 </script>
 </body>

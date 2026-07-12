@@ -989,6 +989,50 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   doc.getElementById('recEquipe').value = 'TORONTO';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
 
+  console.log('— Meneurs de la ligue (XtraStats ligue entière)');
+  {
+    const fixtureLigue = [
+      '    Player                    Team            POS GP   G   A   P  Sh PiM   MP   H Sh/G',
+      '    [Connor Bedard](https://x/#a) TORONTO         C   40  25  30  55 150  10  800  30 3.75',
+      '    [Jaden Schwartz](https://x/#b) SANJOSE        C   40  20  40  60 100   5  900  40 2.50',
+      '    [Tom Wilson](https://x/#c) ANAHEIM            RW  40  10  10  20  90  80  700 150 2.25',
+      '    [Adam Fox](https://x/#d) SANJOSE              D   40   5  35  40  80  10  950  50 2.00',
+      '    [* Backup_RW](https://x/#e) TORONTO           LW   3   0   0   0   0   0    0   0 0.00',
+      '    [Rachat Dvorak](https://x/#f) DALLAS          C   10   0   0   0   0   0    0   0 0.00'
+    ].join('\n');
+    const xl = S.parseXtraLigue(fixtureLigue);
+    egal(xl.length, 4, 'Quatre vrais patineurs extraits (backup et rachat exclus)');
+    egal(xl[0].equipe, 'TORONTO', 'Équipe capturée');
+    egal(xl[3].pos, 'D', 'Position capturée');
+    // rendu
+    const avXL = S.ETAT.xtraLigue;
+    S.ETAT.xtraLigue = xl;
+    doc.querySelector('nav button[data-vue="meneurs"]').click();
+    let rangs = [...doc.querySelectorAll('#tableMeneurs tbody tr')];
+    egal(rangs.length, 4, 'Table des meneurs rendue');
+    ok(rangs[0].textContent.includes('Jaden Schwartz'), 'Meneur aux points : Schwartz (60)');
+    doc.getElementById('menCategorie').value = 'hits';
+    doc.getElementById('menCategorie').dispatchEvent(new W.Event('change'));
+    ok(doc.querySelector('#tableMeneurs tbody tr').textContent.includes('Tom Wilson'),
+      'Catégorie MEÉ : Wilson en tête (150)');
+    doc.getElementById('menPo').value = 'D';
+    doc.getElementById('menPo').dispatchEvent(new W.Event('change'));
+    rangs = [...doc.querySelectorAll('#tableMeneurs tbody tr')];
+    egal(rangs.length, 1, 'Filtre Défenseurs : Fox seulement');
+    doc.getElementById('menPo').value = '';
+    doc.getElementById('menLeafs').checked = true;
+    doc.getElementById('menLeafs').dispatchEvent(new W.Event('change'));
+    rangs = [...doc.querySelectorAll('#tableMeneurs tbody tr')];
+    egal(rangs.length, 1, 'Filtre «mes Leafs seulement» : Bedard');
+    ok(rangs[0].textContent.includes('Connor Bedard'), 'Bedard listé et surligné');
+    doc.getElementById('menLeafs').checked = false;
+    S.ETAT.xtraLigue = avXL;
+    doc.getElementById('menCategorie').value = 'pts';
+    S.rendreMeneurs();
+    ok(doc.getElementById('menSous').textContent.includes('Actualiser'),
+      'Sans données : invitation à actualiser');
+  }
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });
