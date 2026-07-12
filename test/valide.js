@@ -1059,6 +1059,32 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(doc.querySelectorAll('#compZone .cent-top').length >= 1, 'Le top 10 % est souligné (Bigras vs Sanheim)');
   }
 
+  console.log('— Classement de la ligue (fiches relevées des pages en cache)');
+  {
+    // pages en cache : la page du club (roster) et deux équipes consultées
+    W.localStorage.setItem('tml_cache_v1', JSON.stringify({
+      roster: {t: Date.now(), v: 'menu … TORONTO 5-2-1 … table'},
+      equipe_SANJOSE: {t: Date.now(), v: 'menu … SANJOSE 7-1-0 … table'},
+      'equipe_ST.LOUIS': {t: Date.now(), v: 'menu … ST.LOUIS 3-3-2 … table'}
+    }));
+    const avFiche = S.ETAT.fiche;
+    S.ETAT.fiche = 'TORONTO 5-2-1';
+    const fiches = S.fichesConnues();
+    egal(fiches.size, 3, 'Trois fiches relevées (club + 2 équipes consultées)');
+    tableauEgal([fiches.get('SANJOSE').w, fiches.get('SANJOSE').l, fiches.get('SANJOSE').t], [7,1,0], 'Fiche de SANJOSE lue');
+    doc.querySelector('nav button[data-vue="classement"]').click();
+    const rangs = [...doc.querySelectorAll('#tableClassement tbody tr')];
+    egal(rangs.length, 3, 'Classement rendu');
+    ok(rangs[0].textContent.includes('SANJOSE') && rangs[0].textContent.includes('14'), '1er : SANJOSE, 14 points (2×7)');
+    ok(rangs[1].textContent.includes('TORONTO') && rangs[1].textContent.includes('11'), '2e : TORONTO, 11 points (2×5+1)');
+    ok(rangs[2].textContent.includes('ST.LOUIS') && rangs[2].textContent.includes('8'), '3e : ST.LOUIS, 8 points');
+    ok(doc.getElementById('classEtat').textContent.includes('3/32'), 'Compteur de fiches connues');
+    ok(!!doc.getElementById('btnFiches'), 'Bouton «Télécharger les 32 fiches» présent');
+    W.localStorage.removeItem('tml_cache_v1');
+    S.ETAT.fiche = avFiche;
+    S.rendreClassement();
+  }
+
   console.log('— PWA (installation et hors ligne)');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');

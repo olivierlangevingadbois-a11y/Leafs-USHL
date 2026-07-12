@@ -391,6 +391,7 @@
   <button data-vue="comparateur">Comparateur</button>
   <button data-vue="ligue">Ligue</button>
   <button data-vue="meneurs">Meneurs</button>
+  <button data-vue="classement">Classement</button>
   <button data-vue="echange">Échange</button>
   <button data-vue="recotes">Recotes</button>
   <button data-vue="plafond">Plafond</button>
@@ -518,6 +519,17 @@
       <label class="lig-chk" style="align-self:flex-end; padding-bottom:8px"><input type="checkbox" id="menLeafs"> mes Leafs seulement</label>
     </div>
     <div class="table-wrap"><table id="tableMeneurs"></table></div>
+  </section>
+
+  <!-- ================= CLASSEMENT ================= -->
+  <section class="vue" id="vue-classement">
+    <h2>Classement de la ligue</h2>
+    <div class="h2-sous">Fiches V-D-N relevées dans les pages téléchargées de ushl.ca (2 points par victoire, 1 par nulle). Le classement se complète à mesure que les équipes sont consultées — ou d'un coup avec le bouton.</div>
+    <div class="trios-actions">
+      <button id="btnFiches">Télécharger les 32 fiches</button>
+      <span id="classEtat"></span>
+    </div>
+    <div class="table-wrap"><table id="tableClassement"></table></div>
   </section>
 
   <!-- ================= ÉCHANGE ================= -->
@@ -3407,6 +3419,62 @@ function percentileLigue(cle, valeur, groupe){
 const GROUPES_LIGUE = {F:'attaquants de la ligue', D:'défenseurs de la ligue', G:'gardiens de la ligue'};
 function groupeDe(j){ return j.po==='D' ? 'D' : (j.po==='G' ? 'G' : 'F'); }
 
+/* ---------- Classement de la ligue ----------
+   Chaque page de ushl.ca affiche la fiche «ÉQUIPE V-D-N» de l'équipe
+   consultée : on relève toutes les fiches présentes dans les pages en cache
+   (formation, pointage, équipes consultées) et on les classe. */
+function fichesConnues(){
+  const cache = litCache();
+  const textes = [];
+  for (const k of ['roster','scoring']) if (cache[k]) textes.push(cache[k].v);
+  for (const k of Object.keys(cache)) if (k.startsWith('equipe_')) textes.push(cache[k].v);
+  const fiches = new Map();
+  const mClub = ETAT.fiche.match(/(\d+)-(\d+)-(\d+)/);
+  if (mClub) fiches.set(CONFIG.equipe, {w:+mClub[1], l:+mClub[2], t:+mClub[3]});
+  for (const code of LIGUE_EQUIPES){
+    if (fiches.has(code)) continue;
+    const re = new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s+(\\d+)-(\\d+)-(\\d+)');
+    for (const t of textes){
+      const m = t.match(re);
+      if (m){ fiches.set(code, {w:+m[1], l:+m[2], t:+m[3]}); break; }
+    }
+  }
+  return fiches;
+}
+function rendreClassement(){
+  const table = document.getElementById('tableClassement');
+  if (!table) return;
+  const fiches = fichesConnues();
+  const lignes = [...fiches.entries()].map(([code, f])=>({
+    code, ...f, pj: f.w+f.l+f.t, pts: 2*f.w + f.t
+  })).sort((a,b)=> b.pts - a.pts || b.w - a.w || a.pj - b.pj);
+  let html = '<thead><tr><th>Rang</th><th>Équipe</th><th>PJ</th><th>V</th><th>D</th><th>N</th><th>PTS</th></tr></thead><tbody>';
+  lignes.forEach((l,i)=>{
+    const club = l.code===CONFIG.equipe;
+    html += `<tr${club?' style="background:rgba(77,159,255,.10)"':''}>
+      <td>${i+1}</td><td class="${club?'eq-club':''}" style="text-align:left">${club?'<strong>':''}${l.code}${club?'</strong>':''}</td>
+      <td>${l.pj}</td><td>${l.w}</td><td>${l.l}</td><td>${l.t}</td><td><strong>${l.pts}</strong></td></tr>`;
+  });
+  table.innerHTML = html + '</tbody>';
+  document.getElementById('classEtat').textContent =
+    `${fiches.size}/${LIGUE_EQUIPES.length} fiches connues` + (fiches.size<LIGUE_EQUIPES.length ? ' — consulte des équipes ou télécharge les fiches' : '');
+}
+/* Télécharge la page de chaque équipe manquante (mise en cache 12 h) pour
+   compléter le classement. Séquentiel, avec compteur de progression. */
+async function telechargerFiches(){
+  const btn = document.getElementById('btnFiches');
+  btn.disabled = true;
+  const manquantes = LIGUE_EQUIPES.filter(c=>!fichesConnues().has(c));
+  let faites = 0;
+  for (const code of manquantes){
+    document.getElementById('classEtat').textContent = `téléchargement ${++faites}/${manquantes.length} (${code})…`;
+    try { await chargerEquipe(code); } catch(e){ /* fiche manquante : on continue */ }
+    rendreClassement();
+  }
+  btn.disabled = false;
+  rendreClassement();
+}
+
 /* ---------- Meneurs de la ligue (XtraStats) ---------- */
 const MENEURS_CATS = {
   pts:'Points', goals:'Buts', assists:'Passes', hits:'Mises en échec',
@@ -4064,6 +4132,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='comparateur'){ peuplerComparateur(); rendreComparateur(); }
     if (b.dataset.vue==='ligue') rendreLigue();
     if (b.dataset.vue==='meneurs') rendreMeneurs();
+    if (b.dataset.vue==='classement') rendreClassement();
     if (b.dataset.vue==='echange') rendreEchange();
     if (b.dataset.vue==='recotes') rendreRecotes();
     if (b.dataset.vue==='plafond') rendrePlafond();
@@ -4123,6 +4192,7 @@ document.getElementById('recEquipe').addEventListener('change', ()=>{
 });
 ['menCategorie','menPo','menLeafs'].forEach(id=>
   document.getElementById(id).addEventListener('change', rendreMeneurs));
+document.getElementById('btnFiches').addEventListener('click', telechargerFiches);
 document.getElementById('progFiltres').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#progFiltres button').forEach(x=>x.classList.remove('actif'));
@@ -4318,7 +4388,7 @@ if (typeof window !== 'undefined'){
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
-    percentileLigue, distributionsLigue};
+    percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }
 </script>
 </body>
