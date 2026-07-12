@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Maple Leafs de Toronto — Tableau de bord du DG</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#00205B">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%2300205B%22/><text x=%2250%22 y=%2268%22 font-size=%2256%22 text-anchor=%22middle%22>🍁</text></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -4195,6 +4197,11 @@ chargerLimites(false).then(()=>rendreProgression()).catch(()=>{});
    Le harnais de tests désactive cet appel (aucun réseau en test). */
 if (!window.__TML_SANS_AUTO__){
   setTimeout(actualiserTout, 50);
+}
+/* PWA : la page s'installe et s'ouvre hors ligne (réseau d'abord, cache en
+   secours). Uniquement en HTTPS — rien à faire en local ou en test. */
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.__TML_SANS_AUTO__){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 
 /* ------------------ CALCULATEUR OV DÉTAILLÉ ------------------

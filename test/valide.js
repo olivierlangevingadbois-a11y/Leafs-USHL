@@ -1059,6 +1059,20 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(doc.querySelectorAll('#compZone .cent-top').length >= 1, 'Le top 10 % est souligné (Bigras vs Sanheim)');
   }
 
+  console.log('— PWA (installation et hors ligne)');
+  {
+    const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const manifest = JSON.parse(lire('manifest.webmanifest'));
+    egal(manifest.short_name, 'Leafs DG', 'Manifest : nom court');
+    egal(manifest.theme_color, '#00205B', 'Manifest : couleur du club');
+    ok(manifest.icons.length >= 1 && manifest.icons[0].src === 'icon.svg', 'Manifest : icône déclarée');
+    ok(lire('icon.svg').includes('#00205B'), 'Icône aux couleurs du club');
+    const sw = lire('sw.js');
+    ok(sw.includes("addEventListener('fetch'") && sw.includes('caches'), 'Service worker : cache hors ligne');
+    ok(html.includes('rel="manifest"'), 'La page déclare le manifest');
+    ok(html.includes("location.protocol === 'https:'"), 'Enregistrement du service worker réservé au HTTPS');
+  }
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });

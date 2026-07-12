@@ -1,0 +1,13 @@
+{
+  "name": "Maple Leafs de Toronto — Poste du DG",
+  "short_name": "Leafs DG",
+  "description": "Tableau de bord du DG des Maple Leafs de Toronto (USHL Pro)",
+  "lang": "fr",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#05080f",
+  "theme_color": "#00205B",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
