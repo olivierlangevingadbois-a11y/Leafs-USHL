@@ -540,7 +540,7 @@
   <!-- ================= ÉCHANGE ================= -->
   <section class="vue" id="vue-echange">
     <h2>Analyseur d'échange</h2>
-    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. La bascule <strong>«&nbsp;re-signé&nbsp;»</strong> sur une chip compte le joueur à sa valeur standard de la charte (minimum à son statut d'âge) plutôt qu'à son contrat actuel — utile pour comparer un contrat actif à un joueur qui devra être re-signé. L'OV exact (deux décimales) est entre parenthèses. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
+    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. La bascule <strong>«&nbsp;re-signé ensuite&nbsp;»</strong> enchaîne, à l'échéance du contrat actuel (qu'elle respecte — on ne re-signe pas un joueur sous contrat), une re-signature à la valeur standard de la charte, au statut de son âge à ce moment. L'OV exact (deux décimales) est entre parenthèses. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
     <div class="ech-colonnes">
       <div class="ech-cote">
         <h3>Ça part — mon club</h3>
@@ -3539,16 +3539,28 @@ function rendreMeneurs(){
    contrat effectif = prolongation enregistrée pour un contrat échu, sinon
    salaire × CT. */
 const ECHANGE = {sortants: [], entrants: []};
-/* Contrat retenu pour un joueur de l'échange. Bascule «re-signé» : le joueur
-   compte à sa VALEUR STANDARD de la charte (minimum à son statut d'âge,
-   durée proposée du modal : 3 ans pour un RFA, durée max sinon) — pratique
-   pour comparer un contrat actif à un joueur qui sera re-signé après la
-   saison. */
-function contratEchange(j){
-  if (!j._resigner) return {salaire: j.salaire || 0, annees: j.ct || 0, statut: null};
-  const st = statutResignature(j);
+/* Bascule «re-signé» : on ne peut PAS re-signer un joueur encore sous
+   contrat — la re-signature standard s'enchaîne donc À L'ÉCHÉANCE de son
+   contrat actuel : ses années restantes comptent à son salaire réel, puis
+   la valeur standard de la charte prend le relais (statut déduit de son âge
+   AU MOMENT de la re-signature, 3 ans pour un RFA, durée max sinon). */
+function resignatureStandard(j){
+  const reste = j.ct || 0;
+  const ageRe = (j.age || 0) + reste;
+  const st = statutResignature({age: ageRe});
   const duree = st === 'RFA' ? 3 : dureeMaxCharte(st);
-  return {salaire: salaireMinimum(j.ov, st, j.age, duree, j.po) || 0, annees: duree, statut: st};
+  return {st, duree, apres: reste, salaire: salaireMinimum(j.ov, st, ageRe, duree, j.po) || 0};
+}
+/* Salaire comptant au plafond pour la saison k (0 = Y22) d'un joueur de
+   l'échange, contrat réel d'abord, re-signature standard ensuite si cochée. */
+function salaireSaisonEchange(j, k){
+  const reste = j.ct || 0;
+  if (k < reste) return j.salaire || 0;
+  if (j._resigner){
+    const rs = resignatureStandard(j);
+    if (k < reste + rs.duree) return rs.salaire;
+  }
+  return 0;
 }
 /* OV exact (deux décimales) d'un patineur, par la formule du calculateur.
    Les pondérations (OV_ORDRE, OV_POIDS) sont déclarées plus bas dans le
@@ -3564,17 +3576,21 @@ function ovExact(j){
 function projectionEchange(sortants, entrants, nbSaisons){
   const r = litResignatures();
   const exclus = new Set(sortants.map(j=>normaliserNom(j.nom)));
-  const contrats = ETAT.roster.filter(j=>!j.backup && !exclus.has(normaliserNom(j.nom))).map(j=>{
-    const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
-    return sig ? {salaire: sig.salaire, annees: sig.duree || dureeMaxCharte(sig.statut)}
-               : {salaire: j.salaire || 0, annees: j.ct || 0};
-  });
-  // les entrants comptent à leur contrat réel, ou à leur valeur standard de
-  // re-signature si la bascule «re-signé» est cochée sur leur chip
-  for (const j of entrants) contrats.push(contratEchange(j));
   const rangees = [];
   for (let k = 0; k < (nbSaisons || 3); k++){
-    const masse = contrats.filter(x=>x.annees > k).reduce((s,x)=>s+x.salaire, 0);
+    let masse = 0;
+    for (const j of ETAT.roster){
+      if (j.backup || exclus.has(normaliserNom(j.nom))) continue;
+      const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
+      if (sig){
+        if (k < (sig.duree || dureeMaxCharte(sig.statut))) masse += sig.salaire;
+      } else {
+        // un joueur du club basculé «re-signé» (dans les sortants du brouillon,
+        // donc exclu ici — ou pas) compte sa chaîne contrat réel → charte
+        masse += salaireSaisonEchange(j, k);
+      }
+    }
+    for (const j of entrants) masse += salaireSaisonEchange(j, k);
     rangees.push({saison: 'Y' + (22 + k), masse, marge: PLAFOND - masse});
   }
   return rangees;
@@ -3591,15 +3607,18 @@ function bilanClub(sortants, entrants){
   };
 }
 function chipEchange(j, camp){
-  const c = contratEchange(j);
   const exact = ovExact(j);
-  const contratTexte = j._resigner
-    ? `<b>${c.statut} ${fmtArgentCourt(c.salaire)} × ${c.annees} an${c.annees>1?'s':''}</b>`
-    : `${fmtArgentCourt(j.salaire)} × ${j.ct ?? 0} an${(j.ct??0)>1?'s':''}`;
+  const reel = `${fmtArgentCourt(j.salaire)} × ${j.ct ?? 0} an${(j.ct??0)>1?'s':''}`;
+  let contratTexte = reel;
+  if (j._resigner){
+    const rs = resignatureStandard(j);
+    const chaine = `<b>${rs.st} ${fmtArgentCourt(rs.salaire)} × ${rs.duree} an${rs.duree>1?'s':''}</b>`;
+    contratTexte = rs.apres > 0 ? `${reel} puis ${chaine}` : chaine;
+  }
   return `<span class="ech-chip${j._resigner?' resigner':''}">${echap(j.nom)} (${j.po})
     <span class="det">OV ${j.ovEstime?'~':''}${j.ov}${exact?` (${exact})`:''} · ${contratTexte}</span>
-    <label class="ech-resign" title="Compter ce joueur à sa valeur standard de re-signature (minimum de la charte à son statut d'âge) plutôt qu'à son contrat actuel — pour comparer un contrat actif à un joueur qui sera re-signé">
-      <input type="checkbox" data-resign-camp="${camp}" data-nom="${echap(j.nom)}"${j._resigner?' checked':''}> re-signé</label>
+    <label class="ech-resign" title="À l'échéance de son contrat actuel, enchaîner une re-signature à la valeur standard de la charte (statut déduit de son âge à ce moment). Ses années restantes comptent à son salaire réel — on ne re-signe pas un joueur encore sous contrat.">
+      <input type="checkbox" data-resign-camp="${camp}" data-nom="${echap(j.nom)}"${j._resigner?' checked':''}> re-signé ensuite</label>
     <button data-camp="${camp}" data-nom="${echap(j.nom)}" title="Retirer">×</button></span>`;
 }
 function rendreEchange(){
@@ -3622,7 +3641,7 @@ function rendreEchange(){
     b.addEventListener('click', ()=>{
       const liste = b.dataset.camp==='s' ? ECHANGE.sortants : ECHANGE.entrants;
       const i = liste.findIndex(j=>j.nom===b.dataset.nom);
-      if (i>=0) liste.splice(i,1);
+      if (i>=0){ liste[i]._resigner = false; liste.splice(i,1); }
       rendreEchange();
     });
   });
@@ -3639,6 +3658,14 @@ function rendreEchange(){
   const apres = projectionEchange(ECHANGE.sortants, ECHANGE.entrants, 3);
   const bAvant = bilanClub([], []), bApres = bilanClub(ECHANGE.sortants, ECHANGE.entrants);
   const delta = apres[0].masse - avant[0].masse;
+  // OV et âge échangés : total d'OV et moyenne d'âge qui partent vs arrivent
+  const somme = (liste, cle) => liste.reduce((s,j)=>s+(j[cle]||0), 0);
+  const moyenne = (liste, cle) => liste.length ? (somme(liste, cle)/liste.length).toFixed(1).replace('.',',') : '—';
+  const ovOut = somme(ECHANGE.sortants,'ov'), ovIn = somme(ECHANGE.entrants,'ov');
+  const dOv = ovIn - ovOut;
+  const moyAgeOut = moyenne(ECHANGE.sortants,'age'), moyAgeIn = moyenne(ECHANGE.entrants,'age');
+  const dAge = (ECHANGE.entrants.length ? somme(ECHANGE.entrants,'age')/ECHANGE.entrants.length : 0)
+             - (ECHANGE.sortants.length ? somme(ECHANGE.sortants,'age')/ECHANGE.sortants.length : 0);
   document.getElementById('echSommaire').innerHTML = !actif ? '' : `
     <div class="stat-carte ${apres[0].masse>PLAFOND?'alerte':''}">
       <div class="lbl">Masse Y22 après l'échange</div>
@@ -3650,6 +3677,12 @@ function rendreEchange(){
     <div class="stat-carte"><div class="lbl">Âge moyen</div>
       <div class="val">${bApres.age.toFixed(1)}</div>
       <div class="det">avant : ${bAvant.age.toFixed(1)}</div></div>
+    <div class="stat-carte ${dOv>0?'':'orange'}"><div class="lbl">OV gagné / perdu</div>
+      <div class="val">${dOv>0?'+':''}${dOv}</div>
+      <div class="det">sortants ${ovOut} · entrants ${ovIn}</div></div>
+    <div class="stat-carte"><div class="lbl">Âge gagné / perdu</div>
+      <div class="val">${dAge>0?'+':''}${dAge.toFixed(1).replace('.',',')}</div>
+      <div class="det">moy. sortants ${moyAgeOut} · entrants ${moyAgeIn}</div></div>
     <div class="stat-carte orange"><div class="lbl">Effectif</div>
       <div class="val">${bApres.n}</div>
       <div class="det">${ECHANGE.sortants.length} départ${ECHANGE.sortants.length>1?'s':''} · ${ECHANGE.entrants.length} arrivée${ECHANGE.entrants.length>1?'s':''}</div></div>`;
@@ -4245,6 +4278,7 @@ document.getElementById('echEquipe').addEventListener('change', ()=>{
   actualiserEquipe(document.getElementById('echEquipe').value, rendreEchange);
 });
 document.getElementById('echVider').addEventListener('click', ()=>{
+  for (const j of ECHANGE.sortants.concat(ECHANGE.entrants)) j._resigner = false;
   ECHANGE.sortants.length = 0; ECHANGE.entrants.length = 0; rendreEchange();
 });
 document.getElementById('recEquipe').addEventListener('change', ()=>{
@@ -4448,7 +4482,7 @@ if (typeof window !== 'undefined'){
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
-    contratEchange, ovExact, nettoyerLigneXtra,
+    resignatureStandard, salaireSaisonEchange, ovExact, nettoyerLigneXtra,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }

@@ -1121,36 +1121,55 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     const bigrasT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Bigras');
     egal(S.ovExact(bigrasT), '87,85', 'OV exact de Bigras (87,85)');
     egal(S.ovExact(S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Gibson')), null, 'Pas d\'OV exact pour un gardien');
-    // contratEchange : Bedard (OV 80, 20 ans → RFA, 3 ans) à sa valeur standard
+    // la re-signature standard S'ENCHAÎNE après le contrat : on ne re-signe
+    // pas un joueur encore sous contrat
     const bedardT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Connor Bedard');
-    const reel = S.contratEchange(bedardT);
-    tableauEgal([reel.salaire, reel.annees], [975000, 1], 'Sans bascule : contrat réel (975 k × 1)');
-    const resig = S.contratEchange({...bedardT, _resigner:true});
-    tableauEgal([resig.salaire, resig.annees, resig.statut], [5750000, 3, 'RFA'],
-      'Bascule : valeur standard RFA OV80 = 5,75 M × 3 ans');
+    const rsBedard = S.resignatureStandard(bedardT); // ct 1, re-signé à 21 ans → RFA 3 ans, OV 80
+    tableauEgal([rsBedard.st, rsBedard.duree, rsBedard.apres, rsBedard.salaire],
+      ['RFA', 3, 1, 5750000], 'Re-signature standard de Bedard : après 1 an, RFA 5,75 M × 3');
+    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 0), 975000,
+      'Saison Y22 : son contrat réel (975 k), PAS la charte — il est encore sous contrat');
+    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 1), 5750000,
+      'Saison Y23 : la re-signature standard prend le relais (5,75 M)');
+    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 4), 0,
+      'Saison Y26 : après les 3 ans de la re-signature, plus rien');
+    egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Sans bascule : rien après son contrat');
+    // le statut est déduit de l'âge AU MOMENT de la re-signature (28 ans + 1 an de contrat → UFA)
+    egal(S.resignatureStandard({nom:'X', po:'C', ov:80, age:28, salaire:1000000, ct:1}).st, 'UFA',
+      '28 ans avec 1 an de contrat → re-signé à 29 ans : UFA');
     // dans l'interface : ajouter Bedard comme sortant, cocher la bascule
     doc.querySelector('nav button[data-vue="echange"]').click();
     doc.getElementById('echSortant').value = 'Connor Bedard';
     doc.getElementById('echAjSortant').click();
     ok(doc.getElementById('echSortants').textContent.includes('(80,27)'), 'OV exact sur la chip');
-    ok(doc.getElementById('echSortants').textContent.includes('re-signé'), 'Bascule «re-signé» présente');
+    ok(doc.getElementById('echSortants').textContent.includes('re-signé ensuite'), 'Bascule «re-signé ensuite» présente');
     const chk = doc.querySelector('#echSortants input[data-resign-camp="s"]');
     chk.checked = true; chk.dispatchEvent(new W.Event('change'));
-    ok(doc.getElementById('echSortants').textContent.includes('RFA 5,8 M × 3 ans'),
-      'Chip re-signée : statut et valeur de la charte affichés (5,75 M arrondi 5,8 M)');
-    // un entrant re-signé compte à sa valeur standard dans la projection
+    ok(doc.getElementById('echSortants').textContent.includes('975 k × 1 an puis RFA 5,8 M × 3 ans'),
+      'Chip : contrat réel PUIS re-signature standard');
+    // un sortant basculé alourdit la masse AVANT (le garder = le re-signer)
+    const avantResig = S.projectionEchange([], [], 3);
+    egal(avantResig[1].masse, 28371666 + 5750000, 'Avant : Y23 inclut la re-signature de Bedard si on le garde');
+    // un entrant re-signé compte sa chaîne : contrat réel Y22, charte ensuite
     doc.getElementById('echEquipe').value = 'SANJOSE';
     doc.getElementById('echEquipe').dispatchEvent(new W.Event('change'));
     doc.getElementById('echEntrant').value = 'Adam Fox';
     doc.getElementById('echAjEntrant').click();
     const chkE = doc.querySelector('#echEntrants input[data-resign-camp="e"]');
     chkE.checked = true; chkE.dispatchEvent(new W.Event('change'));
-    // Fox OV 83, 27 ans → RFA, 3 ans → minimum charte OV 83 RFA = 10 500 000
+    // Fox : ct 1 à 7,25 M, re-signé à 28 ans → RFA OV83 = 10,5 M × 3
     const apresResig = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
-    const attendu = 83571666 - 975000 + 10500000;
-    egal(apresResig[0].masse, attendu, 'Projection : Fox re-signé compte à 10,5 M (charte RFA OV83)');
-    egal(apresResig[1].masse, 28371666 - 0 + 10500000, 'Y23 : le contrat re-signé de 3 ans engage la saison suivante');
+    egal(apresResig[0].masse, 83571666 - 975000 + 7250000,
+      'Y22 : Fox compte à son contrat RÉEL (7,25 M), Bedard parti');
+    egal(apresResig[1].masse, 28371666 + 10500000,
+      'Y23 : la re-signature standard de Fox (10,5 M) prend le relais, Bedard exclu');
+    // cartes OV et âge gagnés / perdus
+    ok(doc.getElementById('echSommaire').textContent.includes('OV gagné / perdu'), 'Carte OV gagné/perdu');
+    ok(doc.getElementById('echSommaire').textContent.includes('+3'), 'OV : sortants 80, entrants 83 → +3');
+    ok(doc.getElementById('echSommaire').textContent.includes('Âge gagné / perdu'), 'Carte âge gagné/perdu');
+    ok(doc.getElementById('echSommaire').textContent.includes('+7,0'), 'Âge : 20 ans part, 27 ans arrive → +7,0');
     doc.getElementById('echVider').click();
+    egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Vider remet aussi la bascule à zéro (drapeau nettoyé)');
   }
 
   console.log('— PWA (installation et hors ligne)');
