@@ -317,6 +317,11 @@
   .ech-chip{display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line);
     border-left:3px solid var(--bleu); padding:6px 10px; font-family:var(--font-data); font-size:.74rem;}
   .ech-chip .det{color:var(--txt-dim); margin-left:auto;}
+  .ech-chip.resigner{border-left-color:var(--warn);}
+  .ech-chip .det b{color:var(--warn); font-weight:600;}
+  .ech-resign{display:inline-flex; align-items:center; gap:4px; font-size:.62rem; letter-spacing:.5px;
+    text-transform:uppercase; color:var(--txt-faint); cursor:pointer; white-space:nowrap;}
+  .ech-resign:hover{color:var(--warn);}
   .ech-chip button{background:none; border:none; color:var(--bad); font-size:1rem; cursor:pointer; line-height:1; padding:0 2px;}
   .ech-vide{color:var(--txt-faint); font-family:var(--font-data); font-size:.72rem;}
   #tableEchange tr.depasse td{color:var(--bad);}
@@ -535,7 +540,7 @@
   <!-- ================= ÉCHANGE ================= -->
   <section class="vue" id="vue-echange">
     <h2>Analyseur d'échange</h2>
-    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
+    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. La bascule <strong>«&nbsp;re-signé&nbsp;»</strong> sur une chip compte le joueur à sa valeur standard de la charte (minimum à son statut d'âge) plutôt qu'à son contrat actuel — utile pour comparer un contrat actif à un joueur qui devra être re-signé. L'OV exact (deux décimales) est entre parenthèses. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
     <div class="ech-colonnes">
       <div class="ech-cote">
         <h3>Ça part — mon club</h3>
@@ -2340,6 +2345,18 @@ function parseScoring(html, doc){
   return {patineurs, gardiens};
 }
 
+/* Nettoie une ligne XtraStats avant analyse : selon le relais, les noms
+   arrivent entourés de balises HTML (<a href>…</a>) ou de liens markdown
+   [Nom](url), avec des entités (&amp;, &#39;). Sans ce nettoyage, les noms
+   s'affichent avec des débris de balises. */
+function nettoyerLigneXtra(l){
+  return l
+    .replace(/<[^>]*>/g, ' ')                       // balises HTML
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')        // liens markdown
+    .replace(/&amp;/g, '&').replace(/&#0?39;|&apos;|&rsquo;/g, "'")
+    .replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ');
+}
+
 /* ---------- Parseur : XtraStats (texte préformaté) ----------
    Colonnes fixes : Player Team POS GP G A P Sh PiM MP H ...
    On filtre l'équipe demandée. */
@@ -2348,12 +2365,11 @@ function parseXtra(texte, equipe){
   const lignes = texte.split(/\r?\n/);
   const re = new RegExp('^\\s*\\*?\\s*(.+?)\\s+' + equipe + '\\s+(C|LW|RW|D|G)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)');
   for (const l of lignes){
-    // retirer la syntaxe markdown de liens éventuelle [Nom](url)
-    const propre = l.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const propre = nettoyerLigneXtra(l);
     const m = propre.match(re);
     if (!m) continue;
     resultat.push({
-      nom: m[1].trim(), pos: m[2],
+      nom: m[1].replace(/\s+/g,' ').trim(), pos: m[2],
       gp: +m[3], goals: +m[4], assists: +m[5], pts: +m[6],
       shots: +m[7], pim: +m[8], mp: +m[9], hits: +m[10]
     });
@@ -2367,11 +2383,11 @@ function parseXtraLigue(texte){
   const resultat = [];
   const re = /^\s*\*?\s*(.+?)\s+([A-Z][A-Z._-]{2,})\s+(C|LW|RW|D|G)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/;
   for (const l of texte.split(/\r?\n/)){
-    const propre = l.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const propre = nettoyerLigneXtra(l);
     const m = propre.match(re);
     if (!m || estFictif(m[1])) continue;
     resultat.push({
-      nom: m[1].trim(), equipe: m[2], pos: m[3],
+      nom: m[1].replace(/\s+/g,' ').trim(), equipe: m[2], pos: m[3],
       gp: +m[4], goals: +m[5], assists: +m[6], pts: +m[7],
       shots: +m[8], pim: +m[9], mp: +m[10], hits: +m[11]
     });
@@ -3347,13 +3363,16 @@ function rendreComparateur(){
   const b = joueursEquipe(eqB).find(j=>j.nom===document.getElementById('compB').value);
   if (!a || !b){ zone.innerHTML = ''; return; }
   a._equipe = eqA; b._equipe = eqB;
-  const tete = (j, cote) => `
+  const tete = (j, cote) => {
+    const exact = ovExact(j);
+    return `
     <div class="comp-tete ${cote}">
       <span class="nom">${echap(j.nom)}</span>
-      <span class="comp-ov"${j.ovEstime?' title="OV estimé"':''}>${j.ovEstime?'~':''}${j.ov}</span>
+      <span class="comp-ov"${j.ovEstime?' title="OV estimé"':''}>${j.ovEstime?'~':''}${j.ov}${exact?` <small style="font-size:.85rem;color:var(--txt-dim)">(${exact})</small>`:''}</span>
       <span class="meta">${j._equipe} · ${j.po} · ${j.age} ans · ${j._profil.profil}</span>
       <span class="meta">${fmtArgent(j.salaire)} · CT ${j.ct ?? '—'} · ModA ${fmtMod(modA(j))}</span>
     </div>`;
+  };
   let html = `<div class="comp-grille">${tete(a,'gauche')}<div class="comp-mid">·</div>${tete(b,'droite')}`;
   const centile = (j, cle) => {
     const p = percentileLigue(cle, j[cle], groupeDe(j));
@@ -3520,6 +3539,28 @@ function rendreMeneurs(){
    contrat effectif = prolongation enregistrée pour un contrat échu, sinon
    salaire × CT. */
 const ECHANGE = {sortants: [], entrants: []};
+/* Contrat retenu pour un joueur de l'échange. Bascule «re-signé» : le joueur
+   compte à sa VALEUR STANDARD de la charte (minimum à son statut d'âge,
+   durée proposée du modal : 3 ans pour un RFA, durée max sinon) — pratique
+   pour comparer un contrat actif à un joueur qui sera re-signé après la
+   saison. */
+function contratEchange(j){
+  if (!j._resigner) return {salaire: j.salaire || 0, annees: j.ct || 0, statut: null};
+  const st = statutResignature(j);
+  const duree = st === 'RFA' ? 3 : dureeMaxCharte(st);
+  return {salaire: salaireMinimum(j.ov, st, j.age, duree, j.po) || 0, annees: duree, statut: st};
+}
+/* OV exact (deux décimales) d'un patineur, par la formule du calculateur.
+   Les pondérations (OV_ORDRE, OV_POIDS) sont déclarées plus bas dans le
+   fichier : au tout premier rendu de l'initialisation elles n'existent pas
+   encore — on répond null et le rendu suivant complète. */
+function ovExact(j){
+  if (j.po === 'G') return null;
+  try {
+    const r = ovDetaille(j, j.po === 'D' ? 'D' : 'F');
+    return r ? r.valeur.toFixed(2).replace('.', ',') : null;
+  } catch (e){ return null; }
+}
 function projectionEchange(sortants, entrants, nbSaisons){
   const r = litResignatures();
   const exclus = new Set(sortants.map(j=>normaliserNom(j.nom)));
@@ -3528,7 +3569,9 @@ function projectionEchange(sortants, entrants, nbSaisons){
     return sig ? {salaire: sig.salaire, annees: sig.duree || dureeMaxCharte(sig.statut)}
                : {salaire: j.salaire || 0, annees: j.ct || 0};
   });
-  for (const j of entrants) contrats.push({salaire: j.salaire || 0, annees: j.ct || 0});
+  // les entrants comptent à leur contrat réel, ou à leur valeur standard de
+  // re-signature si la bascule «re-signé» est cochée sur leur chip
+  for (const j of entrants) contrats.push(contratEchange(j));
   const rangees = [];
   for (let k = 0; k < (nbSaisons || 3); k++){
     const masse = contrats.filter(x=>x.annees > k).reduce((s,x)=>s+x.salaire, 0);
@@ -3548,8 +3591,15 @@ function bilanClub(sortants, entrants){
   };
 }
 function chipEchange(j, camp){
-  return `<span class="ech-chip">${echap(j.nom)} (${j.po})
-    <span class="det">OV ${j.ovEstime?'~':''}${j.ov} · ${fmtArgentCourt(j.salaire)} × ${j.ct ?? 0} an${(j.ct??0)>1?'s':''}</span>
+  const c = contratEchange(j);
+  const exact = ovExact(j);
+  const contratTexte = j._resigner
+    ? `<b>${c.statut} ${fmtArgentCourt(c.salaire)} × ${c.annees} an${c.annees>1?'s':''}</b>`
+    : `${fmtArgentCourt(j.salaire)} × ${j.ct ?? 0} an${(j.ct??0)>1?'s':''}`;
+  return `<span class="ech-chip${j._resigner?' resigner':''}">${echap(j.nom)} (${j.po})
+    <span class="det">OV ${j.ovEstime?'~':''}${j.ov}${exact?` (${exact})`:''} · ${contratTexte}</span>
+    <label class="ech-resign" title="Compter ce joueur à sa valeur standard de re-signature (minimum de la charte à son statut d'âge) plutôt qu'à son contrat actuel — pour comparer un contrat actif à un joueur qui sera re-signé">
+      <input type="checkbox" data-resign-camp="${camp}" data-nom="${echap(j.nom)}"${j._resigner?' checked':''}> re-signé</label>
     <button data-camp="${camp}" data-nom="${echap(j.nom)}" title="Retirer">×</button></span>`;
 }
 function rendreEchange(){
@@ -3574,6 +3624,13 @@ function rendreEchange(){
       const i = liste.findIndex(j=>j.nom===b.dataset.nom);
       if (i>=0) liste.splice(i,1);
       rendreEchange();
+    });
+  });
+  document.querySelectorAll('.ech-liste input[data-resign-camp]').forEach(chk=>{
+    chk.addEventListener('change', ()=>{
+      const liste = chk.dataset.resignCamp==='s' ? ECHANGE.sortants : ECHANGE.entrants;
+      const j = liste.find(x=>x.nom===chk.dataset.nom);
+      if (j){ j._resigner = chk.checked; rendreEchange(); }
     });
   });
   // impact
@@ -4391,6 +4448,7 @@ if (typeof window !== 'undefined'){
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
+    contratEchange, ovExact, nettoyerLigneXtra,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }

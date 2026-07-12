@@ -1101,6 +1101,58 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     S.rendreClassement();
   }
 
+  console.log('— Noms des Meneurs : nettoyage des balises HTML et entités');
+  {
+    const fixtureHTML = [
+      '    Player                    Team            POS GP   G   A   P  Sh PiM   MP   H Sh/G',
+      '    <a href="stats.php?id=98">Connor Bedard</a> TORONTO         C   40  25  30  55 150  10  800  30 3.75',
+      "    <A HREF='x.php'>Ryan O&#39;Rourke</A> ANAHEIM           D   40   2  10  12  40  30  700  90 1.00"
+    ].join('\n');
+    const xl = S.parseXtraLigue(fixtureHTML);
+    egal(xl.length, 2, 'Lignes avec balises HTML analysées');
+    egal(xl[0].nom, 'Connor Bedard', 'Nom extrait sans balises');
+    egal(xl[1].nom, "Ryan O'Rourke", 'Entité &#39; décodée en apostrophe');
+    egal(S.nettoyerLigneXtra('a &amp; b &nbsp;<b>c</b>'), 'a & b   c ', 'Nettoyage des entités et balises');
+  }
+
+  console.log('— Échange : bascule «re-signé» et OV exact');
+  {
+    // OV exact affiché
+    const bigrasT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Bigras');
+    egal(S.ovExact(bigrasT), '87,85', 'OV exact de Bigras (87,85)');
+    egal(S.ovExact(S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Gibson')), null, 'Pas d\'OV exact pour un gardien');
+    // contratEchange : Bedard (OV 80, 20 ans → RFA, 3 ans) à sa valeur standard
+    const bedardT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Connor Bedard');
+    const reel = S.contratEchange(bedardT);
+    tableauEgal([reel.salaire, reel.annees], [975000, 1], 'Sans bascule : contrat réel (975 k × 1)');
+    const resig = S.contratEchange({...bedardT, _resigner:true});
+    tableauEgal([resig.salaire, resig.annees, resig.statut], [5750000, 3, 'RFA'],
+      'Bascule : valeur standard RFA OV80 = 5,75 M × 3 ans');
+    // dans l'interface : ajouter Bedard comme sortant, cocher la bascule
+    doc.querySelector('nav button[data-vue="echange"]').click();
+    doc.getElementById('echSortant').value = 'Connor Bedard';
+    doc.getElementById('echAjSortant').click();
+    ok(doc.getElementById('echSortants').textContent.includes('(80,27)'), 'OV exact sur la chip');
+    ok(doc.getElementById('echSortants').textContent.includes('re-signé'), 'Bascule «re-signé» présente');
+    const chk = doc.querySelector('#echSortants input[data-resign-camp="s"]');
+    chk.checked = true; chk.dispatchEvent(new W.Event('change'));
+    ok(doc.getElementById('echSortants').textContent.includes('RFA 5,8 M × 3 ans'),
+      'Chip re-signée : statut et valeur de la charte affichés (5,75 M arrondi 5,8 M)');
+    // un entrant re-signé compte à sa valeur standard dans la projection
+    doc.getElementById('echEquipe').value = 'SANJOSE';
+    doc.getElementById('echEquipe').dispatchEvent(new W.Event('change'));
+    doc.getElementById('echEntrant').value = 'Adam Fox';
+    doc.getElementById('echAjEntrant').click();
+    const chkE = doc.querySelector('#echEntrants input[data-resign-camp="e"]');
+    chkE.checked = true; chkE.dispatchEvent(new W.Event('change'));
+    // Fox OV 83, 27 ans → RFA, 3 ans → minimum charte OV 83 RFA = 10 500 000
+    const apresResig = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
+    const attendu = 83571666 - 975000 + 10500000;
+    egal(apresResig[0].masse, attendu, 'Projection : Fox re-signé compte à 10,5 M (charte RFA OV83)');
+    egal(apresResig[1].masse, 28371666 - 0 + 10500000, 'Y23 : le contrat re-signé de 3 ans engage la saison suivante');
+    doc.getElementById('echVider').click();
+  }
+
   console.log('— PWA (installation et hors ligne)');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
