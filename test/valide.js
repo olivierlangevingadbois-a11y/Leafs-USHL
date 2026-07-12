@@ -826,11 +826,27 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(doc.getElementById('triosZone').textContent.includes('OV moyen 82.0'),
     'OV moyen du trio 1 affiché ((83+82+81)/3 = 82.0)');
   egal(doc.getElementById('triosAlerte').textContent, '', 'Aucun doublon après remplissage automatique');
-  // un doublon est signalé
+  // un doublon est signalé dans les trios 1 à 3
+  const selT3AD = doc.querySelector('#triosZone select[data-slot="t3.ad"]');
+  selT3AD.value = 'Filip Zadina'; selT3AD.dispatchEvent(new W.Event('change'));
+  ok(doc.getElementById('triosAlerte').textContent.includes('Filip Zadina'), 'Doublon signalé (Zadina sur les trios 1 et 3)');
+  egal(doc.querySelectorAll('#triosZone select.double').length, 2, 'Les deux postes en conflit sont marqués');
+  // ...mais le DOUBLE SHIFT sur le 4e trio est permis
+  selT3AD.value = 'Ivan Miroshnichenko'; selT3AD.dispatchEvent(new W.Event('change')); // répare le trio 3
   const selT4AD = doc.querySelector('#triosZone select[data-slot="t4.ad"]');
   selT4AD.value = 'Filip Zadina'; selT4AD.dispatchEvent(new W.Event('change'));
-  ok(doc.getElementById('triosAlerte').textContent.includes('Filip Zadina'), 'Doublon signalé (Zadina utilisé deux fois)');
-  egal(doc.querySelectorAll('#triosZone select.double').length, 2, 'Les deux postes en conflit sont marqués');
+  egal(doc.getElementById('triosAlerte').textContent, '',
+    'Double shift : Zadina sur le trio 1 ET le 4e trio → aucune alerte');
+  egal(doc.querySelectorAll('#triosZone select.double').length, 0, 'Aucun poste marqué en conflit');
+  // deux fois sur le 4e trio lui-même, par contre, reste un conflit
+  const selT4AG = doc.querySelector('#triosZone select[data-slot="t4.ag"]');
+  selT4AG.value = 'Filip Zadina'; selT4AG.dispatchEvent(new W.Event('change'));
+  ok(doc.getElementById('triosAlerte').textContent.includes('Filip Zadina'),
+    'Zadina deux fois SUR le 4e trio → doublon signalé');
+  selT4AG.value = 'Ondrej Palat'; selT4AG.dispatchEvent(new W.Event('change'));
+  // remettre le doublon inter-trios pour la suite du scénario (export, persistance)
+  selT4AD.value = 'Paul Cotter'; selT4AD.dispatchEvent(new W.Event('change'));
+  selT3AD.value = 'Filip Zadina'; selT3AD.dispatchEvent(new W.Event('change'));
   // export texte
   const txt = S.texteTrios();
   ok(txt.startsWith('TORONTO — trios'), 'Export texte : en-tête du club');

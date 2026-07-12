@@ -447,7 +447,7 @@
   <!-- ================= TRIOS ================= -->
   <section class="vue" id="vue-trios">
     <h2>Bâtisseur de trios</h2>
-    <div class="h2-sous">Compose les quatre trios, les trois paires de défenseurs et le duo de gardiens à partir de l'alignement. Sauvegardé dans ce navigateur ; «&nbsp;Copier en texte&nbsp;» produit une version prête à coller (courriel, forum, feuille de match).</div>
+    <div class="h2-sous">Compose les quatre trios, les trois paires de défenseurs, le duo de gardiens et les unités spéciales à partir de l'alignement. Le <strong>double shift</strong> est permis sur le 4e trio : un joueur des trios 1 à 3 peut y reprendre sa place sans conflit. Sauvegardé dans ce navigateur ; «&nbsp;Copier en texte&nbsp;» produit une version prête à coller (courriel, forum, feuille de match).</div>
     <div class="trios-actions">
       <button id="btnTriosAuto">Remplir par OV</button>
       <button id="btnTriosCopier" class="secondaire">Copier en texte</button>
@@ -3765,8 +3765,12 @@ const TRIOS_BLOCS = [
   {cle:'in2', titre:'Infériorité numérique 2', type:'X', postes:[['j1','Joueur 1'],['j2','Joueur 2'],['j3','Joueur 3'],['j4','Joueur 4']]}
 ];
 /* Famille d'un bloc : les doublons ne sont signalés qu'à l'intérieur d'une
-   même famille (5 contre 5, avantage numérique, infériorité). */
+   même famille (5 contre 5, avantage numérique, infériorité). Le 4e trio est
+   sa propre famille : la ligue permet le DOUBLE SHIFT — un joueur des trios
+   1 à 3 peut reprendre sa place sur le 4e sans que ce soit un conflit
+   (deux fois sur le 4e trio lui-même, par contre, reste signalé). */
 function familleBloc(cle){
+  if (cle === 't4') return 't4';
   return cle.startsWith('an') ? 'an' : (cle.startsWith('in') ? 'in' : 'ev');
 }
 function litTrios(){
@@ -3785,7 +3789,7 @@ function rendreTrios(){
   const zone = document.getElementById('triosZone');
   if (!zone) return;
   const trios = litTrios();
-  const usage = {ev:{}, an:{}, in:{}};
+  const usage = {ev:{}, t4:{}, an:{}, in:{}};
   for (const [slot, n] of Object.entries(trios)){
     if (!n) continue;
     const fam = familleBloc(slot.split('.')[0]);
