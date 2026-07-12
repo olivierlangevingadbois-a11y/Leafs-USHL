@@ -890,6 +890,41 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(sals[0] >= sals[1] && sals[1] >= sals[2], 'Clic sur Salaire → tri décroissant');
   }
 
+  console.log('— Analyseur d\'échange');
+  doc.querySelector('nav button[data-vue="echange"]').click();
+  egal(doc.getElementById('echSommaire').innerHTML, '', 'Échange vide : aucun sommaire');
+  ok(doc.getElementById('echSortants').textContent.includes('Personne'), 'Listes vides annoncées');
+  // Bigras (11 M, CT 1) part ; Adam Fox de SANJOSE (7,25 M, CT 1) arrive
+  doc.getElementById('echSortant').value = 'Chris Bigras';
+  doc.getElementById('echAjSortant').click();
+  doc.getElementById('echEquipe').value = 'SANJOSE';
+  doc.getElementById('echEquipe').dispatchEvent(new W.Event('change'));
+  doc.getElementById('echEntrant').value = 'Adam Fox';
+  doc.getElementById('echAjEntrant').click();
+  egal(S.ECHANGE.sortants.length, 1, 'Un sortant enregistré');
+  egal(S.ECHANGE.entrants.length, 1, 'Un entrant enregistré');
+  ok(doc.getElementById('echSortants').textContent.includes('Chris Bigras'), 'Chip du sortant affichée');
+  ok(doc.getElementById('echEntrants').textContent.includes('Adam Fox'), 'Chip de l\'entrant affichée');
+  {
+    const apres = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
+    egal(apres[0].masse, 83571666 - 11000000 + 7250000, 'Masse Y22 après : −Bigras (11 M) +Fox (7,25 M)');
+    egal(apres[1].masse, 28371666 - 0 + 0, 'Y23 inchangée : les deux contrats expirent après Y22');
+    ok(doc.getElementById('echSommaire').textContent.includes('Masse Y22 après'), 'Sommaire d\'impact rendu');
+    ok(doc.getElementById('echSommaire').textContent.includes('OV moyen'), 'OV moyen avant/après affiché');
+    egal(doc.querySelectorAll('#tableEchange tbody tr').length, 3, 'Projection sur trois saisons');
+    const b0 = S.bilanClub([], []), b1 = S.bilanClub(S.ECHANGE.sortants, S.ECHANGE.entrants);
+    egal(b1.n, 25, 'Effectif inchangé (1 pour 1)');
+    ok(b1.ov < b0.ov, 'OV moyen en baisse (Bigras 88 → Fox 83)');
+  }
+  // un joueur ajouté disparaît des choix ; retrait par la chip
+  ok(![...doc.getElementById('echSortant').options].some(o=>o.value==='Chris Bigras'),
+    'Bigras retiré du sélecteur des sortants');
+  doc.querySelector('#echSortants button[data-camp="s"]').click();
+  egal(S.ECHANGE.sortants.length, 0, 'Retrait par la chip');
+  doc.getElementById('echVider').click();
+  egal(S.ECHANGE.entrants.length, 0, 'Vider l\'échange');
+  egal(doc.getElementById('echSommaire').innerHTML, '', 'Sommaire retiré après vidage');
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });

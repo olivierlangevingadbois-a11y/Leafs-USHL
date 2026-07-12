@@ -283,6 +283,26 @@
   #ligueCompte{font-family:var(--font-data); font-size:.72rem; color:var(--txt-faint); margin-left:auto;}
   #tableLigue td.eq-club{color:var(--bleu-vif); font-weight:700;}
 
+  /* ---------- Échange ---------- */
+  .ech-colonnes{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;}
+  @media (max-width:900px){ .ech-colonnes{grid-template-columns:1fr;} }
+  .ech-cote{background:var(--panel); border:1px solid var(--line); padding:14px 16px;}
+  .ech-cote h3{font-family:var(--font-body); font-weight:600; text-transform:uppercase; letter-spacing:1.5px;
+    font-size:.78rem; color:var(--accent-vif); margin-bottom:10px;}
+  .ech-ajout{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .ech-ajout select{flex:1; min-width:150px; background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.76rem; padding:7px 9px; border-radius:2px;}
+  .ech-ajout button{font-family:var(--font-body); font-weight:600; font-size:.7rem; letter-spacing:1px; text-transform:uppercase;
+    background:var(--bleu); color:#fff; border:none; padding:7px 14px; cursor:pointer; border-radius:2px;}
+  .ech-ajout button:hover{filter:brightness(1.2);}
+  .ech-liste{display:flex; flex-direction:column; gap:6px; min-height:34px;}
+  .ech-chip{display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line);
+    border-left:3px solid var(--bleu); padding:6px 10px; font-family:var(--font-data); font-size:.74rem;}
+  .ech-chip .det{color:var(--txt-dim); margin-left:auto;}
+  .ech-chip button{background:none; border:none; color:var(--bad); font-size:1rem; cursor:pointer; line-height:1; padding:0 2px;}
+  .ech-vide{color:var(--txt-faint); font-family:var(--font-data); font-size:.72rem;}
+  #tableEchange tr.depasse td{color:var(--bad);}
+
   /* ---------- Comparateur ---------- */
   .comp-choix{display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px;}
   .comp-choix label{display:flex; flex-direction:column; gap:5px; font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-faint);}
@@ -351,6 +371,7 @@
   <button data-vue="trios">Trios</button>
   <button data-vue="comparateur">Comparateur</button>
   <button data-vue="ligue">Ligue</button>
+  <button data-vue="echange">Échange</button>
   <button data-vue="plafond">Plafond</button>
   <button data-vue="ovdetail">OV détaillé</button>
   <button data-vue="reglages">Réglages</button>
@@ -447,6 +468,34 @@
       <span id="ligueCompte"></span>
     </div>
     <div class="table-wrap"><table id="tableLigue"></table></div>
+  </section>
+
+  <!-- ================= ÉCHANGE ================= -->
+  <section class="vue" id="vue-echange">
+    <h2>Analyseur d'échange</h2>
+    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
+    <div class="ech-colonnes">
+      <div class="ech-cote">
+        <h3>Ça part — mon club</h3>
+        <div class="ech-ajout">
+          <select id="echSortant"></select>
+          <button id="echAjSortant">Ajouter</button>
+        </div>
+        <div class="ech-liste" id="echSortants"></div>
+      </div>
+      <div class="ech-cote">
+        <h3>Ça arrive</h3>
+        <div class="ech-ajout">
+          <select id="echEquipe"></select>
+          <select id="echEntrant"></select>
+          <button id="echAjEntrant">Ajouter</button>
+        </div>
+        <div class="ech-liste" id="echEntrants"></div>
+      </div>
+    </div>
+    <div class="sommaire" id="echSommaire"></div>
+    <div class="table-wrap" id="echTableWrap"><table id="tableEchange"></table></div>
+    <div class="regl-actions" style="margin-top:12px"><button id="echVider" class="secondaire">Vider l'échange</button></div>
   </section>
 
   <!-- ================= PLAFOND ================= -->
@@ -2389,6 +2438,103 @@ function rendreComparateur(){
   zone.innerHTML = html;
 }
 
+/* ---------- Analyseur d'échange ----------
+   Brouillon en mémoire : sortants (du club) et entrants (de n'importe quelle
+   équipe). L'impact réutilise la logique de la projection du plafond :
+   contrat effectif = prolongation enregistrée pour un contrat échu, sinon
+   salaire × CT. */
+const ECHANGE = {sortants: [], entrants: []};
+function projectionEchange(sortants, entrants, nbSaisons){
+  const r = litResignatures();
+  const exclus = new Set(sortants.map(j=>normaliserNom(j.nom)));
+  const contrats = ETAT.roster.filter(j=>!j.backup && !exclus.has(normaliserNom(j.nom))).map(j=>{
+    const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
+    return sig ? {salaire: sig.salaire, annees: sig.duree || dureeMaxCharte(sig.statut)}
+               : {salaire: j.salaire || 0, annees: j.ct || 0};
+  });
+  for (const j of entrants) contrats.push({salaire: j.salaire || 0, annees: j.ct || 0});
+  const rangees = [];
+  for (let k = 0; k < (nbSaisons || 3); k++){
+    const masse = contrats.filter(x=>x.annees > k).reduce((s,x)=>s+x.salaire, 0);
+    rangees.push({saison: 'Y' + (22 + k), masse, marge: PLAFOND - masse});
+  }
+  return rangees;
+}
+/* Moyennes du club (OV, âge) pour un état donné de l'échange. */
+function bilanClub(sortants, entrants){
+  const exclus = new Set(sortants.map(j=>normaliserNom(j.nom)));
+  const joueurs = ETAT.roster.filter(j=>!j.backup && !exclus.has(normaliserNom(j.nom))).concat(entrants);
+  const n = joueurs.length || 1;
+  return {
+    n: joueurs.length,
+    ov: joueurs.reduce((s,j)=>s+(j.ov||0),0)/n,
+    age: joueurs.reduce((s,j)=>s+(j.age||0),0)/n
+  };
+}
+function chipEchange(j, camp){
+  return `<span class="ech-chip">${echap(j.nom)} (${j.po})
+    <span class="det">OV ${j.ovEstime?'~':''}${j.ov} · ${fmtArgentCourt(j.salaire)} × ${j.ct ?? 0} an${(j.ct??0)>1?'s':''}</span>
+    <button data-camp="${camp}" data-nom="${echap(j.nom)}" title="Retirer">×</button></span>`;
+}
+function rendreEchange(){
+  const selS = document.getElementById('echSortant');
+  if (!selS) return;
+  const selEq = document.getElementById('echEquipe'), selE = document.getElementById('echEntrant');
+  if (!selEq.options.length){
+    selEq.innerHTML = LIGUE_EQUIPES.filter(e=>e!==CONFIG.equipe).map(e=>`<option value="${e}">${e}</option>`).join('');
+  }
+  const dansListe = (liste, nom) => liste.some(j=>j.nom===nom);
+  selS.innerHTML = joueursEquipe(CONFIG.equipe).filter(j=>!dansListe(ECHANGE.sortants, j.nom))
+    .map(j=>`<option value="${echap(j.nom)}">${echap(j.nom)} (${j.po} · OV ${j.ov} · ${fmtArgentCourt(j.salaire)})</option>`).join('');
+  selE.innerHTML = joueursEquipe(selEq.value).filter(j=>!dansListe(ECHANGE.entrants, j.nom))
+    .map(j=>`<option value="${echap(j.nom)}">${echap(j.nom)} (${j.po} · OV ${j.ovEstime?'~':''}${j.ov} · ${fmtArgentCourt(j.salaire)})</option>`).join('');
+  document.getElementById('echSortants').innerHTML = ECHANGE.sortants.length
+    ? ECHANGE.sortants.map(j=>chipEchange(j,'s')).join('') : '<span class="ech-vide">Personne pour l\'instant.</span>';
+  document.getElementById('echEntrants').innerHTML = ECHANGE.entrants.length
+    ? ECHANGE.entrants.map(j=>chipEchange(j,'e')).join('') : '<span class="ech-vide">Personne pour l\'instant.</span>';
+  document.querySelectorAll('.ech-liste button[data-camp]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const liste = b.dataset.camp==='s' ? ECHANGE.sortants : ECHANGE.entrants;
+      const i = liste.findIndex(j=>j.nom===b.dataset.nom);
+      if (i>=0) liste.splice(i,1);
+      rendreEchange();
+    });
+  });
+  // impact
+  const actif = ECHANGE.sortants.length || ECHANGE.entrants.length;
+  const avant = projectionEchange([], [], 3);
+  const apres = projectionEchange(ECHANGE.sortants, ECHANGE.entrants, 3);
+  const bAvant = bilanClub([], []), bApres = bilanClub(ECHANGE.sortants, ECHANGE.entrants);
+  const delta = apres[0].masse - avant[0].masse;
+  document.getElementById('echSommaire').innerHTML = !actif ? '' : `
+    <div class="stat-carte ${apres[0].masse>PLAFOND?'alerte':''}">
+      <div class="lbl">Masse Y22 après l'échange</div>
+      <div class="val">${fmtArgent(apres[0].masse)}</div>
+      <div class="det">${delta>=0?'+':''}${fmtArgent(delta)} · marge ${fmtArgent(apres[0].marge)}</div></div>
+    <div class="stat-carte"><div class="lbl">OV moyen du club</div>
+      <div class="val">${bApres.ov.toFixed(1)}</div>
+      <div class="det">avant : ${bAvant.ov.toFixed(1)} (${(bApres.ov-bAvant.ov)>=0?'+':''}${(bApres.ov-bAvant.ov).toFixed(2)})</div></div>
+    <div class="stat-carte"><div class="lbl">Âge moyen</div>
+      <div class="val">${bApres.age.toFixed(1)}</div>
+      <div class="det">avant : ${bAvant.age.toFixed(1)}</div></div>
+    <div class="stat-carte orange"><div class="lbl">Effectif</div>
+      <div class="val">${bApres.n}</div>
+      <div class="det">${ECHANGE.sortants.length} départ${ECHANGE.sortants.length>1?'s':''} · ${ECHANGE.entrants.length} arrivée${ECHANGE.entrants.length>1?'s':''}</div></div>`;
+  let html = '';
+  if (actif){
+    html = `<thead><tr><th>Saison</th><th>Masse avant</th><th>Masse après</th><th>Écart</th><th>Marge après (104 M$)</th></tr></thead><tbody>`;
+    for (let k=0;k<3;k++){
+      const d = apres[k].masse - avant[k].masse;
+      html += `<tr class="${apres[k].masse>PLAFOND?'depasse':''}"><td><strong>${apres[k].saison}</strong></td>
+        <td>${fmtArgent(avant[k].masse)}</td><td>${fmtArgent(apres[k].masse)}</td>
+        <td>${d>=0?'+':''}${fmtArgent(d)}</td><td>${fmtArgent(apres[k].marge)}</td></tr>`;
+    }
+    html += '</tbody>';
+  }
+  document.getElementById('tableEchange').innerHTML = html;
+  document.getElementById('echTableWrap').style.display = actif ? '' : 'none';
+}
+
 /* ---------- Joueurs de la ligue (dépistage) ---------- */
 function joueursLigue(){
   const tous = [];
@@ -2815,6 +2961,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='trios') rendreTrios();
     if (b.dataset.vue==='comparateur'){ peuplerComparateur(); rendreComparateur(); }
     if (b.dataset.vue==='ligue') rendreLigue();
+    if (b.dataset.vue==='echange') rendreEchange();
     if (b.dataset.vue==='plafond') rendrePlafond();
     if (b.dataset.vue==='ovdetail') peuplerJoueursOvd();
     if (b.dataset.vue==='reglages') rendreMatrice();
@@ -2850,6 +2997,22 @@ document.getElementById('rechercheAlign').addEventListener('input', e=>{
   document.getElementById(id).addEventListener('input', rendreLigue));
 ['ligueEquipe','liguePo','ligueExpirants'].forEach(id=>
   document.getElementById(id).addEventListener('change', rendreLigue));
+document.getElementById('echAjSortant').addEventListener('click', ()=>{
+  const j = joueursEquipe(CONFIG.equipe).find(x=>x.nom===document.getElementById('echSortant').value);
+  if (j){ ECHANGE.sortants.push(j); rendreEchange(); }
+});
+document.getElementById('echAjEntrant').addEventListener('click', ()=>{
+  const eq = document.getElementById('echEquipe').value;
+  const j = joueursEquipe(eq).find(x=>x.nom===document.getElementById('echEntrant').value);
+  if (j){ ECHANGE.entrants.push(Object.assign({_equipe: eq}, j)); rendreEchange(); }
+});
+document.getElementById('echEquipe').addEventListener('change', ()=>{
+  rendreEchange();
+  actualiserEquipe(document.getElementById('echEquipe').value, rendreEchange);
+});
+document.getElementById('echVider').addEventListener('click', ()=>{
+  ECHANGE.sortants.length = 0; ECHANGE.entrants.length = 0; rendreEchange();
+});
 document.getElementById('progFiltres').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#progFiltres button').forEach(x=>x.classList.remove('actif'));
@@ -3037,7 +3200,8 @@ if (typeof window !== 'undefined'){
     echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond,
     LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
-    joueursLigue, joueursLigueFiltres, rendreLigue};
+    joueursLigue, joueursLigueFiltres, rendreLigue,
+    ECHANGE, projectionEchange, bilanClub, rendreEchange};
 }
 </script>
 </body>
