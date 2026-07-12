@@ -1033,6 +1033,23 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
       'Sans données : invitation à actualiser');
   }
 
+  console.log('— Percentiles de la ligue au comparateur');
+  ok(S.percentileLigue('ov', 88, 'D') >= 95, 'OV 88 chez les défenseurs → 95ᵉ centile et plus');
+  ok(S.percentileLigue('ov', 60, 'F') <= 5, 'OV 60 chez les attaquants → 5ᵉ centile et moins');
+  egal(S.percentileLigue('ov', null, 'F'), null, 'Valeur absente → null');
+  {
+    const p1 = S.percentileLigue('sk', 85, 'F');
+    ok(p1 !== null && p1 >= 0 && p1 <= 100, 'Percentile borné 0-100 (SK 85 attaquants : ' + p1 + ')');
+  }
+  doc.querySelector('nav button[data-vue="comparateur"]').click();
+  S.rendreComparateur();
+  {
+    const bulles = [...doc.querySelectorAll('#compZone .comp-val b[title]')];
+    ok(bulles.length >= 20, 'Info-bulles de centile sur les valeurs (' + bulles.length + ')');
+    ok(bulles.some(b=>b.title.includes('centile des')), 'Le libellé situe la cote dans la ligue');
+    ok(doc.querySelectorAll('#compZone .cent-top').length >= 1, 'Le top 10 % est souligné (Bigras vs Sanheim)');
+  }
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });

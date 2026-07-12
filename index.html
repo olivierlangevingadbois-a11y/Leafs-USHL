@@ -338,6 +338,7 @@
   .comp-val.droite{justify-content:flex-end;}
   .comp-val b{min-width:26px;}
   .comp-val.gagne b{color:var(--bleu-vif);}
+  .comp-val b.cent-top{text-decoration:underline dotted var(--ok); text-underline-offset:3px; cursor:help;}
   .comp-barre{height:8px; border-radius:2px; background:var(--bleu-nuit); position:relative; flex:1; max-width:220px; overflow:hidden;}
   .comp-barre .r{position:absolute; top:0; bottom:0; background:var(--line); border-radius:2px;}
   .comp-barre.gauche .r{right:0;}
@@ -457,7 +458,7 @@
   <!-- ================= COMPARATEUR ================= -->
   <section class="vue" id="vue-comparateur">
     <h2>Comparateur de joueurs</h2>
-    <div class="h2-sous">Deux joueurs de n'importe quelles équipes de la ligue côte à côte : cotes, profil, contrat et modificateurs. La barre pleine marque le plus fort des deux sur chaque cote. Pour les autres équipes, les cotes proviennent des fichiers de la ligue (recote Y22) ; l'OV des gardiens y est estimé (~).</div>
+    <div class="h2-sous">Deux joueurs de n'importe quelles équipes de la ligue côte à côte : cotes, profil, contrat et modificateurs. La barre pleine marque le plus fort des deux sur chaque cote ; survole une valeur pour voir son centile parmi la ligue à sa position (souligné vert = top 10 %). Pour les autres équipes, les cotes proviennent des fichiers de la ligue (recote Y22) ou du direct dès qu'elles sont consultées.</div>
     <div class="comp-choix">
       <label>Équipe A <select id="compEqA"></select></label>
       <label>Joueur A <select id="compA"></select></label>
@@ -3340,6 +3341,10 @@ function rendreComparateur(){
       <span class="meta">${fmtArgent(j.salaire)} · CT ${j.ct ?? '—'} · ModA ${fmtMod(modA(j))}</span>
     </div>`;
   let html = `<div class="comp-grille">${tete(a,'gauche')}<div class="comp-mid">·</div>${tete(b,'droite')}`;
+  const centile = (j, cle) => {
+    const p = percentileLigue(cle, j[cle], groupeDe(j));
+    return p===null ? '' : ` title="${p}ᵉ centile des ${GROUPES_LIGUE[groupeDe(j)]}"${p>=90?' class="cent-top"':''}`;
+  };
   for (const [cle, libelle] of COTES_COMPARATEUR){
     const va = a[cle], vb = b[cle];
     const gagneA = va!==null && (vb===null || va>=vb), gagneB = vb!==null && (va===null || vb>=va);
@@ -3347,11 +3352,11 @@ function rendreComparateur(){
     html += `
       <div class="comp-val droite ${va!==null&&vb!==null&&va>vb?'gagne':''}">
         <div class="comp-barre gauche"><div class="r ${gagneA?'gagne':''}" style="width:${largeur(va).toFixed(1)}%"></div></div>
-        <b>${va??'—'}</b>
+        <b${centile(a, cle)}>${va??'—'}</b>
       </div>
       <div class="comp-mid">${libelle}</div>
       <div class="comp-val ${va!==null&&vb!==null&&vb>va?'gagne':''}">
-        <b>${vb??'—'}</b>
+        <b${centile(b, cle)}>${vb??'—'}</b>
         <div class="comp-barre droite"><div class="r ${gagneB?'gagne':''}" style="width:${largeur(vb).toFixed(1)}%"></div></div>
       </div>`;
   }
@@ -3366,6 +3371,39 @@ function rendreComparateur(){
     provenances.length ? '<br>' + provenances.join(' · ') : ''}</div></div>`;
   zone.innerHTML = html;
 }
+
+/* ---------- Percentiles de la ligue ----------
+   Situe une cote parmi tous les joueurs de la ligue à la même position
+   (attaquants, défenseurs ou gardiens). Distributions mises en mémoire et
+   recalculées quand des alignements en direct arrivent. */
+let _distribsCache = null, _distribsStamp = '';
+const COTES_CLES = ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld'];
+function distributionsLigue(){
+  const stamp = ETAT.equipesLive.size + ':' + ETAT.roster.length;
+  if (_distribsCache && _distribsStamp === stamp) return _distribsCache;
+  const d = {F:{}, D:{}, G:{}};
+  const cles = [...COTES_CLES, 'ov'];
+  for (const j of joueursLigue()){
+    const g = j.po==='D' ? 'D' : (j.po==='G' ? 'G' : 'F');
+    for (const k of cles){
+      const v = j[k];
+      if (v===null || v===undefined) continue;
+      (d[g][k] = d[g][k] || []).push(v);
+    }
+  }
+  _distribsCache = d; _distribsStamp = stamp;
+  return d;
+}
+function percentileLigue(cle, valeur, groupe){
+  if (valeur===null || valeur===undefined) return null;
+  const arr = distributionsLigue()[groupe]?.[cle];
+  if (!arr || !arr.length) return null;
+  let sous = 0, egaux = 0;
+  for (const v of arr){ if (v < valeur) sous++; else if (v === valeur) egaux++; }
+  return Math.round((sous + egaux/2) / arr.length * 100);
+}
+const GROUPES_LIGUE = {F:'attaquants de la ligue', D:'défenseurs de la ligue', G:'gardiens de la ligue'};
+function groupeDe(j){ return j.po==='D' ? 'D' : (j.po==='G' ? 'G' : 'F'); }
 
 /* ---------- Meneurs de la ligue (XtraStats) ---------- */
 const MENEURS_CATS = {
@@ -4239,7 +4277,8 @@ if (typeof window !== 'undefined'){
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
-    COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs};
+    COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
+    percentileLigue, distributionsLigue};
 }
 </script>
 </body>
