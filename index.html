@@ -3686,8 +3686,19 @@ const TRIOS_BLOCS = [
   {cle:'p1', titre:'Paire 1', type:'D', postes:[['dg','D gauche'],['dd','D droit']]},
   {cle:'p2', titre:'Paire 2', type:'D', postes:[['dg','D gauche'],['dd','D droit']]},
   {cle:'p3', titre:'Paire 3', type:'D', postes:[['dg','D gauche'],['dd','D droit']]},
-  {cle:'g',  titre:'Gardiens',type:'G', postes:[['g1','Partant'],['g2','Auxiliaire']]}
+  {cle:'g',  titre:'Gardiens',type:'G', postes:[['g1','Partant'],['g2','Auxiliaire']]},
+  /* unités spéciales : un joueur peut y figurer en plus de son trio,
+     mais pas deux fois dans la même famille d'unités */
+  {cle:'an1', titre:'Avantage numérique 1', type:'X', postes:[['j1','Joueur 1'],['j2','Joueur 2'],['j3','Joueur 3'],['j4','Joueur 4'],['j5','Joueur 5']]},
+  {cle:'an2', titre:'Avantage numérique 2', type:'X', postes:[['j1','Joueur 1'],['j2','Joueur 2'],['j3','Joueur 3'],['j4','Joueur 4'],['j5','Joueur 5']]},
+  {cle:'in1', titre:'Infériorité numérique 1', type:'X', postes:[['j1','Joueur 1'],['j2','Joueur 2'],['j3','Joueur 3'],['j4','Joueur 4']]},
+  {cle:'in2', titre:'Infériorité numérique 2', type:'X', postes:[['j1','Joueur 1'],['j2','Joueur 2'],['j3','Joueur 3'],['j4','Joueur 4']]}
 ];
+/* Famille d'un bloc : les doublons ne sont signalés qu'à l'intérieur d'une
+   même famille (5 contre 5, avantage numérique, infériorité). */
+function familleBloc(cle){
+  return cle.startsWith('an') ? 'an' : (cle.startsWith('in') ? 'in' : 'ev');
+}
 function litTrios(){
   try { return JSON.parse(localStorage.getItem(CLES_LS.trios) || '{}'); }
   catch { return {}; }
@@ -3697,18 +3708,24 @@ function joueursTrios(type){
   const js = ETAT.roster.filter(j=>!j.backup);
   if (type==='D') return js.filter(j=>j.po==='D');
   if (type==='G') return js.filter(j=>j.po==='G');
+  if (type==='X') return js.filter(j=>j.po!=='G'); // unités spéciales : tous les patineurs
   return js.filter(j=>j.po!=='D' && j.po!=='G');
 }
 function rendreTrios(){
   const zone = document.getElementById('triosZone');
   if (!zone) return;
   const trios = litTrios();
-  const usage = {};
-  Object.values(trios).forEach(n=>{ if (n) usage[n] = (usage[n]||0)+1; });
+  const usage = {ev:{}, an:{}, in:{}};
+  for (const [slot, n] of Object.entries(trios)){
+    if (!n) continue;
+    const fam = familleBloc(slot.split('.')[0]);
+    usage[fam][n] = (usage[fam][n]||0)+1;
+  }
   let html = '';
-  const remplis = {F:0, D:0, G:0};
+  const remplis = {F:0, D:0, G:0, X:0};
   for (const bloc of TRIOS_BLOCS){
     const dispo = joueursTrios(bloc.type);
+    const fam = familleBloc(bloc.cle);
     const ovs = [];
     let corps = '';
     for (const [pcle, plabel] of bloc.postes){
@@ -3717,7 +3734,7 @@ function rendreTrios(){
       const jSel = dispo.find(j=>j.nom===val);
       if (jSel){ ovs.push(jSel.ov); remplis[bloc.type]++; }
       corps += `<div class="trio-slot"><span class="poste">${plabel}</span>
-        <select data-slot="${id}" class="${!jSel?'vide':''}${jSel&&usage[val]>1?' double':''}">
+        <select data-slot="${id}" class="${!jSel?'vide':''}${jSel&&usage[fam][val]>1?' double':''}">
           <option value="">—</option>
           ${dispo.map(j=>`<option value="${echap(j.nom)}"${j.nom===val?' selected':''}>${echap(j.nom)} (${j.po} · OV ${j.ovEstime?'~':''}${j.ov})</option>`).join('')}
         </select></div>`;
@@ -3735,11 +3752,11 @@ function rendreTrios(){
       rendreTrios();
     });
   });
-  const doubles = Object.entries(usage).filter(([,n])=>n>1).map(([n])=>n);
+  const doubles = [...new Set([].concat(...Object.values(usage).map(u=>Object.entries(u).filter(([,n])=>n>1).map(([n])=>n))))];
   document.getElementById('triosAlerte').textContent =
-    doubles.length ? '⚠ Joueur utilisé plus d\'une fois : ' + doubles.join(', ') : '';
+    doubles.length ? '⚠ Joueur utilisé plus d\'une fois dans une même famille d\'unités : ' + doubles.join(', ') : '';
   document.getElementById('triosEtat').textContent =
-    `${remplis.F}/12 attaquants · ${remplis.D}/6 défenseurs · ${remplis.G}/2 gardiens`;
+    `${remplis.F}/12 attaquants · ${remplis.D}/6 défenseurs · ${remplis.G}/2 gardiens · ${remplis.X}/18 unités spéciales`;
 }
 /* Remplissage automatique par OV : chaque trio reçoit le meilleur disponible
    à sa position naturelle (sinon le meilleur attaquant restant) ; les paires
@@ -3769,6 +3786,20 @@ function autoTrios(){
   const gs = pool('G');
   if (gs[0]) t['g.g1'] = gs[0].nom;
   if (gs[1]) t['g.g2'] = gs[1].nom;
+  // unités spéciales : l'avantage numérique par le tir (SC), l'infériorité par le jeu défensif (DF)
+  const patineurs = joueursTrios('X');
+  const parSc = [...patineurs].sort((a,b)=>(b.sc??0)-(a.sc??0));
+  const parDf = [...patineurs].sort((a,b)=>(b.df??0)-(a.df??0));
+  for (let u=1; u<=2; u++){
+    for (let s=1; s<=5; s++){
+      const j = parSc[(u-1)*5 + (s-1)];
+      if (j) t[`an${u}.j${s}`] = j.nom;
+    }
+    for (let s=1; s<=4; s++){
+      const j = parDf[(u-1)*4 + (s-1)];
+      if (j) t[`in${u}.j${s}`] = j.nom;
+    }
+  }
   ecritTrios(t);
   rendreTrios();
 }
@@ -3780,6 +3811,8 @@ function texteTrios(){
   for (let i=1; i<=4; i++) l.push(`Trio ${i} : ${slot('t'+i+'.ag')} — ${slot('t'+i+'.c')} — ${slot('t'+i+'.ad')}`);
   for (let i=1; i<=3; i++) l.push(`Paire ${i} : ${slot('p'+i+'.dg')} — ${slot('p'+i+'.dd')}`);
   l.push(`Gardiens : ${slot('g.g1')} / ${slot('g.g2')}`);
+  for (let i=1; i<=2; i++) l.push(`AN ${i} : ${[1,2,3,4,5].map(s=>slot(`an${i}.j${s}`)).join(' — ')}`);
+  for (let i=1; i<=2; i++) l.push(`IN ${i} : ${[1,2,3,4].map(s=>slot(`in${i}.j${s}`)).join(' — ')}`);
   return l.join('\n');
 }
 

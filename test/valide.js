@@ -802,20 +802,27 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   console.log('— Bâtisseur de trios');
   W.localStorage.removeItem('tml_trios_v1');
   doc.querySelector('nav button[data-vue="trios"]').click();
-  egal(doc.querySelectorAll('#triosZone .trio-bloc').length, 8, '8 blocs : 4 trios, 3 paires, gardiens');
-  egal(doc.querySelectorAll('#triosZone select[data-slot]').length, 20, '20 postes à combler');
-  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens',
+  egal(doc.querySelectorAll('#triosZone .trio-bloc').length, 12, '12 blocs : 4 trios, 3 paires, gardiens, 2 AN, 2 IN');
+  egal(doc.querySelectorAll('#triosZone select[data-slot]').length, 38, '38 postes à combler (20 + 18 unités spéciales)');
+  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens · 0/18 unités spéciales',
     'Compteur à zéro au départ');
   S.autoTrios();
   const t = S.litTrios();
-  egal(Object.keys(t).length, 20, 'Remplissage par OV : les 20 postes sont comblés');
+  egal(Object.keys(t).length, 38, 'Remplissage par OV : les 38 postes sont comblés');
   egal(t['t1.c'], 'Barrett Hayton', 'Trio 1, centre = meilleur C par OV (Hayton)');
   egal(t['t1.ag'], 'Filip Zadina', 'Trio 1, AG = meilleur ailier gauche (Zadina)');
   egal(t['t1.ad'], 'Tyson Jost', 'Trio 1, AD = meilleur ailier droit (Jost)');
   egal(t['p1.dg'], 'Chris Bigras', 'Paire 1 = meilleur défenseur (Bigras)');
   egal(t['g.g1'], 'Chris Gibson', 'Gardien partant = meilleur OV (Gibson)');
-  egal(doc.getElementById('triosEtat').textContent, '12/12 attaquants · 6/6 défenseurs · 2/2 gardiens',
+  egal(doc.getElementById('triosEtat').textContent, '12/12 attaquants · 6/6 défenseurs · 2/2 gardiens · 18/18 unités spéciales',
     'Alignement complet après remplissage');
+  // unités spéciales : AN 1 mené par le meilleur tir (SC), IN 1 par le meilleur jeu défensif (DF)
+  egal(t['an1.j1'], 'Filip Zadina', 'AN 1 : meilleur tir du club (Zadina, SC 87)');
+  egal(t['in1.j1'], 'Chris Bigras', 'IN 1 : meilleur jeu défensif (Bigras, DF 86)');
+  ok(Object.values(t).filter(n=>n==='Connor Bedard').length >= 2,
+    'Un joueur peut être à la fois dans son trio et en avantage numérique');
+  egal(doc.getElementById('triosAlerte').textContent, '',
+    'Trio + unité spéciale : pas un doublon (familles distinctes)');
   ok(doc.getElementById('triosZone').textContent.includes('OV moyen 82.0'),
     'OV moyen du trio 1 affiché ((83+82+81)/3 = 82.0)');
   egal(doc.getElementById('triosAlerte').textContent, '', 'Aucun doublon après remplissage automatique');
@@ -829,10 +836,12 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(txt.startsWith('TORONTO — trios'), 'Export texte : en-tête du club');
   ok(txt.includes('Trio 1 : Filip Zadina (83) — Barrett Hayton (82) — Tyson Jost (81)'), 'Export texte : trio 1 lisible');
   ok(txt.includes('Gardiens : Chris Gibson (82) / Kevin Lankinen (79)'), 'Export texte : gardiens');
+  ok(txt.includes('AN 1 : Filip Zadina'), 'Export texte : avantage numérique');
+  ok(/IN 2 : .+ — .+ — .+ — .+/.test(txt), 'Export texte : deuxième unité d\'infériorité complète');
   // persistance
   ok(W.localStorage.getItem('tml_trios_v1').includes('Barrett Hayton'), 'Trios persistés dans le navigateur');
   S.ecritTrios({}); S.rendreTrios();
-  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens',
+  egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens · 0/18 unités spéciales',
     'Vidage : compteur remis à zéro');
 
   console.log('— Actualisation automatique à l\'ouverture');
