@@ -234,6 +234,17 @@
   table.matrice input:focus{border-color:var(--accent); outline:none;}
   table.matrice td, table.matrice th{padding:5px 7px;}
 
+  /* ---------- Bureau du DG (alertes) ---------- */
+  #alertesDG{display:flex; flex-direction:column; gap:6px; margin-bottom:16px;}
+  #alertesDG:empty{display:none;}
+  .alerte-ligne{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--txt-faint);
+    padding:8px 12px; font-family:var(--font-data); font-size:.74rem; color:var(--txt-dim);}
+  .alerte-ligne b{color:var(--txt);}
+  .alerte-ligne.rouge{border-left-color:var(--bad);}
+  .alerte-ligne.rouge b{color:var(--bad);}
+  .alerte-ligne.jaune{border-left-color:var(--warn);}
+  .alerte-ligne.jaune b{color:var(--warn);}
+
   /* ---------- Outils de l'alignement (recherche + export) ---------- */
   .align-outils{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
   .align-outils input[type=search]{
@@ -390,6 +401,7 @@
   <section class="vue actif" id="vue-alignement">
     <h2>Alignement professionnel</h2>
     <div class="h2-sous" id="alignSous">Cotes, salaires et contrats — source : TeamRosters.php (TORONTO)</div>
+    <div id="alertesDG"></div>
     <div class="sommaire" id="alignSommaire"></div>
     <div class="align-outils">
       <input type="search" id="rechercheAlign" placeholder="Filtrer par nom, position ou profil…" aria-label="Filtrer l'alignement">
@@ -2018,9 +2030,70 @@ function calculerMasse(resignMap){
   return {masse, cap: PLAFOND};
 }
 
+/* ---------- Bureau du DG : les urgences en tête de l'alignement ----------
+   Rassemble ce qu'un DG doit voir sans fouiller : plafond, contrats échus,
+   contrats qui expirent, joueurs sous les attentes et gardiens qui
+   approchent leur limite de parties (punitions de la ligue à la clé). */
+function alertesDG(){
+  const alertes = [];
+  const resign = litResignatures();
+  const actifs = ETAT.roster.filter(j=>!j.backup);
+  const {masse, cap} = calculerMasse(resign);
+  if (masse > cap){
+    alertes.push({niveau:'rouge', texte:`<b>Plafond dépassé</b> de ${fmtArgent(masse-cap)} — la ligue ne validera pas l'alignement.`});
+  } else if (cap - masse < 2000000){
+    alertes.push({niveau:'jaune', texte:`<b>Marge mince sous le plafond</b> : ${fmtArgent(cap-masse)}.`});
+  }
+  const echus = actifs.filter(j=>j.ct===0 && !resign[normaliserNom(j.nom)]);
+  if (echus.length){
+    alertes.push({niveau:'rouge', texte:`<b>${echus.length} contrat${echus.length>1?'s':''} échu${echus.length>1?'s':''} sans prolongation</b> : ${echus.map(j=>echap(j.nom)).join(', ')} — règle la situation dans la colonne Re-signer.`});
+  }
+  const expirants = actifs.filter(j=>j.ct===1);
+  if (expirants.length){
+    alertes.push({niveau:'info', texte:`<b>${expirants.length} contrat${expirants.length>1?'s':''}</b> expire${expirants.length>1?'nt':''} à la fin de la saison — planifie les re-signatures (onglet Plafond).`});
+  }
+  // gardiens : limite de parties (limites.json + parties jouées de la saison)
+  for (const g of actifs.filter(j=>j.po==='G')){
+    const lim = ETAT.limites.get(normaliserNom(g.nom));
+    const prod = productionDe(g);
+    if (!lim || !prod || !prod.gp || prod._reference || prod._modeY21) continue;
+    if (prod.gp >= lim){
+      alertes.push({niveau:'rouge', texte:`<b>${echap(g.nom)} a atteint sa limite de parties</b> (${prod.gp}/${lim}) — chaque départ de plus expose le club aux sanctions.`});
+    } else if (prod.gp / lim >= 0.85){
+      alertes.push({niveau:'jaune', texte:`<b>${echap(g.nom)} approche sa limite</b> : ${prod.gp}/${lim} parties (${Math.round(prod.gp/lim*100)} %).`});
+    }
+  }
+  // joueurs sous les attentes (au moins une statistique Décevante ou À oublier)
+  if (ETAT.scoring.patineurs.length || ETAT.scoring.gardiens.length){
+    const matrices = chargerMatrices(), overrides = chargerOverrides();
+    const ctx = {pmRangs: calculerPmRangs(ETAT.scoring.patineurs), limites: ETAT.limites};
+    const enDifficulte = [];
+    for (const j of actifs){
+      const prod = productionDe(j);
+      if (!prod || prod._reference) continue;
+      const mauvaises = (j._profil.stats||[]).some(cle=>{
+        const ev = evaluerStat(cle, valeurStat(j, prod, cle, ctx), seuilsPour(j, cle, matrices, overrides).seuils);
+        return ev.statut==='decevante' || ev.statut==='oublier';
+      });
+      if (mauvaises) enDifficulte.push(j.nom);
+    }
+    if (enDifficulte.length){
+      const noms = enDifficulte.slice(0,4).map(echap).join(', ') + (enDifficulte.length>4 ? '…' : '');
+      alertes.push({niveau:'jaune', texte:`<b>${enDifficulte.length} joueur${enDifficulte.length>1?'s':''} sous les attentes</b> (statut Décevante ou pire) : ${noms} — voir l'onglet Progression, filtre «En difficulté».`});
+    }
+  }
+  return alertes;
+}
+function rendreAlertes(){
+  const zone = document.getElementById('alertesDG');
+  if (!zone) return;
+  zone.innerHTML = alertesDG().map(a=>`<div class="alerte-ligne ${a.niveau}">${a.texte}</div>`).join('');
+}
+
 /* ---------- Alignement ---------- */
 let triAlign = {col:'ov', desc:true};
 function rendreAlignement(){
+  rendreAlertes();
   $('#ficheEquipe').textContent = ETAT.fiche;
   $('#sourceInfo').textContent = ETAT.source;
   const actifs = ETAT.roster.filter(j=>!j.backup);
@@ -3201,7 +3274,7 @@ if (typeof window !== 'undefined'){
     LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
     joueursLigue, joueursLigueFiltres, rendreLigue,
-    ECHANGE, projectionEchange, bilanClub, rendreEchange};
+    ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes};
 }
 </script>
 </body>

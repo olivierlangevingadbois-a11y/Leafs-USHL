@@ -925,6 +925,43 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(S.ECHANGE.entrants.length, 0, 'Vider l\'échange');
   egal(doc.getElementById('echSommaire').innerHTML, '', 'Sommaire retiré après vidage');
 
+  console.log('— Bureau du DG (alertes en tête de l\'alignement)');
+  doc.querySelector('nav button[data-vue="alignement"]').click();
+  {
+    let alertes = S.alertesDG();
+    ok(alertes.some(a=>a.niveau==='info' && a.texte.includes('15 contrats')),
+      'Alerte info : 15 contrats expirent à la fin de la saison');
+    ok(!alertes.some(a=>a.texte.includes('échu')), 'Aucun contrat échu dans l\'alignement de départ');
+    ok(doc.querySelectorAll('#alertesDG .alerte-ligne').length >= 1, 'Bandeau d\'alertes rendu');
+    // contrat échu non prolongé → alerte rouge
+    const jEchu = S.ETAT.roster.find(x=>!x.backup && x.po!=='G');
+    const ctAv = jEchu.ct; jEchu.ct = 0;
+    alertes = S.alertesDG();
+    ok(alertes.some(a=>a.niveau==='rouge' && a.texte.includes(jEchu.nom)),
+      'Contrat échu sans prolongation → alerte rouge nominative');
+    jEchu.ct = ctAv;
+    // gardien près de sa limite / au-delà
+    const avLim = new Map(S.ETAT.limites), avSc = S.ETAT.scoring;
+    S.ETAT.limites.set(S.normaliserNom('Chris Gibson'), 40);
+    S.ETAT.scoring = {patineurs:[], gardiens:[{nom:'Chris Gibson', gp:36, w:20, avg:2.5, svpct:0.91}]};
+    alertes = S.alertesDG();
+    ok(alertes.some(a=>a.niveau==='jaune' && a.texte.includes('approche sa limite') && a.texte.includes('36/40')),
+      'Gardien à 90 % de sa limite → alerte jaune');
+    S.ETAT.scoring.gardiens[0].gp = 40;
+    alertes = S.alertesDG();
+    ok(alertes.some(a=>a.niveau==='rouge' && a.texte.includes('atteint sa limite')),
+      'Gardien à sa limite → alerte rouge');
+    // joueur sous les attentes (production catastrophique sur toute la saison du club)
+    S.ETAT.scoring = {patineurs:[{nom:'Filip Zadina', gp:40, goals:1, assists:1, pts:2, shots:150, plusminus:-20, ppg:0, gwg:0}], gardiens:[]};
+    S.ETAT.fiche = 'TORONTO 20-20-0';
+    alertes = S.alertesDG();
+    ok(alertes.some(a=>a.texte.includes('sous les attentes') && a.texte.includes('Filip Zadina')),
+      'Production décevante → alerte «sous les attentes»');
+    S.ETAT.limites.clear(); avLim.forEach((v,k)=>S.ETAT.limites.set(k,v));
+    S.ETAT.scoring = avSc; S.ETAT.fiche = 'TORONTO 0-0-0';
+    S.rendreAlertes();
+  }
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });
