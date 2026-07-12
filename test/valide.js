@@ -851,6 +851,45 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     dom2.window.close();
   }
 
+  console.log('— Onglet Ligue : dépistage des 32 équipes');
+  doc.querySelector('nav button[data-vue="ligue"]').click();
+  const tousLigue = S.joueursLigue();
+  const attenduLigue = S.LIGUE_EQUIPES.reduce((a,e)=>a+S.joueursEquipe(e).length, 0);
+  egal(tousLigue.length, attenduLigue, 'Tous les vrais joueurs de la ligue réunis (' + attenduLigue + ')');
+  egal(doc.querySelectorAll('#tableLigue tbody tr').length, tousLigue.length, 'Table rendue au complet sans filtre');
+  ok(doc.getElementById('ligueCompte').textContent.includes(String(tousLigue.length)), 'Compteur de joueurs affiché');
+  egal(doc.getElementById('ligueEquipe').options.length, 33, 'Filtre d\'équipe : Toutes + 32');
+  // tri par défaut : OV décroissant
+  {
+    const ovs = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(5)')].slice(0,5)
+      .map(td=>+td.textContent.replace('~',''));
+    ok(ovs.every((v,i)=>i===0 || v<=ovs[i-1]), 'Tri par OV décroissant par défaut');
+  }
+  // filtres
+  const fBase = {texte:'', equipe:'', po:'', ovMin:null, ageMax:null, expirants:false};
+  egal(S.joueursLigueFiltres({...fBase, equipe:'TORONTO'}).length, 25, 'Filtre équipe TORONTO → 25 Leafs');
+  ok(S.joueursLigueFiltres({...fBase, ovMin:85}).every(j=>j.ov>=85), 'Filtre OV min respecté');
+  ok(S.joueursLigueFiltres({...fBase, po:'G'}).every(j=>j.po==='G'), 'Filtre gardiens');
+  ok(S.joueursLigueFiltres({...fBase, po:'F'}).every(j=>j.po!=='D' && j.po!=='G'), 'Filtre attaquants (C, AG, AD)');
+  ok(S.joueursLigueFiltres({...fBase, ageMax:21}).every(j=>j.age<=21), 'Filtre âge max');
+  ok(S.joueursLigueFiltres({...fBase, expirants:true}).every(j=>(j.ct??0)<=1), 'Filtre contrats d\'un an ou échus');
+  egal(S.joueursLigueFiltres({...fBase, texte:'bedard'}).length, 1, 'Recherche par nom');
+  // interaction : le champ OV min filtre la table
+  doc.getElementById('ligueOvMin').value = '85';
+  doc.getElementById('ligueOvMin').dispatchEvent(new W.Event('input'));
+  const nb85 = S.joueursLigueFiltres({...fBase, ovMin:85}).length;
+  egal(doc.querySelectorAll('#tableLigue tbody tr').length, nb85, 'Champ OV min branché sur la table');
+  ok(nb85 > 0 && nb85 < 60, 'Le filtre OV 85+ garde une élite (' + nb85 + ' joueurs)');
+  doc.getElementById('ligueOvMin').value = '';
+  doc.getElementById('ligueOvMin').dispatchEvent(new W.Event('input'));
+  // tri par salaire au clic
+  doc.querySelector('#tableLigue th[data-col="salaire"]').click();
+  {
+    const sals = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(6)')].slice(0,3)
+      .map(td=>S.parseArgent(td.textContent.replace(' $','')));
+    ok(sals[0] >= sals[1] && sals[1] >= sals[2], 'Clic sur Salaire → tri décroissant');
+  }
+
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
 })().catch(e => { console.error('ERREUR FATALE', e); process.exit(1); });

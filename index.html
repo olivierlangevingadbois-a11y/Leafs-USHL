@@ -271,6 +271,18 @@
   .trio-slot select.double{border-color:var(--warn); color:var(--warn);}
   .trio-slot select.vide{color:var(--txt-faint);}
 
+  /* ---------- Ligue ---------- */
+  .ligue-filtres{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
+  .ligue-filtres input[type=search]{background:var(--panel); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.8rem; padding:8px 12px; border-radius:2px; min-width:170px;}
+  .ligue-filtres select, .ligue-filtres input[type=number]{background:var(--bleu-nuit); border:1px solid var(--line);
+    color:var(--txt); font-family:var(--font-data); font-size:.78rem; padding:8px 10px; border-radius:2px;}
+  .ligue-filtres input[type=number]{width:92px;}
+  .ligue-filtres input:focus, .ligue-filtres select:focus{outline:none; border-color:var(--bleu-vif);}
+  .lig-chk{font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); display:inline-flex; align-items:center; gap:6px;}
+  #ligueCompte{font-family:var(--font-data); font-size:.72rem; color:var(--txt-faint); margin-left:auto;}
+  #tableLigue td.eq-club{color:var(--bleu-vif); font-weight:700;}
+
   /* ---------- Comparateur ---------- */
   .comp-choix{display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px;}
   .comp-choix label{display:flex; flex-direction:column; gap:5px; font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-faint);}
@@ -338,6 +350,7 @@
   <button data-vue="progression">Progression</button>
   <button data-vue="trios">Trios</button>
   <button data-vue="comparateur">Comparateur</button>
+  <button data-vue="ligue">Ligue</button>
   <button data-vue="plafond">Plafond</button>
   <button data-vue="ovdetail">OV détaillé</button>
   <button data-vue="reglages">Réglages</button>
@@ -413,6 +426,27 @@
       <label>Joueur B <select id="compB"></select></label>
     </div>
     <div id="compZone"></div>
+  </section>
+
+  <!-- ================= LIGUE ================= -->
+  <section class="vue" id="vue-ligue">
+    <h2>Joueurs de la ligue</h2>
+    <div class="h2-sous">Dépistage à l'échelle des 32 équipes. Les cotes d'une équipe passent en direct dès qu'elle est consultée (comparateur ou calculateur d'OV) ; sinon, instantané des fichiers de la ligue. Clique un en-tête pour trier.</div>
+    <div class="ligue-filtres">
+      <input type="search" id="ligueTexte" placeholder="Nom…" aria-label="Filtrer par nom">
+      <select id="ligueEquipe" aria-label="Équipe"><option value="">Toutes les équipes</option></select>
+      <select id="liguePo" aria-label="Position">
+        <option value="">Toutes les positions</option>
+        <option value="F">Attaquants</option>
+        <option value="C">C</option><option value="AG">AG</option><option value="AD">AD</option>
+        <option value="D">D</option><option value="G">G</option>
+      </select>
+      <input type="number" id="ligueOvMin" placeholder="OV min" min="50" max="99" aria-label="OV minimum">
+      <input type="number" id="ligueAgeMax" placeholder="Âge max" min="18" max="45" aria-label="Âge maximum">
+      <label class="lig-chk"><input type="checkbox" id="ligueExpirants"> contrat d'un an ou échu</label>
+      <span id="ligueCompte"></span>
+    </div>
+    <div class="table-wrap"><table id="tableLigue"></table></div>
   </section>
 
   <!-- ================= PLAFOND ================= -->
@@ -2355,6 +2389,78 @@ function rendreComparateur(){
   zone.innerHTML = html;
 }
 
+/* ---------- Joueurs de la ligue (dépistage) ---------- */
+function joueursLigue(){
+  const tous = [];
+  for (const eq of LIGUE_EQUIPES){
+    for (const j of joueursEquipe(eq)) tous.push(Object.assign({equipe: eq}, j));
+  }
+  return tous;
+}
+let triLigue = {col:'ov', desc:true};
+function filtresLigue(){
+  return {
+    texte: normaliserNom(document.getElementById('ligueTexte').value),
+    equipe: document.getElementById('ligueEquipe').value,
+    po: document.getElementById('liguePo').value,
+    ovMin: nombre(document.getElementById('ligueOvMin').value),
+    ageMax: nombre(document.getElementById('ligueAgeMax').value),
+    expirants: document.getElementById('ligueExpirants').checked
+  };
+}
+function joueursLigueFiltres(f){
+  return joueursLigue().filter(j =>
+    (!f.texte || normaliserNom(j.nom).includes(f.texte))
+    && (!f.equipe || j.equipe === f.equipe)
+    && (!f.po || (f.po === 'F' ? (j.po !== 'D' && j.po !== 'G') : j.po === f.po))
+    && (f.ovMin === null || j.ov >= f.ovMin)
+    && (f.ageMax === null || j.age <= f.ageMax)
+    && (!f.expirants || (j.ct ?? 0) <= 1));
+}
+function rendreLigue(){
+  const table = document.getElementById('tableLigue');
+  if (!table) return;
+  const selEq = document.getElementById('ligueEquipe');
+  if (selEq.options.length <= 1){
+    selEq.innerHTML = '<option value="">Toutes les équipes</option>' +
+      LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
+  }
+  const liste = joueursLigueFiltres(filtresLigue());
+  const c = triLigue.col;
+  liste.sort((a,b)=>{
+    const va = c==='profil' ? a._profil.profil : a[c], vb = c==='profil' ? b._profil.profil : b[c];
+    if (va===vb) return 0;
+    if (va===null||va===undefined) return 1;
+    if (vb===null||vb===undefined) return -1;
+    const r = (typeof va==='string') ? va.localeCompare(vb) : va - vb;
+    return triLigue.desc ? -r : r;
+  });
+  document.getElementById('ligueCompte').textContent = liste.length + ' joueur' + (liste.length>1?'s':'');
+  const cols = [['nom','Nom'],['equipe','Équipe'],['po','PO'],['age','Âge'],['ov','OV'],
+                ['salaire','Salaire'],['ct','CT'],['profil','Profil']];
+  let html = '<thead><tr>' + cols.map(([cl,l])=>
+    `<th data-col="${cl}" class="${triLigue.col===cl?'tri-actif':''}">${l}${triLigue.col===cl?(triLigue.desc?' ▾':' ▴'):''}</th>`).join('') + '</tr></thead><tbody>';
+  for (const j of liste){
+    const badge = j.po==='G' ? 'g' : (j.po==='D' ? 'd' : '');
+    const tag = j.po==='G' ? 'g-tag' : (j.po==='D' ? 'd-tag' : '');
+    html += `<tr><td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>
+      <td class="${j.equipe===CONFIG.equipe?'eq-club':''}">${j.equipe}</td>
+      <td>${j.po}</td><td>${j.age}</td>
+      <td class="${j.ov>=82?'cote-elite':(j.ov>=78?'cote-forte':'')}"><strong>${j.ovEstime?'~':''}${j.ov}</strong></td>
+      <td>${fmtArgent(j.salaire)}</td><td>${j.ct ?? '—'}</td>
+      <td style="text-align:left"><span class="profil-tag ${tag}">${j._profil.profil}</span></td></tr>`;
+  }
+  table.innerHTML = html + '</tbody>';
+  table.querySelectorAll('th[data-col]').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const cl = th.dataset.col;
+      if (triLigue.col===cl) triLigue.desc = !triLigue.desc;
+      else triLigue = {col:cl, desc:true};
+      rendreLigue();
+    });
+  });
+}
+
 /* ---------- Bâtisseur de trios ----------
    Quatre trios (AG-C-AD), trois paires de défenseurs, deux gardiens.
    Persisté dans ce navigateur (clé → nom). Un joueur peut être placé hors
@@ -2708,6 +2814,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='progression') rendreProgression();
     if (b.dataset.vue==='trios') rendreTrios();
     if (b.dataset.vue==='comparateur'){ peuplerComparateur(); rendreComparateur(); }
+    if (b.dataset.vue==='ligue') rendreLigue();
     if (b.dataset.vue==='plafond') rendrePlafond();
     if (b.dataset.vue==='ovdetail') peuplerJoueursOvd();
     if (b.dataset.vue==='reglages') rendreMatrice();
@@ -2739,6 +2846,10 @@ document.getElementById('rechercheAlign').addEventListener('input', e=>{
   ETAT.rechercheAlign = e.target.value;
   rendreAlignement();
 });
+['ligueTexte','ligueOvMin','ligueAgeMax'].forEach(id=>
+  document.getElementById(id).addEventListener('input', rendreLigue));
+['ligueEquipe','liguePo','ligueExpirants'].forEach(id=>
+  document.getElementById(id).addEventListener('change', rendreLigue));
 document.getElementById('progFiltres').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#progFiltres button').forEach(x=>x.classList.remove('actif'));
@@ -2925,7 +3036,8 @@ if (typeof window !== 'undefined'){
     ovDetaille, OV_POIDS, OV_ORDRE, peuplerJoueursOvd, calculerOvd,
     echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond,
     LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
-    estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe};
+    estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
+    joueursLigue, joueursLigueFiltres, rendreLigue};
 }
 </script>
 </body>
