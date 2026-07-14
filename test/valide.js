@@ -1016,13 +1016,64 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   doc.querySelector('nav button[data-vue="recotes"]').click();
   egal(doc.getElementById('recEquipe').value, 'TORONTO', 'Équipe par défaut : mon club');
   egal(doc.querySelectorAll('#tableRecotes tbody tr').length, 25, '25 lignes pour les Leafs');
-  ok(doc.querySelector('#tableRecotes thead').textContent.includes('OV Y21→Y22'), 'Colonne OV avant→après');
+  ok(doc.querySelector('#tableRecotes thead').textContent.includes('OV avant→après'), 'Colonne OV avant→après');
   doc.getElementById('recEquipe').value = 'SANJOSE';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
   ok(doc.querySelector('#tableRecotes tbody').textContent.includes('Jesperi Kotkaniemi'), 'Recotes de SANJOSE affichées');
   ok(doc.querySelectorAll('#tableRecotes td.rec-plus').length >= 1, 'Les hausses sont marquées en vert');
   doc.getElementById('recEquipe').value = 'TORONTO';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
+
+  console.log('— Recotes depuis la fiche ushl.ca du joueur (CareerStatsPlayer)');
+  {
+    // fixture calquée sur la fiche réelle d'Ivan Miroshnichenko (S22 et S21)
+    const ficheHTML = `<html><body>
+      <h2>Ivan Miroshnichenko</h2>
+      <table><tr><th>S</th><th>P</th><th>TM</th><th>GP</th><th>G</th></tr>
+        <tr><td>22</td><td>R</td><td>TOR</td><td>5</td><td>0</td></tr></table>
+      <table><tr><th>S</th><th>IN</th><th>SP</th><th>ST</th><th>EN</th><th>DU</th><th>DI</th><th>SK</th><th>PA</th><th>PC</th><th>DF</th><th>OF</th><th>EX</th><th>LD</th><th>OV</th></tr>
+        <tr><td>22</td><td>69</td><td>78</td><td>74</td><td>76</td><td>72</td><td>77</td><td>78</td><td>74</td><td>77</td><td>59</td><td>85</td><td>50</td><td>49</td><td>79</td></tr>
+        <tr><td>21</td><td>69</td><td>75</td><td>73</td><td>73</td><td>70</td><td>75</td><td>75</td><td>72</td><td>74</td><td>59</td><td>83</td><td>47</td><td>43</td><td>77</td></tr>
+      </table></body></html>` + ' '.repeat(600);
+    const saisons = S.parseFicheAttributs(ficheHTML);
+    egal(saisons.length, 2, 'Deux saisons dans l\'historique des attributs');
+    egal(saisons[0].saison, 22, 'Saison 22 lue');
+    egal(saisons[0].cotes.sp, 78, 'SP de la S22 (78)');
+    egal(saisons[0].cotes.sc, 85, 'Colonne OF lue comme SC (85)');
+    egal(saisons[0].ov, 79, 'OV du site lu (79)');
+    egal(saisons[1].ov, 77, 'OV S21 du site (77)');
+    ok(S.urlFicheJoueur('Ivan Miroshnichenko').includes('CareerStatsPlayer.php?csName=Ivan%20Miroshnichenko'),
+      'URL de la fiche du joueur');
+    // téléchargement (fetch simulé) puis intégration aux recotes
+    const fetchAv = W.fetch;
+    W.fetch = async () => ({ok:true, status:200, text: async () => ficheHTML});
+    await S.chargerFiche('Ivan Miroshnichenko');
+    W.fetch = fetchAv;
+    ok(S.ETAT.fiches.has(S.normaliserNom('Ivan Miroshnichenko')), 'Fiche gardée en mémoire');
+    const recTor = S.recotesEquipe('TORONTO');
+    const miro = recTor.find(r=>r.j.nom==='Ivan Miroshnichenko');
+    egal(miro.source, 'site', 'Recote de Miroshnichenko servie par sa fiche ushl.ca');
+    egal(miro.deltas.sp, 3, 'SP : 75 → 78 = +3 (S21 → S22 du site)');
+    egal(miro.deltas.ld, 6, 'LD : 43 → 49 = +6');
+    egal(miro.ovDelta, 2, 'OV du site : 77 → 79 = +2');
+    egal(miro.somme, 30, 'Δ total depuis la fiche (0+3+1+3+2+2+3+2+3+0+2+3+6)');
+    // rendu : indicateur «✓ site» pour lui, bouton «fiche» pour les autres
+    S.rendreRecotes();
+    const rangMiro = [...doc.querySelectorAll('#tableRecotes tbody tr')].find(r=>r.textContent.includes('Miroshnichenko'));
+    ok(rangMiro.textContent.includes('✓ site'), 'Indicateur «✓ site» sur sa ligne');
+    ok(rangMiro.textContent.includes('77→79'), 'OV avant→après du site affiché');
+    ok(doc.querySelectorAll('#tableRecotes button.btn-fiche').length >= 20, 'Bouton «fiche» sur les autres lignes');
+    ok(!!doc.getElementById('btnRecFiches'), 'Bouton «Compléter depuis les fiches du site» présent');
+    ok(doc.getElementById('recNote').textContent.includes('1 joueur depuis les fiches'), 'Compteur de fiches dans la note');
+    // deuxième appel : servi de la mémoire, aucun réseau
+    W.fetch = () => { throw new Error('ne doit pas être appelé'); };
+    await S.chargerFiche('Ivan Miroshnichenko');
+    W.fetch = fetchAv;
+    // nettoyage
+    S.ETAT.fiches.delete(S.normaliserNom('Ivan Miroshnichenko'));
+    W.localStorage.removeItem('tml_cache_v1');
+    S.rendreRecotes();
+  }
 
   console.log('— Meneurs de la ligue (XtraStats ligue entière)');
   {

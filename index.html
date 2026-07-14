@@ -288,6 +288,14 @@
   #tableRecotes td.rec-plus{color:var(--ok); font-weight:600;}
   #tableRecotes td.rec-moins{color:var(--bad); font-weight:600;}
   #tableRecotes td.rec-zero{color:var(--txt-faint);}
+  #btnRecFiches{font-family:var(--font-body); font-weight:600; font-size:.7rem; letter-spacing:1px; text-transform:uppercase;
+    background:var(--bleu); color:#fff; border:none; padding:8px 14px; cursor:pointer; border-radius:2px;}
+  #btnRecFiches:hover{filter:brightness(1.2);}
+  #btnRecFiches:disabled{background:var(--line); cursor:wait;}
+  .btn-fiche{font-family:var(--font-data); font-size:.62rem; letter-spacing:.4px; padding:3px 8px; cursor:pointer;
+    background:transparent; color:var(--bleu-vif); border:1px solid var(--bleu); border-radius:3px;}
+  .btn-fiche:hover{background:var(--bleu-fonce);}
+  .btn-fiche:disabled{color:var(--txt-faint); border-color:var(--line); cursor:wait;}
 
   /* ---------- Ligue ---------- */
   .ligue-filtres{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
@@ -576,6 +584,7 @@
     <div class="h2-sous">Chaque cote actuelle comparée à la fin de la saison Y21 (fichiers de la ligue) : qui progresse, qui décline — pour cibler les joueurs en ascension et vendre les actifs qui baissent. Vert = a monté, rouge = a baissé. Survole une cellule pour voir avant → après.</div>
     <div class="comp-choix" style="margin-bottom:14px">
       <label>Équipe <select id="recEquipe"></select></label>
+      <button id="btnRecFiches" style="align-self:flex-end" title="Télécharge l'historique des attributs de chaque joueur de l'équipe depuis sa fiche ushl.ca (source la plus fiable : saison par saison, OV du site, gardiens compris)">Compléter depuis les fiches du site</button>
       <span id="recNote" style="font-family:var(--font-data); font-size:.72rem; color:var(--txt-faint); align-self:flex-end; padding-bottom:6px"></span>
     </div>
     <div class="table-wrap"><table id="tableRecotes"></table></div>
@@ -2354,6 +2363,34 @@ function parseScoring(html, doc){
   return {patineurs, gardiens};
 }
 
+/* ---------- Parseur : fiche d'un joueur (CareerStatsPlayer.php) ----------
+   Section «Historique des attributs» : une rangée par saison —
+   S IN SP ST EN DU DI SK PA PC DF OF EX LD OV. C'est la source la plus
+   fiable pour le suivi des recotes (OV du site compris, gardiens inclus). */
+function parseFicheAttributs(html, doc){
+  const d = doc || new DOMParser().parseFromString(html, 'text/html');
+  const correspondance = [['it','IN'],['sp','SP'],['st','ST'],['en','EN'],['du','DU'],['di','DI'],
+    ['sk','SK'],['pa','PA'],['pc','PC'],['df','DF'],['sc','OF'],['ex','EX'],['ld','LD']];
+  for (const table of Array.from(d.querySelectorAll('table'))){
+    const lignes = Array.from(table.querySelectorAll('tr'));
+    if (lignes.length < 2) continue;
+    const entetes = Array.from(lignes[0].querySelectorAll('th,td')).map(c=>c.textContent.trim().toUpperCase());
+    if (entetes[0] !== 'S' || !entetes.includes('OV') || !entetes.includes('IN') || !entetes.includes('OF')) continue;
+    const idx = {}; entetes.forEach((h,i)=>{ idx[h] = i; });
+    const saisons = [];
+    for (let i=1; i<lignes.length; i++){
+      const cel = Array.from(lignes[i].querySelectorAll('td,th')).map(c=>c.textContent.trim());
+      const s = nombre(cel[0]);
+      if (s === null) continue;
+      const cotes = {};
+      for (const [k,h] of correspondance) cotes[k] = nombre(cel[idx[h]]);
+      saisons.push({saison: s, cotes, ov: nombre(cel[idx.OV])});
+    }
+    if (saisons.length) return saisons;
+  }
+  return [];
+}
+
 /* Nettoie une ligne XtraStats avant analyse : selon le relais, les noms
    arrivent entourés de balises HTML (<a href>…</a>) ou de liens markdown
    [Nom](url), avec des entités (&amp;, &#39;). Sans ce nettoyage, les noms
@@ -2545,6 +2582,7 @@ const ETAT = {
   rechercheAlign: '',  // filtre texte de la table d'alignement
   limites: new Map(),  // limites d'utilisation des gardiens (gestiongardiens)
   equipesLive: new Map(), // alignements des autres équipes téléchargés de ushl.ca
+  fiches: new Map(),   // historiques d'attributs des fiches de joueurs (recotes)
   xtraLigue: []        // XtraStats de toute la ligue (meneurs)
 };
 function matchsEquipe(){
@@ -2676,6 +2714,31 @@ async function chargerEquipe(code, forcer){
   ETAT.equipesLive.set(code, joueurs);
   return joueurs;
 }
+/* ---------- Fiche d'un joueur (historique des attributs, ushl.ca) ---------- */
+function urlFicheJoueur(nom){
+  return 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/CareerStatsPlayer.php?csName=' + encodeURIComponent(nom);
+}
+async function chargerFiche(nom, forcer){
+  const cle = normaliserNom(nom);
+  if (!forcer && ETAT.fiches.has(cle)) return ETAT.fiches.get(cle);
+  const cache = litCache();
+  const cleCache = 'fiche_' + cle;
+  const c = cache[cleCache];
+  let saisons = null;
+  if (!forcer && c && (Date.now() - c.t) < CONFIG.ttl.roster){
+    saisons = parseFicheAttributs(c.v);
+  }
+  if (!saisons || !saisons.length){
+    const texte = await chercherViaProxy(urlFicheJoueur(nom));
+    saisons = parseFicheAttributs(texte);
+    if (!saisons.length) throw new Error('historique des attributs introuvable pour ' + nom);
+    cache[cleCache] = {t: Date.now(), v: texte};
+    ecritCache(cache);
+  }
+  ETAT.fiches.set(cle, saisons);
+  return saisons;
+}
+
 /* Déclenche le téléchargement d'une équipe puis re-rend la vue demandeuse.
    Silencieux en cas d'échec : l'instantané intégré demeure affiché. */
 function actualiserEquipe(code, rafraichir){
@@ -3715,12 +3778,37 @@ function rendreEchange(){
   document.getElementById('echTableWrap').style.display = actif ? '' : 'none';
 }
 
-/* ---------- Suivi des recotes (Y21 → maintenant) ---------- */
+/* ---------- Suivi des recotes (Y21 → maintenant) ----------
+   Deux sources, la meilleure gagne :
+   1. la FICHE du joueur sur ushl.ca (CareerStatsPlayer.php, section
+      «Historique des attributs») — saison par saison, OV du site compris,
+      gardiens inclus ; téléchargée à la demande ou pour toute l'équipe ;
+   2. sinon, l'instantané de fin Y21 (USHL21.csv) comparé aux cotes
+      actuelles — environ 140 joueurs de la ligue n'y figurent pas. */
 function cotesY21De(nom){ return COTES_Y21[normaliserNom(nom)] || null; }
 function recotesEquipe(code){
   return joueursEquipe(code).map(j=>{
+    const fiche = ETAT.fiches.get(normaliserNom(j.nom));
+    if (fiche && fiche.length){
+      const tri = [...fiche].sort((a,b)=>b.saison-a.saison);
+      const cur = tri[0], prev = tri[1] || null;
+      if (!prev) return {j, absent:true, source:'site', noteAbsent:'une seule saison à sa fiche ushl.ca (recrue)'};
+      const avant = OV_ORDRE.map(k=>prev.cotes[k]);
+      const actuel = OV_ORDRE.map(k=>cur.cotes[k]);
+      const deltas = {};
+      let somme = 0;
+      OV_ORDRE.forEach((k,i)=>{
+        if (actuel[i]===null || avant[i]===null){ deltas[k] = null; return; }
+        deltas[k] = actuel[i] - avant[i];
+        somme += deltas[k];
+      });
+      return {j, avant, actuel, deltas, somme, source:'site',
+              ovAvant: prev.ov, ovActuel: cur.ov,
+              ovDelta: (prev.ov!==null && cur.ov!==null) ? cur.ov - prev.ov : null};
+    }
     const avant = cotesY21De(j.nom);
-    if (!avant) return {j, absent:true};
+    if (!avant) return {j, absent:true, source:'fichiers',
+      noteAbsent:'non recensé à la fin de la Y21 — consulte sa fiche ushl.ca (bouton à droite)'};
     const deltas = {};
     let somme = 0;
     OV_ORDRE.forEach((k,i)=>{
@@ -3733,7 +3821,8 @@ function recotesEquipe(code){
       const r = ovDetaille(Object.fromEntries(OV_ORDRE.map((k,i)=>[k, avant[i]])), j.po==='D'?'D':'F');
       ovAvant = r ? r.arrondi : null;
     }
-    return {j, avant, deltas, somme, ovAvant,
+    return {j, avant, actuel: OV_ORDRE.map(k=>j[k]), deltas, somme, source:'fichiers', ovAvant,
+            ovActuel: j.ov ?? null,
             ovDelta: (ovAvant!==null && j.ov!==null && j.ov!==undefined) ? j.ov - ovAvant : null};
   });
 }
@@ -3752,28 +3841,57 @@ function rendreRecotes(){
     const cls = d>0 ? 'rec-plus' : (d<0 ? 'rec-moins' : 'rec-zero');
     return `<td class="${cls}" title="${av} → ${ap}">${d>0?'+':''}${d||'·'}</td>`;
   };
-  let html = '<thead><tr><th>Nom</th><th>PO</th><th>Âge</th><th>OV Y21→Y22</th>'
-    + OV_ORDRE.map(k=>`<th>${OVD_LIBELLES[k]}</th>`).join('') + '<th>Δ total</th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Nom</th><th>PO</th><th>Âge</th><th>OV avant→après</th>'
+    + OV_ORDRE.map(k=>`<th>${OVD_LIBELLES[k]}</th>`).join('') + '<th>Δ total</th><th>Fiche</th></tr></thead><tbody>';
+  const btnFiche = r => r.source==='site'
+    ? '<td class="rec-zero" title="Historique des attributs de sa fiche ushl.ca">✓ site</td>'
+    : `<td><button class="btn-fiche" data-nom="${echap(r.j.nom)}" title="Télécharger l'historique des attributs de sa fiche ushl.ca (CareerStatsPlayer)">fiche</button></td>`;
   for (const r of lignes){
     html += `<tr><td>${echap(r.j.nom)}</td><td>${r.j.po}</td><td>${r.j.age}</td>`;
     if (r.absent){
-      html += `<td class="rec-zero" colspan="${OV_ORDRE.length+2}" style="text-align:left">non recensé à la fin de la Y21 (recrue ou nouveau venu)</td></tr>`;
+      html += `<td class="rec-zero" colspan="${OV_ORDRE.length+2}" style="text-align:left">${r.noteAbsent}</td>${btnFiche(r)}</tr>`;
       continue;
     }
     if (r.ovDelta!==null){
       const cls = r.ovDelta>0?'rec-plus':(r.ovDelta<0?'rec-moins':'rec-zero');
-      html += `<td class="${cls}" title="${r.ovAvant} → ${r.j.ov}">${r.ovAvant}→${r.j.ov} (${r.ovDelta>0?'+':''}${r.ovDelta||'='})</td>`;
+      html += `<td class="${cls}" title="${r.ovAvant} → ${r.ovActuel}">${r.ovAvant}→${r.ovActuel} (${r.ovDelta>0?'+':''}${r.ovDelta||'='})</td>`;
     } else {
       html += `<td class="rec-zero">${r.j.po==='G'?'gardien':'—'}</td>`;
     }
-    OV_ORDRE.forEach((k,i)=>{ html += cell(r.deltas[k], r.avant[i], r.j[k]); });
+    OV_ORDRE.forEach((k,i)=>{ html += cell(r.deltas[k], r.avant[i], r.actuel[i]); });
     const clsS = r.somme>0?'rec-plus':(r.somme<0?'rec-moins':'rec-zero');
-    html += `<td class="${clsS}"><strong>${r.somme>0?'+':''}${r.somme}</strong></td></tr>`;
+    html += `<td class="${clsS}"><strong>${r.somme>0?'+':''}${r.somme}</strong></td>${btnFiche(r)}</tr>`;
   }
   table.innerHTML = html + '</tbody>';
+  table.querySelectorAll('button.btn-fiche').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      b.disabled = true; b.textContent = '…';
+      chargerFiche(b.dataset.nom)
+        .then(()=>{ rendreRecotes(); flash('Fiche de ' + b.dataset.nom + ' chargée depuis ushl.ca'); })
+        .catch(()=>{ b.disabled = false; b.textContent = 'fiche'; flash('Fiche introuvable — réessaie dans un instant'); });
+    });
+  });
+  const nbSite = lignes.filter(r=>r.source==='site').length;
   document.getElementById('recNote').textContent =
-    selEq.value===CONFIG.equipe || ETAT.equipesLive.has(selEq.value)
-      ? 'cotes actuelles en direct' : `cotes actuelles : fichiers de la ligue du ${LIGUE_DATE}`;
+    (nbSite ? `${nbSite} joueur${nbSite>1?'s':''} depuis les fiches du site · ` : '')
+    + (selEq.value===CONFIG.equipe || ETAT.equipesLive.has(selEq.value)
+      ? 'cotes actuelles en direct' : `cotes actuelles : fichiers de la ligue du ${LIGUE_DATE}`);
+}
+/* Télécharge les fiches ushl.ca de tous les joueurs de l'équipe affichée. */
+async function telechargerFichesEquipe(){
+  const btn = document.getElementById('btnRecFiches');
+  btn.disabled = true;
+  const code = document.getElementById('recEquipe').value;
+  const manquants = joueursEquipe(code).filter(j=>!ETAT.fiches.has(normaliserNom(j.nom)));
+  let faites = 0;
+  for (const j of manquants){
+    try { await chargerFiche(j.nom); } catch(e){ /* fiche injoignable : on continue */ }
+    rendreRecotes();
+    document.getElementById('recNote').textContent = `fiches ushl.ca : ${++faites}/${manquants.length} (${j.nom})…`;
+  }
+  btn.disabled = false;
+  rendreRecotes();
+  flash('Fiches de ' + code + ' chargées depuis ushl.ca');
 }
 
 /* ---------- Joueurs de la ligue (dépistage) ---------- */
@@ -4321,6 +4439,7 @@ document.getElementById('recEquipe').addEventListener('change', ()=>{
   rendreRecotes();
   actualiserEquipe(document.getElementById('recEquipe').value, rendreRecotes);
 });
+document.getElementById('btnRecFiches').addEventListener('click', telechargerFichesEquipe);
 ['menCategorie','menPo','menLeafs'].forEach(id=>
   document.getElementById(id).addEventListener('change', rendreMeneurs));
 document.getElementById('btnFiches').addEventListener('click', telechargerFiches);
@@ -4521,6 +4640,7 @@ if (typeof window !== 'undefined'){
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
     resignatureStandard, salaireSaisonEchange, ovExact, nettoyerLigneXtra,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
+    parseFicheAttributs, chargerFiche, urlFicheJoueur, telechargerFichesEquipe,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }
 </script>
