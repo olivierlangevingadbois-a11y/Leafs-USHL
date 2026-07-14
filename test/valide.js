@@ -884,11 +884,19 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(doc.querySelectorAll('#tableLigue tbody tr').length, tousLigue.length, 'Table rendue au complet sans filtre');
   ok(doc.getElementById('ligueCompte').textContent.includes(String(tousLigue.length)), 'Compteur de joueurs affiché');
   egal(doc.getElementById('ligueEquipe').options.length, 33, 'Filtre d\'équipe : Toutes + 32');
-  // tri par défaut : OV décroissant
+  // toutes les cotes affichées, OV exact à deux décimales
+  ok(['IT','SP','ST','EN','DU','DI','SK','PA','PC','DF','SC','EX','LD'].every(h=>
+    doc.querySelector('#tableLigue thead').textContent.includes(h)), 'Les 13 cotes ont leur colonne');
   {
-    const ovs = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(5)')].slice(0,5)
-      .map(td=>+td.textContent.replace('~',''));
-    ok(ovs.every((v,i)=>i===0 || v<=ovs[i-1]), 'Tri par OV décroissant par défaut');
+    const rangBigras = [...doc.querySelectorAll('#tableLigue tbody tr')].find(r=>r.textContent.includes('Chris Bigras'));
+    ok(!!rangBigras && rangBigras.textContent.includes('87,85'), 'OV exact de Bigras affiché (87,85)');
+    ok(rangBigras.textContent.includes('96'), 'Cote IT de Bigras affichée (96)');
+  }
+  // tri par défaut : OV (exact) décroissant — colonne 18
+  {
+    const ovs = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(18)')].slice(0,5)
+      .map(td=>parseFloat(td.textContent.replace('~','').replace(',','.')));
+    ok(ovs.every((v,i)=>i===0 || v<=ovs[i-1]), 'Tri par OV exact décroissant par défaut');
   }
   // filtres
   const fBase = {texte:'', equipe:'', po:'', ovMin:null, ageMax:null, expirants:false};
@@ -910,7 +918,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   // tri par salaire au clic
   doc.querySelector('#tableLigue th[data-col="salaire"]').click();
   {
-    const sals = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(6)')].slice(0,3)
+    const sals = [...doc.querySelectorAll('#tableLigue tbody tr td:nth-child(19)')].slice(0,3)
       .map(td=>S.parseArgent(td.textContent.replace(' $','')));
     ok(sals[0] >= sals[1] && sals[1] >= sals[2], 'Clic sur Salaire → tri décroissant');
   }

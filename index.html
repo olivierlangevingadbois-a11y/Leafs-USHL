@@ -3799,9 +3799,21 @@ function rendreLigue(){
       LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
   }
   const liste = joueursLigueFiltres(filtresLigue());
+  // OV détaillé (deux décimales) pour l'affichage ET le tri des patineurs ;
+  // les gardiens gardent leur OV (estimé ou en direct)
+  for (const j of liste){
+    if (j._ovd === undefined){
+      let v = null;
+      if (j.po !== 'G'){
+        try { v = ovDetaille(j, j.po==='D'?'D':'F')?.valeur ?? null; } catch(e){ v = null; }
+      }
+      j._ovd = v !== null ? v : j.ov;
+    }
+  }
   const c = triLigue.col;
   liste.sort((a,b)=>{
-    const va = c==='profil' ? a._profil.profil : a[c], vb = c==='profil' ? b._profil.profil : b[c];
+    const va = c==='profil' ? a._profil.profil : (c==='ov' ? a._ovd : a[c]);
+    const vb = c==='profil' ? b._profil.profil : (c==='ov' ? b._ovd : b[c]);
     if (va===vb) return 0;
     if (va===null||va===undefined) return 1;
     if (vb===null||vb===undefined) return -1;
@@ -3809,8 +3821,10 @@ function rendreLigue(){
     return triLigue.desc ? -r : r;
   });
   document.getElementById('ligueCompte').textContent = liste.length + ' joueur' + (liste.length>1?'s':'');
-  const cols = [['nom','Nom'],['equipe','Équipe'],['po','PO'],['age','Âge'],['ov','OV'],
-                ['salaire','Salaire'],['ct','CT'],['profil','Profil']];
+  const cols = [['nom','Nom'],['equipe','Équipe'],['po','PO'],['age','Âge'],
+                ['it','IT'],['sp','SP'],['st','ST'],['en','EN'],['du','DU'],['di','DI'],['sk','SK'],
+                ['pa','PA'],['pc','PC'],['df','DF'],['sc','SC'],['ex','EX'],['ld','LD'],
+                ['ov','OV'],['salaire','Salaire'],['ct','CT'],['profil','Profil']];
   let html = '<thead><tr>' + cols.map(([cl,l])=>
     `<th data-col="${cl}" class="${triLigue.col===cl?'tri-actif':''}">${l}${triLigue.col===cl?(triLigue.desc?' ▾':' ▴'):''}</th>`).join('') + '</tr></thead><tbody>';
   for (const j of liste){
@@ -3818,8 +3832,16 @@ function rendreLigue(){
     const tag = j.po==='G' ? 'g-tag' : (j.po==='D' ? 'd-tag' : '');
     html += `<tr><td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>
       <td class="${j.equipe===CONFIG.equipe?'eq-club':''}">${j.equipe}</td>
-      <td>${j.po}</td><td>${j.age}</td>
-      <td class="${j.ov>=82?'cote-elite':(j.ov>=78?'cote-forte':'')}"><strong>${j.ovEstime?'~':''}${j.ov}</strong></td>
+      <td>${j.po}</td><td>${j.age}</td>`;
+    for (const cle of ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld']){
+      const v = j[cle];
+      const cls = (v===null||v===undefined) ? '' : (v>=85?'cote-elite':(v>=78?'cote-forte':''));
+      html += `<td class="${cls}">${v ?? '—'}</td>`;
+    }
+    const ovAff = (j.po==='G')
+      ? `${j.ovEstime?'~':''}${j.ov}`
+      : j._ovd.toFixed(2).replace('.', ',');
+    html += `<td class="${j.ov>=82?'cote-elite':(j.ov>=78?'cote-forte':'')}"><strong>${ovAff}</strong></td>
       <td>${fmtArgent(j.salaire)}</td><td>${j.ct ?? '—'}</td>
       <td style="text-align:left"><span class="profil-tag ${tag}">${j._profil.profil}</span></td></tr>`;
   }
