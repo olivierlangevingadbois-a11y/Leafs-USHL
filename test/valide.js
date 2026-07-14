@@ -1021,6 +1021,10 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
   ok(doc.querySelector('#tableRecotes tbody').textContent.includes('Jesperi Kotkaniemi'), 'Recotes de SANJOSE affichées');
   ok(doc.querySelectorAll('#tableRecotes td.rec-plus').length >= 1, 'Les hausses sont marquées en vert');
+  {
+    const rangKotka = [...doc.querySelectorAll('#tableRecotes tbody tr')].find(r=>r.textContent.includes('Kotkaniemi'));
+    ok(/\d{2},\d{2}→\d{2},\d{2}/.test(rangKotka.textContent), 'OV exact aussi pour la source fichiers (CSV)');
+  }
   doc.getElementById('recEquipe').value = 'TORONTO';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
 
@@ -1061,7 +1065,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     S.rendreRecotes();
     const rangMiro = [...doc.querySelectorAll('#tableRecotes tbody tr')].find(r=>r.textContent.includes('Miroshnichenko'));
     ok(rangMiro.textContent.includes('✓ site'), 'Indicateur «✓ site» sur sa ligne');
-    ok(rangMiro.textContent.includes('77→79'), 'OV avant→après du site affiché');
+    ok(/\d{2},\d{2}→\d{2},\d{2} \(\+\d+,\d{2}\)/.test(rangMiro.textContent),
+      'OV EXACT avant→après affiché (xx,xx→xx,xx (+x,xx))');
+    // valeurs exactes recalculées sur les cotes de chaque saison de la fiche
+    const avExact = S.ovDetaille(Object.fromEntries(S.OV_ORDRE.map((k,i)=>[k,[69,75,73,73,70,75,75,72,74,59,83,47,43][i]])),'F').valeur;
+    const apExact = S.ovDetaille(Object.fromEntries(S.OV_ORDRE.map((k,i)=>[k,[69,78,74,76,72,77,78,74,77,59,85,50,49][i]])),'F').valeur;
+    ok(rangMiro.textContent.includes(avExact.toFixed(2).replace('.',',')), 'OV exact S21 (' + avExact.toFixed(2) + ')');
+    ok(rangMiro.textContent.includes(apExact.toFixed(2).replace('.',',')), 'OV exact S22 (' + apExact.toFixed(2) + ')');
+    ok((rangMiro.querySelector('td[title*="site"]')||{}).title?.includes('77 → 79'),
+      'Les OV affichés sur le site (77 → 79) restent au survol');
     ok(doc.querySelectorAll('#tableRecotes button.btn-fiche').length >= 20, 'Bouton «fiche» sur les autres lignes');
     ok(!!doc.getElementById('btnRecFiches'), 'Bouton «Compléter depuis les fiches du site» présent');
     ok(doc.getElementById('recNote').textContent.includes('1 joueur depuis les fiches'), 'Compteur de fiches dans la note');

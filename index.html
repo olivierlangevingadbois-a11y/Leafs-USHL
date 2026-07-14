@@ -3786,6 +3786,14 @@ function rendreEchange(){
    2. sinon, l'instantané de fin Y21 (USHL21.csv) comparé aux cotes
       actuelles — environ 140 joueurs de la ligue n'y figurent pas. */
 function cotesY21De(nom){ return COTES_Y21[normaliserNom(nom)] || null; }
+/* OV exact (valeur au centième) d'un tableau de 13 cotes, patineurs seulement. */
+function ovExactDe(cotesArr, po){
+  if (po === 'G') return null;
+  try {
+    const r = ovDetaille(Object.fromEntries(OV_ORDRE.map((k,i)=>[k, cotesArr[i]])), po==='D'?'D':'F');
+    return r ? r.valeur : null;
+  } catch (e){ return null; }
+}
 function recotesEquipe(code){
   return joueursEquipe(code).map(j=>{
     const fiche = ETAT.fiches.get(normaliserNom(j.nom));
@@ -3802,8 +3810,11 @@ function recotesEquipe(code){
         deltas[k] = actuel[i] - avant[i];
         somme += deltas[k];
       });
+      const ovAvantExact = ovExactDe(avant, j.po), ovActuelExact = ovExactDe(actuel, j.po);
       return {j, avant, actuel, deltas, somme, source:'site',
               ovAvant: prev.ov, ovActuel: cur.ov,
+              ovAvantExact, ovActuelExact,
+              ovDeltaExact: (ovAvantExact!==null && ovActuelExact!==null) ? ovActuelExact - ovAvantExact : null,
               ovDelta: (prev.ov!==null && cur.ov!==null) ? cur.ov - prev.ov : null};
     }
     const avant = cotesY21De(j.nom);
@@ -3821,8 +3832,12 @@ function recotesEquipe(code){
       const r = ovDetaille(Object.fromEntries(OV_ORDRE.map((k,i)=>[k, avant[i]])), j.po==='D'?'D':'F');
       ovAvant = r ? r.arrondi : null;
     }
-    return {j, avant, actuel: OV_ORDRE.map(k=>j[k]), deltas, somme, source:'fichiers', ovAvant,
+    const actuel = OV_ORDRE.map(k=>j[k]);
+    const ovAvantExact = ovExactDe(avant, j.po), ovActuelExact = ovExactDe(actuel, j.po);
+    return {j, avant, actuel, deltas, somme, source:'fichiers', ovAvant,
             ovActuel: j.ov ?? null,
+            ovAvantExact, ovActuelExact,
+            ovDeltaExact: (ovAvantExact!==null && ovActuelExact!==null) ? ovActuelExact - ovAvantExact : null,
             ovDelta: (ovAvant!==null && j.ov!==null && j.ov!==undefined) ? j.ov - ovAvant : null};
   });
 }
@@ -3835,7 +3850,8 @@ function rendreRecotes(){
     selEq.value = CONFIG.equipe;
   }
   const lignes = recotesEquipe(selEq.value);
-  lignes.sort((a,b)=> (b.ovDelta ?? b.somme/20 ?? -99) - (a.ovDelta ?? a.somme/20 ?? -99));
+  const rangDe = r => r.ovDeltaExact ?? r.ovDelta ?? (r.somme!==undefined ? r.somme/20 : -99);
+  lignes.sort((a,b)=> rangDe(b) - rangDe(a));
   const cell = (d, av, ap) => {
     if (d===null || d===undefined) return '<td class="rec-zero">—</td>';
     const cls = d>0 ? 'rec-plus' : (d<0 ? 'rec-moins' : 'rec-zero');
@@ -3852,7 +3868,15 @@ function rendreRecotes(){
       html += `<td class="rec-zero" colspan="${OV_ORDRE.length+2}" style="text-align:left">${r.noteAbsent}</td>${btnFiche(r)}</tr>`;
       continue;
     }
-    if (r.ovDelta!==null){
+    if (r.ovAvantExact!==null && r.ovActuelExact!==null){
+      // OV exact au centième, calculé sur les cotes de chaque saison
+      const dE = r.ovActuelExact - r.ovAvantExact;
+      const cls = dE>0.005?'rec-plus':(dE<-0.005?'rec-moins':'rec-zero');
+      const fx = v => v.toFixed(2).replace('.', ',');
+      const titre = (r.ovAvant!==null && r.ovActuel!==null)
+        ? ` title="OV ${r.source==='site'?'affiché sur le site':'arrondi'} : ${r.ovAvant} → ${r.ovActuel}"` : '';
+      html += `<td class="${cls}"${titre}>${fx(r.ovAvantExact)}→${fx(r.ovActuelExact)} (${dE>0?'+':''}${fx(dE)})</td>`;
+    } else if (r.ovDelta!==null){
       const cls = r.ovDelta>0?'rec-plus':(r.ovDelta<0?'rec-moins':'rec-zero');
       html += `<td class="${cls}" title="${r.ovAvant} → ${r.ovActuel}">${r.ovAvant}→${r.ovActuel} (${r.ovDelta>0?'+':''}${r.ovDelta||'='})</td>`;
     } else {
