@@ -45,6 +45,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(bedard.age, 20, 'Bedard a 20 ans (catégorie junior)');
   const gibson = S.SECOURS_ROSTER.find(j => j.nom === 'Chris Gibson');
   egal(gibson.ov, 82, 'OV estimé de Gibson (gardien) = 82');
+  egal(gibson.ct, 0, 'Contrat de Gibson échu (CT 0) — état d\'entre-saison rétabli depuis le CSV de fin Y21');
   egal(gibson.ovEstime, true, 'L\'OV des gardiens de secours porte le drapeau ovEstime');
   ok(S.SECOURS_ROSTER.filter(j=>j.po!=='G').every(j=>!j.ovEstime), 'L\'OV des patineurs n\'est pas marqué estimé');
   egal(gibson.df, null, 'DF du gardien = null');
@@ -296,9 +297,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   console.log('— Masse salariale (cohérence)');
   const actifs = S.SECOURS_ROSTER.filter(x2 => !x2.backup);
   const comptabilises = actifs.filter(x2 => x2.ct > 0);
-  egal(comptabilises.length, 25, 'Les 25 joueurs TORONTO sont sous contrat');
+  egal(comptabilises.length, 24, '24 joueurs sous contrat (Gibson échu, exclu du plafond)');
   const masse = comptabilises.reduce((s2, x2) => s2 + x2.salaire, 0);
-  egal(masse, 83571666, 'Masse salariale des 25 joueurs sous contrat = 83 571 666 $');
+  egal(masse, 76821666, 'Masse salariale des 24 joueurs sous contrat = 76 821 666 $');
   ok(!doc.querySelector('#alignSommaire .stat-carte').classList.contains('alerte'), 'Sous le plafond de 104 M$ : aucune alerte');
   ok(doc.querySelector('#alignSommaire .stat-carte .det').textContent.replace(/\s/g,'').includes('104000000'), 'Plafond affiché = 104 000 000 $');
 
@@ -657,11 +658,11 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const proj = S.projectionPlafond(5, {});
   egal(proj.length, 5, 'Cinq saisons projetées');
   egal(proj[0].saison, 'Y22', 'La projection démarre à la saison Y22');
-  egal(proj[0].masse, 83571666, 'Masse Y22 = masse salariale actuelle');
-  egal(proj[0].engages, 25, '25 joueurs sous contrat en Y22');
-  egal(proj[0].marge, 104000000 - 83571666, 'Marge Y22 sous le plafond de 104 M$');
-  egal(proj[1].masse, 28371666, 'Masse Y23 = contrats de 2 ans et plus');
-  egal(proj[1].engages, 10, '10 joueurs encore sous contrat en Y23');
+  egal(proj[0].masse, 76821666, 'Masse Y22 = masse salariale actuelle (Gibson échu exclu)');
+  egal(proj[0].engages, 24, '24 joueurs sous contrat en Y22');
+  egal(proj[0].marge, 104000000 - 76821666, 'Marge Y22 sous le plafond de 104 M$');
+  egal(proj[1].masse, 21621666, 'Masse Y23 = contrats de 2 ans et plus');
+  egal(proj[1].engages, 9, '9 joueurs encore sous contrat en Y23');
   egal(proj[2].masse, 14500000, 'Masse Y24 = Hayton + Merkley (7,25 M chacun)');
   egal(proj[2].engages, 2, 'Deux contrats de 3 ans');
   egal(proj[3].masse, 0, 'Aucun contrat ne couvre la Y25');
@@ -940,8 +941,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(doc.getElementById('echEntrants').textContent.includes('Adam Fox'), 'Chip de l\'entrant affichée');
   {
     const apres = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
-    egal(apres[0].masse, 83571666 - 11000000 + 7250000, 'Masse Y22 après : −Bigras (11 M) +Fox (7,25 M)');
-    egal(apres[1].masse, 28371666 - 0 + 0, 'Y23 inchangée : les deux contrats expirent après Y22');
+    egal(apres[0].masse, 76821666 - 11000000 + 7250000, 'Masse Y22 après : −Bigras (11 M) +Fox (7,25 M)');
+    egal(apres[1].masse, 21621666, 'Y23 inchangée : les deux contrats expirent après Y22');
     ok(doc.getElementById('echSommaire').textContent.includes('Masse Y22 après'), 'Sommaire d\'impact rendu');
     ok(doc.getElementById('echSommaire').textContent.includes('OV moyen'), 'OV moyen avant/après affiché');
     egal(doc.querySelectorAll('#tableEchange tbody tr').length, 3, 'Projection sur trois saisons');
@@ -964,7 +965,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     let alertes = S.alertesDG();
     ok(alertes.some(a=>a.niveau==='info' && a.texte.includes('15 contrats')),
       'Alerte info : 15 contrats expirent à la fin de la saison');
-    ok(!alertes.some(a=>a.texte.includes('échu')), 'Aucun contrat échu dans l\'alignement de départ');
+    ok(alertes.some(a=>a.niveau==='rouge' && a.texte.includes('Chris Gibson')),
+      'Contrat échu de Gibson signalé dès le départ (entre-saison)');
     ok(doc.querySelectorAll('#alertesDG .alerte-ligne').length >= 1, 'Bandeau d\'alertes rendu');
     // contrat échu non prolongé → alerte rouge
     const jEchu = S.ETAT.roster.find(x=>!x.backup && x.po!=='G');
@@ -1157,7 +1159,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
       'Chip : contrat réel PUIS re-signature standard');
     // un sortant basculé alourdit la masse AVANT (le garder = le re-signer)
     const avantResig = S.projectionEchange([], [], 3);
-    egal(avantResig[1].masse, 28371666 + 5750000, 'Avant : Y23 inclut la re-signature de Bedard si on le garde');
+    egal(avantResig[1].masse, 21621666 + 5750000, 'Avant : Y23 inclut la re-signature de Bedard si on le garde');
     // un entrant re-signé compte sa chaîne : contrat réel Y22, charte ensuite
     doc.getElementById('echEquipe').value = 'SANJOSE';
     doc.getElementById('echEquipe').dispatchEvent(new W.Event('change'));
@@ -1167,9 +1169,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     chkE.checked = true; chkE.dispatchEvent(new W.Event('change'));
     // Fox : ct 1 à 7,25 M, re-signé à 28 ans → RFA OV83 = 10,5 M × 3
     const apresResig = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
-    egal(apresResig[0].masse, 83571666 - 975000 + 7250000,
+    egal(apresResig[0].masse, 76821666 - 975000 + 7250000,
       'Y22 : Fox compte à son contrat RÉEL (7,25 M), Bedard parti');
-    egal(apresResig[1].masse, 28371666 + 10500000,
+    egal(apresResig[1].masse, 21621666 + 10500000,
       'Y23 : la re-signature standard de Fox (10,5 M) prend le relais, Bedard exclu');
     // cartes OV et âge gagnés / perdus
     ok(doc.getElementById('echSommaire').textContent.includes('OV gagné / perdu'), 'Carte OV gagné/perdu');

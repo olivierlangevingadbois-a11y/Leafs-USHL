@@ -1,7 +1,7 @@
 /* Service worker — Poste du DG des Maple Leafs.
    Stratégie : réseau d'abord (la page reste fraîche), cache en secours
    (l'application s'ouvre hors ligne avec la dernière version vue). */
-const CACHE = 'leafs-dg-v1';
+const CACHE = 'leafs-dg-v2';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
