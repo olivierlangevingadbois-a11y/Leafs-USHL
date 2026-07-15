@@ -1,0 +1,83 @@
+CLASSEMENT DES ÉQUIPES AYANT LE PLUS BÉNÉFICIÉ DE LA RECOTE — USHL Pro
+======================================================================
+
+Méthode : pour chaque joueur apparié entre l'état de fin Y21 (USHL21.csv)
+et les fichiers de la ligue post-recote (10 juillet 2026), on recalcule
+l'OV exact au centième avec la formule calibrée du calculateur, puis on
+classe les équipes par GAIN MOYEN D'OV PAR PATINEUR. Le total des points
+de cotes (13 attributs, gardiens compris sauf DF/OF) est donné en appui.
+
+Limites : ~140 joueurs arrivés depuis la fin Y21 ne sont pas appariés ;
+les recotes plus récentes publiées sur ushl.ca après le 10 juillet ne
+sont pas couvertes (utiliser l'onglet Recotes avec les fiches du site).
+
+Rang  Équipe       ΔOV moyen   ΔOV total   Δcotes tot.  (patineurs appariés)
+----  -----------  ---------   ---------   -----------  --------------------
+  1.  MONTREAL     +  0.685   +   13.0   +      114  (19)
+  2.  WINNIPEG     +  0.678   +   12.9   +      160  (19)
+  3.  VANCOUVER    +  0.573   +   10.9   +       68  (19)
+  4.  PHILLY       +  0.563   +   10.1   +       97  (18)
+  5.  DETROIT      +  0.510   +    9.2   +       80  (18)
+  6.  ISLANDERS    +  0.499   +    9.0   +       64  (18)
+  7.  BUFFALO      +  0.493   +    9.4   +       74  (19)
+  8.  CALGARY      +  0.462   +    8.3          -8  (18)
+  9.  NASHVILLE    +  0.448   +    9.0   +       10  (20)
+ 10.  WASHINGTON   +  0.440   +    7.9   +       52  (18)
+ 11.  BOSTON       +  0.399   +    7.2   +       58  (18)
+ 12.  EDMONTON     +  0.392   +    6.7   +       16  (17)
+ 13.  TAMPABAY     +  0.384   +    5.8   +       51  (15)
+ 14.  SEATTLE      +  0.358   +    5.0   +       34  (14)
+ 15.  SANJOSE      +  0.353   +    6.4          -2  (18)
+ 16.  CHICAGO      +  0.311   +    5.0   +       29  (16)
+ 17.  CAROLINA     +  0.274   +    4.1   +       40  (15)
+ 18.  VEGAS        +  0.270   +    5.1   +       78  (19)
+ 19.  FLORIDE      +  0.258   +    4.9   +       67  (19)
+ 20.  OTTAWA       +  0.222   +    4.4   +       64  (20)
+ 21.  TORONTO      +  0.221   +    3.5   +        1  (16)
+ 22.  UTAH         +  0.203   +    4.3   +       23  (21)
+ 23.  NYRANGERS    +  0.200   +    3.2   +       18  (16)
+ 24.  DALLAS       +  0.191   +    3.6   +        4  (19)
+ 25.  ST.LOUIS     +  0.186   +    3.3         -21  (18)
+ 26.  NEWJERSEY    +  0.183   +    3.1   +       25  (17)
+ 27.  PITTSBURGH   +  0.168   +    2.7   +       40  (16)
+ 28.  LOSANGELES   +  0.156   +    3.0   +       15  (19)
+ 29.  ANAHEIM      +  0.116   +    2.3   +       21  (20)
+ 30.  COLUMBUS     +  0.078   +    1.4         -26  (18)
+ 31.  MINNESOTA    +  0.040   +    0.6         -15  (14)
+ 32.  COLORADO     +  0.033   +    0.6   +        1  (18)
+
+Meilleures progressions individuelles par équipe (ΔOV exact) :
+  1. MONTREAL : Brayden Schenn +3.56, Alexander Ovechkin +2.26
+  2. WINNIPEG : Thomas Harley +3.61, Tyler Toffoli +2.31
+  3. VANCOUVER : Valeri Nichushkin +3.91, Evgeni Malkin +2.87
+  4. PHILLY : Nic Dowd +3.29, Matt Grzelcyk +1.68
+  5. DETROIT : Martin Necas +2.43, Jaccob Slavin +2.17
+  6. ISLANDERS : Sidney Crosby +3.83, Nicolas Roy +3.34
+  7. BUFFALO : Mattias Ekholm +2.37, Connor Brown +2.29
+  8. CALGARY : Brad Marchand +3.62, Frank Vatrano +2.00
+  9. NASHVILLE : Matej Blumel +1.97, Yegor Sharangovich +1.83
+ 10. WASHINGTON : Timo Meier +2.01, Josh Norris +1.44
+ 11. BOSTON : Ryan O'Reilly +2.75, Matt Duchene +2.15
+ 12. EDMONTON : Leon Draisaitl +2.95, Teddy Blueger +1.41
+ 13. TAMPABAY : Scott Laughton +2.36, Jordan Eberle +1.67
+ 14. SEATTLE : Zach Werenski +2.07, Charlie Coyle +1.59
+ 15. SANJOSE : Akil Thomas +2.12, Nate Schmidt +1.78
+ 16. CHICAGO : William Nylander +2.98, Brett Pesce +1.45
+ 17. CAROLINA : Jonathan Huberdeau +2.80, Jeff Skinner +0.19
+ 18. VEGAS : Brett Howden +2.28, Tomas Hertl +1.68
+ 19. FLORIDE : Nathan Beaulieu +2.05, Sam Reinhart +1.29
+ 20. OTTAWA : Mikhail Sergachev +1.85, Jordan Harris +0.70
+ 21. TORONTO : Ondrej Palat +1.46, Rasmus Ristolainen +0.84
+ 22. UTAH : Matthew Boldy +3.11, Colton Parayko +0.19
+ 23. NYRANGERS : David Pastrnak +1.76, K'Andre Miller +0.19
+ 24. DALLAS : Evgeny Dadonov +2.74, Bryan Rust +2.03
+ 25. ST.LOUIS : Ivan Barbashev +1.27, Adam Pelech +0.72
+ 26. NEWJERSEY : Ilya Lyubushkin +1.23, Aaron Ekblad +0.30
+ 27. PITTSBURGH : Anders Lee +0.90, Albert Johansson +0.50
+ 28. LOSANGELES : Devon Toews +2.74, Johnathan Kovacevic +0.63
+ 29. ANAHEIM : Peyton Krebs +1.46, Tom Wilson +0.56
+ 30. COLUMBUS : Ryan McLeod +0.46, Kevin Bahl +0.19
+ 31. MINNESOTA : Radko Gudas +0.75, Pierre-Olivier Joseph +0.19
+ 32. COLORADO : Daemon Hunt +0.19, Thomas Chabot +0.19
+
+Généré le 14 juillet 2026 à partir des données intégrées du tableau de bord.
