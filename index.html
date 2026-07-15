@@ -502,6 +502,7 @@
         <option value="C">C</option><option value="AG">AG</option><option value="AD">AD</option>
         <option value="D">D</option><option value="G">G</option>
       </select>
+      <select id="ligueProfil" aria-label="Profil"><option value="">Tous les profils</option></select>
       <input type="number" id="ligueOvMin" placeholder="OV min" min="50" max="99" aria-label="OV minimum">
       <input type="number" id="ligueAgeMax" placeholder="Âge max" min="18" max="45" aria-label="Âge maximum">
       <label class="lig-chk"><input type="checkbox" id="ligueExpirants"> contrat d'un an ou échu</label>
@@ -4022,6 +4023,7 @@ function filtresLigue(){
     texte: normaliserNom(document.getElementById('ligueTexte').value),
     equipe: document.getElementById('ligueEquipe').value,
     po: document.getElementById('liguePo').value,
+    profil: document.getElementById('ligueProfil').value,
     ovMin: nombre(document.getElementById('ligueOvMin').value),
     ageMax: nombre(document.getElementById('ligueAgeMax').value),
     expirants: document.getElementById('ligueExpirants').checked
@@ -4032,6 +4034,7 @@ function joueursLigueFiltres(f){
     (!f.texte || normaliserNom(j.nom).includes(f.texte))
     && (!f.equipe || j.equipe === f.equipe)
     && (!f.po || (f.po === 'F' ? (j.po !== 'D' && j.po !== 'G') : j.po === f.po))
+    && (!f.profil || j._profil.profil === f.profil)
     && (f.ovMin === null || j.ov >= f.ovMin)
     && (f.ageMax === null || j.age <= f.ageMax)
     && (!f.expirants || (j.ct ?? 0) <= 1));
@@ -4043,6 +4046,12 @@ function rendreLigue(){
   if (selEq.options.length <= 1){
     selEq.innerHTML = '<option value="">Toutes les équipes</option>' +
       LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
+  }
+  const selProfil = document.getElementById('ligueProfil');
+  if (selProfil.options.length <= 1){
+    const profils = [...new Set(joueursLigue().map(j=>j._profil.profil))].sort((a,b)=>a.localeCompare(b));
+    selProfil.innerHTML = '<option value="">Tous les profils</option>' +
+      profils.map(pr=>`<option value="${echap(pr)}">${echap(pr)}</option>`).join('');
   }
   const liste = joueursLigueFiltres(filtresLigue());
   // OV détaillé (deux décimales) pour l'affichage ET le tri des patineurs ;
@@ -4531,7 +4540,7 @@ document.getElementById('rechercheAlign').addEventListener('input', e=>{
 });
 ['ligueTexte','ligueOvMin','ligueAgeMax'].forEach(id=>
   document.getElementById(id).addEventListener('input', rendreLigue));
-['ligueEquipe','liguePo','ligueExpirants'].forEach(id=>
+['ligueEquipe','liguePo','ligueProfil','ligueExpirants'].forEach(id=>
   document.getElementById(id).addEventListener('change', rendreLigue));
 document.getElementById('echAjSortant').addEventListener('click', ()=>{
   const j = joueursEquipe(CONFIG.equipe).find(x=>x.nom===document.getElementById('echSortant').value);

@@ -906,6 +906,22 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(S.joueursLigueFiltres({...fBase, ageMax:21}).every(j=>j.age<=21), 'Filtre âge max');
   ok(S.joueursLigueFiltres({...fBase, expirants:true}).every(j=>(j.ct??0)<=1), 'Filtre contrats d\'un an ou échus');
   egal(S.joueursLigueFiltres({...fBase, texte:'bedard'}).length, 1, 'Recherche par nom');
+  // recherche par profil
+  {
+    const selProfil = doc.getElementById('ligueProfil');
+    ok(selProfil.options.length > 10, 'Sélecteur de profils peuplé (' + (selProfil.options.length-1) + ' profils de la ligue)');
+    const parProfil = S.joueursLigueFiltres({...fBase, profil:'DEliteQB'});
+    ok(parProfil.length > 0 && parProfil.every(j=>j._profil.profil==='DEliteQB'), 'Filtre profil DEliteQB');
+    ok(parProfil.some(j=>j.nom==='Ryan Merkley'), 'Merkley dans les DEliteQB de la ligue');
+    const grinders = S.joueursLigueFiltres({...fBase, profil:'Grinder', equipe:'TORONTO'});
+    ok(grinders.every(j=>j.equipe==='TORONTO' && j._profil.profil==='Grinder'), 'Profil + équipe combinés');
+    selProfil.value = 'Starter Goalie';
+    selProfil.dispatchEvent(new W.Event('change'));
+    ok([...doc.querySelectorAll('#tableLigue tbody tr')].every(r=>r.textContent.includes('Starter Goalie')),
+      'Sélecteur branché : la table ne montre que des Starter Goalie');
+    selProfil.value = '';
+    selProfil.dispatchEvent(new W.Event('change'));
+  }
   // interaction : le champ OV min filtre la table
   doc.getElementById('ligueOvMin').value = '85';
   doc.getElementById('ligueOvMin').dispatchEvent(new W.Event('input'));
