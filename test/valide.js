@@ -1001,28 +1001,66 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     'Cotes Y21 de Kotkaniemi retrouvées (nom normalisé)');
   egal(S.cotesY21De('Joueur Inconnu'), null, 'Joueur absent de la Y21 → null');
   {
-    const recSJ = S.recotesEquipe('SANJOSE');
+    // sans alignement en direct, la recote n'est pas «captée» (les fichiers
+    // sont l'état S21 : les comparer à eux-mêmes ne dirait rien)
+    let recSJ = S.recotesEquipe('SANJOSE');
+    ok(recSJ.every(r=>r.absent), 'SANJOSE hors direct : recotes en attente des cotes du site');
+    ok(recSJ.some(r=>r.noteAbsent.includes('pas encore captée')), 'La ligne explique que les cotes du site se chargent');
+    // simulons l'alignement du site : Kotkaniemi recoté +1 PA, +2 SC
+    const enDirectSJ = S.decoderEquipe('SANJOSE').map(j=>{
+      const c = {...j};
+      delete c._instantane;
+      if (c.nom==='Jesperi Kotkaniemi'){ c.pa += 1; c.sc += 2; }
+      return c;
+    });
+    S.ETAT.equipesLive.set('SANJOSE', enDirectSJ);
+    recSJ = S.recotesEquipe('SANJOSE');
     const kotka = recSJ.find(r=>r.j.nom==='Jesperi Kotkaniemi');
-    ok(!!kotka && !kotka.absent, 'Ligne de recote de Kotkaniemi construite');
-    egal(kotka.deltas.pa, 1, 'PA de Kotkaniemi : 82 → 83 = +1');
+    ok(!!kotka && !kotka.absent && kotka.source==='direct', 'Ligne de recote construite depuis les cotes du site');
+    egal(kotka.deltas.pa, 1, 'PA de Kotkaniemi : +1 (S21 → site)');
+    egal(kotka.deltas.sc, 2, 'SC de Kotkaniemi : +2');
     egal(kotka.deltas.ld, 0, 'LD inchangé = 0');
-    egal(kotka.somme, 1, 'Δ total de Kotkaniemi = +1');
-    ok(recSJ.every(r=>r.absent || typeof r.somme==='number'), 'Δ total calculé pour chaque joueur recensé');
+    egal(kotka.somme, 3, 'Δ total de Kotkaniemi = +3');
+    ok(kotka.ovDeltaExact > 0, 'OV exact en hausse (PA et SC pèsent dans la formule)');
+    const inchange = recSJ.find(r=>r.j.nom==='Adam Fox');
+    egal(inchange.somme, 0, 'Joueur non recoté : Δ total 0');
     const gardienSJ = recSJ.find(r=>r.j.po==='G' && !r.absent);
     ok(!!gardienSJ && gardienSJ.ovDelta===null, 'Gardien : pas de delta d\'OV (formule non couverte), cotes comparées quand même');
+    // classement des recotes : seules les équipes en direct sont classées
+    const rangs = S.classementRecotes();
+    ok(rangs.some(r=>r.eq==='SANJOSE'), 'SANJOSE (en direct) est classée');
+    const rSJ = rangs.find(r=>r.eq==='SANJOSE');
+    ok(rSJ.moy > 0 && rSJ.top.nom==='Jesperi Kotkaniemi', 'Gain moyen positif, meilleure progression = Kotkaniemi');
+    ok(!rangs.some(r=>r.eq==='ANAHEIM'), 'ANAHEIM (pas en direct) n\'est pas classée — pas de faux chiffres');
+    const txt = S.texteClassementRecotes();
+    ok(txt.includes('SANJOSE') && txt.includes('Kotkaniemi'), 'Export texte du classement');
+    ok(txt.includes('équipes chargées'), 'L\'export signale les équipes manquantes');
+    // rendu de la table de classement
+    doc.querySelector('nav button[data-vue="recotes"]').click();
+    ok(doc.querySelectorAll('#tableRecClassement tbody tr').length >= 1, 'Table du classement rendue');
+    ok(!!doc.getElementById('btnRecClassement') && !!doc.getElementById('btnRecClassementTxt'),
+      'Boutons «Classer les 32 équipes» et «Télécharger en .txt» présents');
+    S.ETAT.equipesLive.delete('SANJOSE');
   }
   doc.querySelector('nav button[data-vue="recotes"]').click();
   egal(doc.getElementById('recEquipe').value, 'TORONTO', 'Équipe par défaut : mon club');
   egal(doc.querySelectorAll('#tableRecotes tbody tr').length, 25, '25 lignes pour les Leafs');
   ok(doc.querySelector('#tableRecotes thead').textContent.includes('OV avant→après'), 'Colonne OV avant→après');
+  // avec un alignement en direct simulé (Kotkaniemi +1 PA), la table se colore
+  S.ETAT.equipesLive.set('SANJOSE', S.decoderEquipe('SANJOSE').map(j=>{
+    const c = {...j}; delete c._instantane;
+    if (c.nom==='Jesperi Kotkaniemi') c.pa += 1;
+    return c;
+  }));
   doc.getElementById('recEquipe').value = 'SANJOSE';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
   ok(doc.querySelector('#tableRecotes tbody').textContent.includes('Jesperi Kotkaniemi'), 'Recotes de SANJOSE affichées');
   ok(doc.querySelectorAll('#tableRecotes td.rec-plus').length >= 1, 'Les hausses sont marquées en vert');
   {
     const rangKotka = [...doc.querySelectorAll('#tableRecotes tbody tr')].find(r=>r.textContent.includes('Kotkaniemi'));
-    ok(/\d{2},\d{2}→\d{2},\d{2}/.test(rangKotka.textContent), 'OV exact aussi pour la source fichiers (CSV)');
+    ok(/\d{2},\d{2}→\d{2},\d{2}/.test(rangKotka.textContent), 'OV exact affiché (S21 → cotes du site)');
   }
+  S.ETAT.equipesLive.delete('SANJOSE');
   doc.getElementById('recEquipe').value = 'TORONTO';
   doc.getElementById('recEquipe').dispatchEvent(new W.Event('change'));
 

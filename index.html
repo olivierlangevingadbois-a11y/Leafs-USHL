@@ -588,6 +588,14 @@
       <span id="recNote" style="font-family:var(--font-data); font-size:.72rem; color:var(--txt-faint); align-self:flex-end; padding-bottom:6px"></span>
     </div>
     <div class="table-wrap"><table id="tableRecotes"></table></div>
+
+    <h2 style="margin-top:28px">Classement des recotes de la ligue</h2>
+    <div class="h2-sous">Gain moyen d'OV exact par patineur entre la fin S21 et les cotes actuelles du site, équipe par équipe. Seules les équipes dont l'alignement en direct est chargé sont classées — le bouton télécharge les 32.</div>
+    <div class="trios-actions">
+      <button id="btnRecClassement">Classer les 32 équipes</button>
+      <button id="btnRecClassementTxt" class="secondaire">Télécharger en .txt</button>
+    </div>
+    <div class="table-wrap"><table id="tableRecClassement"></table></div>
   </section>
 
   <!-- ================= PLAFOND ================= -->
@@ -2196,10 +2204,10 @@ function estFictif(nom){
    1. le club → la formation vivante (ETAT.roster, actualisée à l'ouverture) ;
    2. un alignement téléchargé en direct de ushl.ca (chargerEquipe) ;
    3. sinon, l'instantané intégré des fichiers de la ligue (LIGUE_DATE). */
-function joueursEquipe(code){
-  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!estFictif(j.nom) && !j.backup);
-  const direct = ETAT.equipesLive.get(code);
-  if (direct) return direct;
+/* Décode l'instantané intégré d'une équipe (fichiers de la ligue = état
+   final S21), même quand un alignement en direct est disponible — c'est la
+   BASE DE COMPARAISON du suivi des recotes. */
+function decoderEquipe(code){
   const cles = ['nom','po','hd','no','it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld','ov','age','salaire','ct'];
   return (LIGUE[code]||[]).map(t=>{
     const j = Object.fromEntries(cles.map((k,i)=>[k,t[i]]));
@@ -2208,6 +2216,12 @@ function joueursEquipe(code){
     j._profil = determinerProfil(j);
     return j;
   }).filter(j=>!estFictif(j.nom));
+}
+function joueursEquipe(code){
+  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!estFictif(j.nom) && !j.backup);
+  const direct = ETAT.equipesLive.get(code);
+  if (direct) return direct;
+  return decoderEquipe(code);
 }
 </script>
 <script>
@@ -3789,6 +3803,11 @@ function rendreEchange(){
    2. sinon, l'instantané de fin Y21 (USHL21.csv) comparé aux cotes
       actuelles — environ 140 joueurs de la ligue n'y figurent pas. */
 function cotesY21De(nom){ return COTES_Y21[normaliserNom(nom)] || null; }
+/* Prépare la base S21 et l'état de fraîcheur pour recotesEquipe. */
+function preparerRecotes(code){
+  recotesEquipe._snapshot = new Map(decoderEquipe(code).map(x=>[normaliserNom(x.nom), x]));
+  recotesEquipe._enDirect = (code === CONFIG.equipe && ETAT.source.includes('ushl.ca')) || ETAT.equipesLive.has(code);
+}
 /* OV exact (valeur au centième) d'un tableau de 13 cotes, patineurs seulement. */
 function ovExactDe(cotesArr, po){
   if (po === 'G') return null;
@@ -3798,6 +3817,7 @@ function ovExactDe(cotesArr, po){
   } catch (e){ return null; }
 }
 function recotesEquipe(code){
+  preparerRecotes(code);
   return joueursEquipe(code).map(j=>{
     const fiche = ETAT.fiches.get(normaliserNom(j.nom));
     if (fiche && fiche.length){
@@ -3820,14 +3840,21 @@ function recotesEquipe(code){
               ovDeltaExact: (ovAvantExact!==null && ovActuelExact!==null) ? ovActuelExact - ovAvantExact : null,
               ovDelta: (prev.ov!==null && cur.ov!==null) ? cur.ov - prev.ov : null};
     }
-    const avant = cotesY21De(j.nom);
-    if (!avant) return {j, absent:true, source:'fichiers',
-      noteAbsent:'non recensé à la fin de la Y21 — consulte sa fiche ushl.ca (bouton à droite)'};
+    // base = instantané S21 des fichiers ; actuel = cotes du site (alignement
+    // en direct, chargé automatiquement à l'ouverture pour le club et à la
+    // sélection pour les autres équipes)
+    const avType = recotesEquipe._snapshot.get(normaliserNom(j.nom));
+    if (!avType) return {j, absent:true, source:'fichiers',
+      noteAbsent:'absent des fichiers S21 de la ligue — consulte sa fiche ushl.ca (bouton à droite)'};
+    if (!recotesEquipe._enDirect) return {j, absent:true, source:'fichiers',
+      noteAbsent:'recote pas encore captée — les cotes du site se chargent (ou clique sa fiche)'};
+    const avant = OV_ORDRE.map(k=>avType[k]);
+    const actuel = OV_ORDRE.map(k=>j[k]);
     const deltas = {};
     let somme = 0;
     OV_ORDRE.forEach((k,i)=>{
-      if (j[k]===null || j[k]===undefined){ deltas[k] = null; return; }
-      deltas[k] = j[k] - avant[i];
+      if (actuel[i]===null || actuel[i]===undefined || avant[i]===null){ deltas[k] = null; return; }
+      deltas[k] = actuel[i] - avant[i];
       somme += deltas[k];
     });
     let ovAvant = null;
@@ -3835,9 +3862,8 @@ function recotesEquipe(code){
       const r = ovDetaille(Object.fromEntries(OV_ORDRE.map((k,i)=>[k, avant[i]])), j.po==='D'?'D':'F');
       ovAvant = r ? r.arrondi : null;
     }
-    const actuel = OV_ORDRE.map(k=>j[k]);
     const ovAvantExact = ovExactDe(avant, j.po), ovActuelExact = ovExactDe(actuel, j.po);
-    return {j, avant, actuel, deltas, somme, source:'fichiers', ovAvant,
+    return {j, avant, actuel, deltas, somme, source:'direct', ovAvant,
             ovActuel: j.ov ?? null,
             ovAvantExact, ovActuelExact,
             ovDeltaExact: (ovAvantExact!==null && ovActuelExact!==null) ? ovActuelExact - ovAvantExact : null,
@@ -3847,6 +3873,9 @@ function recotesEquipe(code){
 function rendreRecotes(){
   const table = document.getElementById('tableRecotes');
   if (!table) return;
+  // au tout premier rendu de l'initialisation, le moteur d'OV (OV_ORDRE,
+  // déclaré plus bas) n'existe pas encore : on repassera au prochain rendu
+  try { void OV_ORDRE; } catch (e){ return; }
   const selEq = document.getElementById('recEquipe');
   if (!selEq.options.length){
     selEq.innerHTML = LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
@@ -3904,6 +3933,64 @@ function rendreRecotes(){
     + (selEq.value===CONFIG.equipe || ETAT.equipesLive.has(selEq.value)
       ? 'cotes actuelles en direct' : `cotes actuelles : fichiers de la ligue du ${LIGUE_DATE}`);
 }
+/* ---------- Classement des recotes de la ligue ----------
+   Pour chaque équipe dont l'alignement en direct est chargé : gain moyen
+   d'OV exact par patineur entre l'instantané S21 (fichiers de la ligue) et
+   les cotes actuelles du site. Fiable parce que les deux côtés viennent de
+   la même formule d'OV et que le côté «après» vient du site. */
+function classementRecotes(){
+  const rangs = [];
+  for (const eq of LIGUE_EQUIPES){
+    const enDirect = (eq === CONFIG.equipe && ETAT.source.includes('ushl.ca')) || ETAT.equipesLive.has(eq);
+    if (!enDirect) continue;
+    const avantM = new Map(decoderEquipe(eq).map(x=>[normaliserNom(x.nom), x]));
+    let n = 0, tot = 0, top = null;
+    for (const j of joueursEquipe(eq)){
+      if (j.po === 'G') continue;
+      const av = avantM.get(normaliserNom(j.nom));
+      if (!av) continue;
+      const oAv = ovExactDe(OV_ORDRE.map(k=>av[k]), j.po);
+      const oAp = ovExactDe(OV_ORDRE.map(k=>j[k]), j.po);
+      if (oAv === null || oAp === null) continue;
+      const d = oAp - oAv;
+      tot += d; n++;
+      if (!top || d > top.d) top = {nom: j.nom, d};
+    }
+    if (n) rangs.push({eq, n, moy: tot/n, tot, top});
+  }
+  rangs.sort((a,b)=>b.moy - a.moy);
+  return rangs;
+}
+function texteClassementRecotes(){
+  const rangs = classementRecotes();
+  const l = ['CLASSEMENT DES RECOTES — USHL Pro (S21 → cotes actuelles du site)',
+    'Gain moyen d\'OV exact par patineur apparié (formule du calculateur des deux côtés).', ''];
+  rangs.forEach((r,i)=>{
+    l.push(`${String(i+1).padStart(2)}. ${r.eq.padEnd(11)} ${(r.moy>=0?'+':'')}${r.moy.toFixed(3)} d'OV moyen · total ${(r.tot>=0?'+':'')}${r.tot.toFixed(1)} sur ${r.n} patineurs · meilleur : ${r.top.nom} ${(r.top.d>=0?'+':'')}${r.top.d.toFixed(2)}`);
+  });
+  if (rangs.length < LIGUE_EQUIPES.length){
+    l.push('', `(${rangs.length}/${LIGUE_EQUIPES.length} équipes chargées — «Classer les 32 équipes» télécharge les manquantes)`);
+  }
+  return l.join('\n');
+}
+function rendreClassementRecotes(){
+  const table = document.getElementById('tableRecClassement');
+  if (!table) return;
+  const rangs = classementRecotes();
+  if (!rangs.length){ table.innerHTML = ''; return; }
+  let html = `<thead><tr><th>Rang</th><th>Équipe</th><th>ΔOV moyen</th><th>ΔOV total</th><th>Patineurs</th>
+    <th style="text-align:left">Meilleure progression</th></tr></thead><tbody>`;
+  rangs.forEach((r,i)=>{
+    const club = r.eq === CONFIG.equipe;
+    html += `<tr${club?' style="background:rgba(77,159,255,.10)"':''}>
+      <td>${i+1}</td><td class="${club?'eq-club':''}" style="text-align:left">${club?'<strong>':''}${r.eq}${club?'</strong>':''}</td>
+      <td class="${r.moy>0?'rec-plus':(r.moy<0?'rec-moins':'rec-zero')}">${r.moy>=0?'+':''}${r.moy.toFixed(3)}</td>
+      <td>${r.tot>=0?'+':''}${r.tot.toFixed(1)}</td><td>${r.n}</td>
+      <td style="text-align:left">${echap(r.top.nom)} ${r.top.d>=0?'+':''}${r.top.d.toFixed(2)}</td></tr>`;
+  });
+  table.innerHTML = html + '</tbody>';
+}
+
 /* Télécharge les fiches ushl.ca de tous les joueurs de l'équipe affichée. */
 async function telechargerFichesEquipe(){
   const btn = document.getElementById('btnRecFiches');
@@ -4395,6 +4482,7 @@ function toutRendre(){
   rendreComparateur();
   rendrePlafond();
   rendreTrios();
+  rendreRecotes(); // les recotes du club se remplissent dès que le direct arrive
 }
 document.querySelectorAll('nav button[data-vue]').forEach(b=>{
   b.addEventListener('click', ()=>{
@@ -4409,7 +4497,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='meneurs') rendreMeneurs();
     if (b.dataset.vue==='classement') rendreClassement();
     if (b.dataset.vue==='echange') rendreEchange();
-    if (b.dataset.vue==='recotes') rendreRecotes();
+    if (b.dataset.vue==='recotes'){ rendreRecotes(); rendreClassementRecotes(); }
     if (b.dataset.vue==='plafond') rendrePlafond();
     if (b.dataset.vue==='ovdetail') peuplerJoueursOvd();
     if (b.dataset.vue==='reglages') rendreMatrice();
@@ -4467,6 +4555,17 @@ document.getElementById('recEquipe').addEventListener('change', ()=>{
   actualiserEquipe(document.getElementById('recEquipe').value, rendreRecotes);
 });
 document.getElementById('btnRecFiches').addEventListener('click', telechargerFichesEquipe);
+document.getElementById('btnRecClassement').addEventListener('click', ()=>
+  telechargerLigue('recNote', ()=>{ rendreRecotes(); rendreClassementRecotes(); }));
+document.getElementById('btnRecClassementTxt').addEventListener('click', ()=>{
+  const blob = new Blob([texteClassementRecotes() + '\n'], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'classement-recotes.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  flash('Classement des recotes téléchargé');
+});
 ['menCategorie','menPo','menLeafs'].forEach(id=>
   document.getElementById(id).addEventListener('change', rendreMeneurs));
 document.getElementById('btnFiches').addEventListener('click', telechargerFiches);
@@ -4668,6 +4767,7 @@ if (typeof window !== 'undefined'){
     resignatureStandard, salaireSaisonEchange, ovExact, nettoyerLigneXtra,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
     parseFicheAttributs, chargerFiche, urlFicheJoueur, telechargerFichesEquipe,
+    decoderEquipe, classementRecotes, texteClassementRecotes, rendreClassementRecotes,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }
 </script>
