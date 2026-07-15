@@ -1306,37 +1306,40 @@ function seuilsMatrice(matCle, statCle, ov){
 /* ------------------ DONNÉES DE SECOURS ------------------
    Alignement TORONTO extrait des fichiers officiels du simulateur FHL de la
    ligue (USHL21.ros, recote Y22 — dépôt FHL-analyse, juillet 2026). Sert de
-   base hors-ligne et de fixture de tests. L'OV des patineurs est calculé au
-   centième par la formule calibrée du calculateur (voir ovDetaille) ; l'OV
-   des gardiens est une ESTIMATION (formule des gardiens non couverte),
-   remplacée par la valeur réelle dès la première actualisation ushl.ca. */
-const DATE_SECOURS = '10 juillet 2026';
+   base hors-ligne et de fixture de tests. OV, âges, salaires et contrats
+   RELEVÉS DU SITE le 14 juillet 2026 (TeamRosters) — l'état de départ
+   correspond donc au site d'aujourd'hui, le bouton d'actualisation servant
+   à suivre les changements futurs. Les 13 cotes datent des fichiers de la
+   ligue (sauf Miroshnichenko : fiche S22) et se rafraîchissent en direct ;
+   McGroarty n'était pas visible sur le relevé, ses valeurs restent celles
+   des fichiers. */
+const DATE_SECOURS = '14 juillet 2026';
 const SECOURS_ROSTER = [
- {nom:'Barrett Hayton', po:'C', hd:'G', no:22, it:71,sp:86,st:81,en:87,du:81,di:77,sk:82,pa:80,pc:79,df:64,sc:79,ex:62,ld:43,ov:82,age:25,salaire:7250000,ct:3},
- {nom:'Connor Bedard', po:'C', hd:'D', no:98, it:71,sp:75,st:69,en:79,du:76,di:77,sk:83,pa:79,pc:81,df:62,sc:84,ex:41,ld:45,ov:80,age:20,salaire:975000,ct:1},
- {nom:'Evan Rodrigues', po:'C', hd:'D', no:17, it:75,sp:75,st:71,en:79,du:77,di:78,sk:74,pa:77,pc:75,df:66,sc:74,ex:72,ld:74,ov:78,age:32,salaire:800000,ct:1},
+ {nom:'Barrett Hayton', po:'C', hd:'G', no:22, it:71,sp:86,st:81,en:87,du:81,di:77,sk:82,pa:80,pc:79,df:64,sc:79,ex:62,ld:43,ov:81,age:26,salaire:9075000,ct:2},
+ {nom:'Connor Bedard', po:'C', hd:'D', no:98, it:71,sp:75,st:69,en:79,du:76,di:77,sk:83,pa:79,pc:81,df:62,sc:84,ex:41,ld:49,ov:82,age:21,salaire:975000,ct:0},
+ {nom:'Evan Rodrigues', po:'C', hd:'D', no:17, it:75,sp:75,st:71,en:79,du:77,di:78,sk:74,pa:77,pc:75,df:66,sc:74,ex:72,ld:70,ov:76,age:33,salaire:1000000,ct:0},
  {nom:'Rutger McGroarty', po:'C', hd:'G', no:4, it:79,sp:73,st:77,en:75,du:81,di:69,sk:66,pa:71,pc:70,df:69,sc:75,ex:42,ld:43,ov:76,age:21,salaire:900000,ct:2},
- {nom:'Filip Zadina', po:'AG', hd:'G', no:11, it:63,sp:89,st:76,en:92,du:80,di:84,sk:91,pa:78,pc:78,df:55,sc:87,ex:69,ld:59,ov:83,age:26,salaire:8500000,ct:1},
- {nom:'Vassili Zaitsev', po:'AG', hd:'G', no:70, it:70,sp:85,st:65,en:89,du:80,di:86,sk:83,pa:76,pc:79,df:58,sc:81,ex:57,ld:47,ov:80,age:24,salaire:4750000,ct:1},
- {nom:'Lawson Crouse', po:'AG', hd:'G', no:52, it:80,sp:74,st:79,en:79,du:79,di:72,sk:72,pa:73,pc:71,df:66,sc:74,ex:71,ld:53,ov:78,age:28,salaire:1900000,ct:1},
- {nom:'Ondrej Palat', po:'AG', hd:'G', no:18, it:74,sp:76,st:70,en:74,du:72,di:74,sk:78,pa:73,pc:74,df:65,sc:75,ex:90,ld:83,ov:78,age:34,salaire:800000,ct:1},
- {nom:'Filip Mesar', po:'AG', hd:'D', no:16, it:63,sp:78,st:64,en:71,du:70,di:75,sk:79,pa:74,pc:76,df:58,sc:72,ex:44,ld:41,ov:75,age:21,salaire:900000,ct:2},
- {nom:'Tyson Jost', po:'AD', hd:'G', no:75, it:72,sp:82,st:73,en:81,du:81,di:91,sk:81,pa:81,pc:66,df:73,sc:81,ex:60,ld:64,ov:81,age:27,salaire:4750000,ct:1},
- {nom:'Matvei Michkov', po:'AD', hd:'G', no:7, it:67,sp:73,st:62,en:80,du:65,di:72,sk:81,pa:81,pc:82,df:62,sc:84,ex:45,ld:43,ov:79,age:21,salaire:975000,ct:1},
- {nom:'Ivan Miroshnichenko', po:'AD', hd:'D', no:13, it:69,sp:75,st:73,en:73,du:70,di:75,sk:75,pa:72,pc:74,df:59,sc:83,ex:47,ld:43,ov:77,age:21,salaire:900000,ct:2},
- {nom:'Paul Cotter', po:'AD', hd:'G', no:45, it:78,sp:70,st:81,en:80,du:88,di:83,sk:74,pa:64,pc:67,df:72,sc:67,ex:64,ld:53,ov:76,age:26,salaire:850000,ct:1},
- {nom:'Chris Bigras', po:'D', hd:'G', no:10, it:96,sp:79,st:85,en:99,du:92,di:94,sk:87,pa:78,pc:81,df:86,sc:53,ex:70,ld:84,ov:88,age:30,salaire:11000000,ct:1},
- {nom:'Travis Sanheim', po:'D', hd:'G', no:6, it:88,sp:78,st:84,en:86,du:88,di:79,sk:85,pa:64,pc:76,df:84,sc:62,ex:71,ld:65,ov:84,age:29,salaire:9750000,ct:1},
- {nom:'Darnell Nurse', po:'D', hd:'G', no:25, it:84,sp:77,st:85,en:92,du:83,di:72,sk:78,pa:75,pc:71,df:79,sc:69,ex:77,ld:84,ov:83,age:30,salaire:7250000,ct:1},
- {nom:'Ryan Merkley', po:'D', hd:'D', no:42, it:55,sp:89,st:66,en:87,du:82,di:71,sk:89,pa:84,pc:79,df:53,sc:81,ex:61,ld:65,ov:83,age:25,salaire:7250000,ct:3},
- {nom:'Rasmus Ristolainen', po:'D', hd:'D', no:55, it:76,sp:72,st:82,en:79,du:68,di:78,sk:72,pa:70,pc:71,df:77,sc:58,ex:80,ld:70,ov:78,age:31,salaire:1133000,ct:2},
- {nom:'Eamon Powell', po:'D', hd:'D', no:43, it:61,sp:81,st:65,en:82,du:72,di:78,sk:77,pa:74,pc:75,df:68,sc:69,ex:52,ld:44,ov:77,age:23,salaire:1500000,ct:2},
- {nom:'Lian Bichsel', po:'D', hd:'G', no:20, it:81,sp:73,st:83,en:76,du:78,di:61,sk:70,pa:63,pc:62,df:80,sc:54,ex:47,ld:34,ov:77,age:21,salaire:900000,ct:2},
- {nom:'Rasmus Sandin', po:'D', hd:'G', no:37, it:64,sp:81,st:67,en:86,du:81,di:90,sk:78,pa:71,pc:70,df:73,sc:65,ex:55,ld:38,ov:76,age:25,salaire:1125000,ct:1},
- {nom:'Guillaume Richard', po:'D', hd:'G', no:12, it:69,sp:72,st:75,en:72,du:76,di:74,sk:74,pa:65,pc:62,df:72,sc:61,ex:49,ld:40,ov:74,age:22,salaire:75000,ct:1},
- {nom:'Chris Gibson', po:'G', hd:'G', no:41, it:84,sp:91,st:92,en:89,du:83,di:79,sk:91,pa:66,pc:88,df:null,sc:null,ex:86,ld:66,ov:82,age:33,salaire:6750000,ct:2, ovEstime:true},
- {nom:'Kevin Lankinen', po:'G', hd:'G', no:32, it:85,sp:84,st:80,en:82,du:82,di:85,sk:87,pa:75,pc:80,df:null,sc:null,ex:60,ld:60,ov:79,age:30,salaire:888666,ct:2, ovEstime:true},
- {nom:'Scott Wedgewood', po:'G', hd:'G', no:44, it:84,sp:84,st:82,en:80,du:78,di:82,sk:81,pa:73,pc:87,df:null,sc:null,ex:60,ld:60,ov:78,age:33,salaire:1700000,ct:1, ovEstime:true},
+ {nom:'Filip Zadina', po:'AG', hd:'G', no:11, it:63,sp:89,st:76,en:92,du:80,di:84,sk:91,pa:78,pc:78,df:55,sc:87,ex:69,ld:61,ov:82,age:27,salaire:10625000,ct:0},
+ {nom:'Vassili Zaitsev', po:'AG', hd:'G', no:70, it:70,sp:85,st:65,en:89,du:80,di:86,sk:83,pa:76,pc:79,df:58,sc:81,ex:57,ld:50,ov:80,age:25,salaire:5950000,ct:0},
+ {nom:'Lawson Crouse', po:'AG', hd:'G', no:52, it:80,sp:74,st:79,en:79,du:79,di:72,sk:72,pa:73,pc:71,df:66,sc:74,ex:71,ld:49,ov:76,age:29,salaire:2375000,ct:0},
+ {nom:'Ondrej Palat', po:'AG', hd:'G', no:18, it:74,sp:76,st:70,en:74,du:72,di:74,sk:78,pa:73,pc:74,df:65,sc:75,ex:90,ld:81,ov:76,age:35,salaire:1000000,ct:0},
+ {nom:'Filip Mesar', po:'AG', hd:'D', no:16, it:63,sp:78,st:64,en:71,du:70,di:75,sk:79,pa:74,pc:76,df:58,sc:72,ex:44,ld:47,ov:77,age:22,salaire:900000,ct:1},
+ {nom:'Tyson Jost', po:'AD', hd:'G', no:75, it:72,sp:82,st:73,en:81,du:81,di:91,sk:81,pa:81,pc:66,df:73,sc:81,ex:60,ld:70,ov:82,age:28,salaire:5950000,ct:0},
+ {nom:'Matvei Michkov', po:'AD', hd:'G', no:7, it:67,sp:73,st:62,en:80,du:65,di:72,sk:81,pa:81,pc:82,df:62,sc:84,ex:45,ld:46,ov:81,age:22,salaire:975000,ct:0},
+ {nom:'Ivan Miroshnichenko', po:'AD', hd:'D', no:13, it:69,sp:78,st:74,en:76,du:72,di:77,sk:78,pa:74,pc:77,df:59,sc:85,ex:50,ld:49,ov:79,age:22,salaire:900000,ct:1},
+ {nom:'Paul Cotter', po:'AD', hd:'G', no:45, it:78,sp:70,st:81,en:80,du:88,di:83,sk:74,pa:64,pc:67,df:72,sc:67,ex:64,ld:53,ov:75,age:27,salaire:1075000,ct:0},
+ {nom:'Chris Bigras', po:'D', hd:'G', no:10, it:96,sp:79,st:85,en:99,du:92,di:94,sk:87,pa:78,pc:81,df:86,sc:53,ex:70,ld:93,ov:89,age:31,salaire:13750000,ct:0},
+ {nom:'Travis Sanheim', po:'D', hd:'G', no:6, it:88,sp:78,st:84,en:86,du:88,di:79,sk:85,pa:64,pc:76,df:84,sc:62,ex:71,ld:65,ov:82,age:30,salaire:12200000,ct:0},
+ {nom:'Darnell Nurse', po:'D', hd:'G', no:25, it:84,sp:77,st:85,en:92,du:83,di:72,sk:78,pa:75,pc:71,df:79,sc:69,ex:77,ld:90,ov:84,age:31,salaire:9075000,ct:0},
+ {nom:'Ryan Merkley', po:'D', hd:'D', no:42, it:55,sp:89,st:66,en:87,du:82,di:71,sk:89,pa:84,pc:79,df:53,sc:81,ex:61,ld:69,ov:82,age:26,salaire:9075000,ct:2},
+ {nom:'Rasmus Ristolainen', po:'D', hd:'D', no:55, it:76,sp:72,st:82,en:79,du:68,di:78,sk:72,pa:70,pc:71,df:77,sc:58,ex:80,ld:69,ov:76,age:32,salaire:1425000,ct:1},
+ {nom:'Eamon Powell', po:'D', hd:'D', no:43, it:61,sp:81,st:65,en:82,du:72,di:78,sk:77,pa:74,pc:75,df:68,sc:69,ex:52,ld:44,ov:76,age:24,salaire:1875000,ct:1},
+ {nom:'Lian Bichsel', po:'D', hd:'G', no:20, it:81,sp:73,st:83,en:76,du:78,di:61,sk:70,pa:63,pc:62,df:80,sc:54,ex:47,ld:37,ov:78,age:22,salaire:900000,ct:1},
+ {nom:'Rasmus Sandin', po:'D', hd:'G', no:37, it:64,sp:81,st:67,en:86,du:81,di:90,sk:78,pa:71,pc:70,df:73,sc:65,ex:55,ld:38,ov:76,age:26,salaire:1400000,ct:0},
+ {nom:'Guillaume Richard', po:'D', hd:'G', no:12, it:69,sp:72,st:75,en:72,du:76,di:74,sk:74,pa:65,pc:62,df:72,sc:61,ex:49,ld:42,ov:75,age:23,salaire:75000,ct:0},
+ {nom:'Chris Gibson', po:'G', hd:'G', no:41, it:84,sp:91,st:92,en:89,du:83,di:79,sk:91,pa:66,pc:88,df:null,sc:null,ex:86,ld:67,ov:83,age:34,salaire:8450000,ct:1},
+ {nom:'Kevin Lankinen', po:'G', hd:'G', no:32, it:85,sp:84,st:80,en:82,du:82,di:85,sk:87,pa:75,pc:80,df:null,sc:null,ex:60,ld:64,ov:79,age:31,salaire:1100000,ct:1},
+ {nom:'Scott Wedgewood', po:'G', hd:'G', no:44, it:84,sp:84,st:82,en:80,du:78,di:82,sk:81,pa:73,pc:87,df:null,sc:null,ex:60,ld:61,ov:78,age:34,salaire:2125000,ct:0},
 ];
 
 /* Saison de référence Y21 : aucun total Y21 n'est intégré pour TORONTO (les

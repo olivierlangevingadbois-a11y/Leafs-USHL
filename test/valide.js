@@ -38,15 +38,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(S.SECOURS_ROSTER.length, 25, '25 joueurs dans la formation de secours');
   egal(S.SECOURS_ROSTER.filter(j=>j.backup).length, 0, 'Aucun joueur Backup_ dans la formation TORONTO');
   const hayton = S.SECOURS_ROSTER.find(j => j.nom === 'Barrett Hayton');
-  egal(hayton.salaire, 7250000, 'Salaire Hayton');
-  egal(hayton.ct, 3, 'Contrat Hayton 3 ans');
+  egal(hayton.salaire, 9075000, 'Salaire Hayton relevé du site');
+  egal(hayton.ct, 2, 'Contrat Hayton : 2 ans (site)');
   egal(hayton.no, 22, 'Numéro de chandail de Hayton');
   const bedard = S.SECOURS_ROSTER.find(j => j.nom === 'Connor Bedard');
-  egal(bedard.age, 20, 'Bedard a 20 ans (catégorie junior)');
+  egal(bedard.age, 21, 'Bedard a 21 ans (catégorie prospect, âge du site)');
   const gibson = S.SECOURS_ROSTER.find(j => j.nom === 'Chris Gibson');
-  egal(gibson.ov, 82, 'OV estimé de Gibson (gardien) = 82');
-  egal(gibson.ct, 2, 'Contrat de Gibson selon les fichiers de la ligue (le site fait foi à l\'actualisation)');
-  egal(gibson.ovEstime, true, 'L\'OV des gardiens de secours porte le drapeau ovEstime');
+  egal(gibson.ov, 83, 'OV de Gibson relevé du site (83)');
+  egal(gibson.ct, 1, 'Contrat de Gibson : 1 an (site)');
+  egal(gibson.ovEstime, undefined, 'Plus de drapeau ovEstime : OV des gardiens du club relevé du site');
   ok(S.SECOURS_ROSTER.filter(j=>j.po!=='G').every(j=>!j.ovEstime), 'L\'OV des patineurs n\'est pas marqué estimé');
   egal(gibson.df, null, 'DF du gardien = null');
   egal(S.SECOURS_Y21.length, 0, 'Aucun total Y21 intégré (compteurs de la ligue remis à zéro) — la référence vient de XtraStats');
@@ -62,8 +62,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   tableauEgal(profilDe('Barrett Hayton').stats, ['assists','pts'], 'Stats Playmaker = A, P');
   egal(profilDe('Paul Cotter').profil, 'Grinder', 'Cotter → Grinder');
   egal(profilDe('Evan Rodrigues').profil, 'Two-Way Forward', 'Rodrigues → Two-Way Forward');
-  egal(profilDe('Connor Bedard').profil, 'Junior Elite', 'Bedard (20 ans) → Junior Elite');
-  egal(profilDe('Connor Bedard').mat, 'ELITE', 'Junior Elite → même matrice ELITE');
+  egal(profilDe('Connor Bedard').profil, 'Prospect Elite', 'Bedard (21 ans) → Prospect Elite');
+  egal(profilDe('Connor Bedard').mat, 'ELITE', 'Prospect Elite → même matrice ELITE');
   egal(profilDe('Matvei Michkov').profil, 'Prospect Elite', 'Michkov (21 ans) → Prospect Elite');
   egal(profilDe('Rutger McGroarty').profil, 'Prospect Power Forward', 'McGroarty → Prospect Power Forward');
   egal(profilDe('Rutger McGroarty').mat, 'POWERFWD', 'Prospect Power Forward → matrice POWERFWD');
@@ -213,9 +213,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const jz = joueurDe('Filip Zadina'); // Elite, OV 83
   jz._profil = S.determinerProfil(jz);
   let s = S.seuilsPour(jz, 'pts', {}, {});
-  tableauEgal(s.seuils, [97,86,74,63,37,-1], 'Seuils Y17 par défaut (OV 83)');
+  tableauEgal(s.seuils, [97,86,74,63,37,-1], 'Seuils Y17 par défaut (OV 82)');
   egal(s.source, 'Y17', 'Source = Y17');
-  const perso = {ELITE: {pts: {83: [100,90,80,70,40,-1]}}};
+  const perso = {ELITE: {pts: {82: [100,90,80,70,40,-1]}}};
   s = S.seuilsPour(jz, 'pts', perso, {});
   tableauEgal(s.seuils, [100,90,80,70,40,-1], 'La rangée personnalisée remplace Y17');
   egal(s.source, 'personnalisée', 'Source = personnalisée');
@@ -274,7 +274,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(rangees.length, 25, '25 rangées dans la table d\'alignement');
   {
     const ligneGibson = [...rangees].find(r=>r.textContent.includes('Chris Gibson'));
-    ok(ligneGibson && ligneGibson.textContent.includes('~82'), 'OV estimé du gardien affiché avec un tilde (~82)');
+    ok(ligneGibson && !ligneGibson.textContent.includes('~'), 'Plus de tilde : OV du gardien relevé du site (83)');
   }
   ok(doc.querySelector('#alignSommaire').textContent.includes('Masse salariale'), 'Sommaire de masse salariale rendu');
   ok(doc.querySelector('#ficheEquipe').textContent.includes('TORONTO'), 'Fiche d\'équipe affichée');
@@ -297,9 +297,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   console.log('— Masse salariale (cohérence)');
   const actifs = S.SECOURS_ROSTER.filter(x2 => !x2.backup);
   const comptabilises = actifs.filter(x2 => x2.ct > 0);
-  egal(comptabilises.length, 25, 'Les 25 joueurs TORONTO sont sous contrat (instantané des fichiers)');
+  egal(comptabilises.length, 10, '10 joueurs sous contrat — entre-saison du site (15 contrats échus)');
   const masse = comptabilises.reduce((s2, x2) => s2 + x2.salaire, 0);
-  egal(masse, 83571666, 'Masse salariale des 25 joueurs sous contrat = 83 571 666 $');
+  egal(masse, 34600000, 'Masse salariale des 10 joueurs sous contrat = 34 600 000 $ (salaires du site)');
   ok(!doc.querySelector('#alignSommaire .stat-carte').classList.contains('alerte'), 'Sous le plafond de 104 M$ : aucune alerte');
   ok(doc.querySelector('#alignSommaire .stat-carte .det').textContent.replace(/\s/g,'').includes('104000000'), 'Plafond affiché = 104 000 000 $');
 
@@ -530,20 +530,20 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   {
     const avantXtra = S.ETAT.xtra, avantEstY21 = S.ETAT.xtraEstY21;
     // archive Y21 fictive téléchargée : saison complète de Bedard
-    S.ETAT.xtra = [{nom:'Connor Bedard', gp:82, goals:40, assists:55, pts:95, shots:250, pim:20, mp:1700, hits:60}];
+    S.ETAT.xtra = [{nom:'Connor Bedard', gp:82, goals:45, assists:55, pts:100, shots:260, pim:20, mp:1700, hits:60}];
     S.ETAT.xtraEstY21 = true;
     btnY21.click();
     egal(S.ETAT.modeY21, true, 'Bascule activée');
     ok(doc.querySelector('#bandeauY21').style.display !== 'none', 'Bandeau de vérification affiché');
     const prodY21 = S.productionDe(S.SECOURS_ROSTER.find(x2=>x2.nom==='Connor Bedard'));
     egal(prodY21?._modeY21, true, 'Production servie par l\'archive Y21 téléchargée');
-    egal(prodY21?.pts, 95, 'Points Y21 de Bedard');
+    egal(prodY21?.pts, 100, 'Points Y21 de Bedard');
     const carteBedard = [...doc.querySelectorAll('#progGrille .joueur-carte')]
       .find(c=>c.querySelector('.jc-nom').textContent==='Connor Bedard');
     ok(!!carteBedard, 'Carte de Bedard rendue en mode Y21');
     ok(carteBedard.textContent.includes('Mode vérification Y21'), 'Note du mode Y21 sur la carte');
     ok(carteBedard.querySelectorAll('.badge-etat.memorable').length >= 2,
-       'Bedard Mémorable en points et en % de tirs (95 PTS > 81 ; 16 %T > 15,5)');
+       'Bedard Mémorable en points et en % de tirs (100 PTS > 97 ; 17,3 %T > 16 à OV 82)');
     ok(!carteBedard.textContent.includes('proj.'), 'Aucune projection affichée (saison complète)');
     btnY21.click();
     egal(S.ETAT.modeY21, false, 'Retour à la saison en cours');
@@ -587,11 +587,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     'Fox (PA 86 + OF 70 = 156 ≥ DF 79 + ST 70 = 149) → formule offensive');
   ok(S.ovDetaille(versCotes([68,70,78,84,68,82,72,73,74,84,62,85,80]),'D').formule.includes('défensif'),
     'Brodin (PA 73 + OF 62 = 135 < DF 84 + ST 78 = 162) → formule défensive');
-  // cohérence : l'OV des patineurs des données de secours provient de cette formule
-  S.SECOURS_ROSTER.filter(j => j.po !== 'G').forEach(j => {
-    const r = S.ovDetaille(j, j.po === 'D' ? 'D' : 'F');
-    ok(r && r.arrondi === j.ov, `Arrondi de l'OV détaillé = OV affiché — ${j.nom} (${j.ov})`);
-  });
+  // (les OV affichés sont relevés du site ; les 13 cotes des fichiers peuvent
+  // retarder d'une recote — plus de test de cohérence arrondi = affiché)
   // ancre 50 partout et gardiens
   proche(S.ovDetaille(versCotes(Array(13).fill(50)),'F').arrondi, 55, 0,
     'Patineur 50 partout → OV 55');
@@ -651,29 +648,29 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(lignesCSV[0].startsWith('Nom;No;PO;HD;Age;'), 'En-tête CSV (séparateur point-virgule)');
   const ligneHayton = lignesCSV.find(l=>l.startsWith('Barrett Hayton;'));
   ok(!!ligneHayton, 'Rangée de Hayton présente');
-  ok(ligneHayton.includes(';7250000;3'), 'Salaire et contrat de Hayton exportés');
+  ok(ligneHayton.includes(';9075000;2'), 'Salaire et contrat de Hayton exportés (valeurs du site)');
   ok(ligneHayton.includes(';Playmaker;'), 'Profil exporté');
 
   console.log('— Projection du plafond salarial');
   const proj = S.projectionPlafond(5, {});
   egal(proj.length, 5, 'Cinq saisons projetées');
   egal(proj[0].saison, 'Y22', 'La projection démarre à la saison Y22');
-  egal(proj[0].masse, 83571666, 'Masse Y22 = masse salariale actuelle');
-  egal(proj[0].engages, 25, '25 joueurs sous contrat en Y22');
-  egal(proj[0].marge, 104000000 - 83571666, 'Marge Y22 sous le plafond de 104 M$');
-  egal(proj[1].masse, 28371666, 'Masse Y23 = contrats de 2 ans et plus');
-  egal(proj[1].engages, 10, '10 joueurs encore sous contrat en Y23');
-  egal(proj[2].masse, 14500000, 'Masse Y24 = Hayton + Merkley (7,25 M chacun)');
-  egal(proj[2].engages, 2, 'Deux contrats de 3 ans');
+  egal(proj[0].masse, 34600000, 'Masse Y22 = masse salariale actuelle (site)');
+  egal(proj[0].engages, 10, '10 joueurs sous contrat en Y22');
+  egal(proj[0].marge, 104000000 - 34600000, 'Marge Y22 sous le plafond de 104 M$');
+  egal(proj[1].masse, 19050000, 'Masse Y23 = Hayton + Merkley + McGroarty (contrats de 2 ans)');
+  egal(proj[1].engages, 3, 'Trois joueurs encore sous contrat en Y23');
+  egal(proj[2].masse, 0, 'Aucun contrat ne couvre la Y24');
   egal(proj[3].masse, 0, 'Aucun contrat ne couvre la Y25');
-  egal(proj[0].expirants.length, 15, '15 contrats expirent après la Y22');
-  ok(proj[0].expirants.includes('Connor Bedard'), 'Bedard dans les contrats qui expirent après la Y22');
-  tableauEgal(proj[2].expirants.sort(), ['Barrett Hayton','Ryan Merkley'], 'Hayton et Merkley expirent après la Y24');
+  egal(proj[0].expirants.length, 7, '7 contrats expirent après la Y22');
+  ok(proj[0].expirants.includes('Chris Gibson'), 'Gibson dans les contrats qui expirent après la Y22');
+  tableauEgal(proj[1].expirants.sort(), ['Barrett Hayton','Rutger McGroarty','Ryan Merkley'],
+    'Hayton, McGroarty et Merkley expirent après la Y23');
   // rendu de la vue
   doc.querySelector('nav button[data-vue="plafond"]').click();
   egal(doc.querySelectorAll('#tablePlafond tbody tr').length, 5, 'Table de projection : 5 rangées');
   ok(doc.querySelector('#plafondSommaire').textContent.includes('Masse Y22'), 'Sommaire de la projection rendu');
-  ok(doc.querySelector('#tablePlafond').textContent.includes('Connor Bedard'), 'Expirants listés dans la table');
+  ok(doc.querySelector('#tablePlafond').textContent.includes('Chris Gibson'), 'Expirants listés dans la table');
 
   console.log('— Comparateur de joueurs');
   doc.querySelector('nav button[data-vue="comparateur"]').click();
@@ -681,15 +678,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(selA.options.length, 25, 'Sélecteur A : 25 joueurs');
   egal(selB.options.length, 25, 'Sélecteur B : 25 joueurs');
   egal(selA.value, 'Chris Bigras', 'Joueur A par défaut = meilleur OV du club (Bigras, 88)');
-  egal(selB.value, 'Travis Sanheim', 'Joueur B par défaut = deuxième OV du club (Sanheim, 84)');
+  egal(selB.value, 'Darnell Nurse', 'Joueur B par défaut = deuxième OV du club (Nurse, 84)');
   selA.value = 'Connor Bedard'; selA.dispatchEvent(new W.Event('change'));
   selB.value = 'Matvei Michkov'; selB.dispatchEvent(new W.Event('change'));
   const zone = doc.getElementById('compZone');
   ok(zone.textContent.includes('Connor Bedard') && zone.textContent.includes('Matvei Michkov'),
     'Les deux joueurs choisis sont affichés');
   egal(zone.querySelectorAll('.comp-barre').length, 28, '14 cotes × 2 barres (13 cotes + OV)');
-  ok(zone.textContent.includes('Junior Elite') && zone.textContent.includes('Prospect Elite'),
-    'Profils des deux joueurs affichés');
+  ok((zone.textContent.match(/Prospect Elite/g)||[]).length >= 2,
+    'Profils des deux joueurs affichés (tous deux Prospect Elite)');
   ok(zone.querySelector('.comp-pied').textContent.includes('Statistiques évaluées'),
     'Statistiques évaluées par profil listées au pied');
   // le plus fort sur une cote est marqué : Bedard SC 84 = Michkov SC 84 → égalité, les deux gagnent
@@ -810,7 +807,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   S.autoTrios();
   const t = S.litTrios();
   egal(Object.keys(t).length, 38, 'Remplissage par OV : les 38 postes sont comblés');
-  egal(t['t1.c'], 'Barrett Hayton', 'Trio 1, centre = meilleur C par OV (Hayton)');
+  egal(t['t1.c'], 'Connor Bedard', 'Trio 1, centre = meilleur C par OV (Bedard, 82)');
   egal(t['t1.ag'], 'Filip Zadina', 'Trio 1, AG = meilleur ailier gauche (Zadina)');
   egal(t['t1.ad'], 'Tyson Jost', 'Trio 1, AD = meilleur ailier droit (Jost)');
   egal(t['p1.dg'], 'Chris Bigras', 'Paire 1 = meilleur défenseur (Bigras)');
@@ -851,8 +848,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   // export texte
   const txt = S.texteTrios();
   ok(txt.startsWith('TORONTO — trios'), 'Export texte : en-tête du club');
-  ok(txt.includes('Trio 1 : Filip Zadina (83) — Barrett Hayton (82) — Tyson Jost (81)'), 'Export texte : trio 1 lisible');
-  ok(txt.includes('Gardiens : Chris Gibson (82) / Kevin Lankinen (79)'), 'Export texte : gardiens');
+  ok(txt.includes('Trio 1 : Filip Zadina (82) — Connor Bedard (82) — Tyson Jost (82)'), 'Export texte : trio 1 lisible');
+  ok(txt.includes('Gardiens : Chris Gibson (83) / Kevin Lankinen (79)'), 'Export texte : gardiens');
   ok(txt.includes('AN 1 : Filip Zadina'), 'Export texte : avantage numérique');
   ok(/IN 2 : .+ — .+ — .+ — .+/.test(txt), 'Export texte : deuxième unité d\'infériorité complète');
   // persistance
@@ -891,7 +888,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     doc.querySelector('#tableLigue thead').textContent.includes(h)), 'Les 13 cotes ont leur colonne');
   {
     const rangBigras = [...doc.querySelectorAll('#tableLigue tbody tr')].find(r=>r.textContent.includes('Chris Bigras'));
-    ok(!!rangBigras && rangBigras.textContent.includes('87,85'), 'OV exact de Bigras affiché (87,85)');
+    ok(!!rangBigras && rangBigras.textContent.includes('87,98'), 'OV exact de Bigras affiché (87,98 — LD du site)');
     ok(rangBigras.textContent.includes('96'), 'Cote IT de Bigras affichée (96)');
   }
   // tri par défaut : OV (exact) décroissant — colonne 18
@@ -942,8 +939,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(doc.getElementById('echEntrants').textContent.includes('Adam Fox'), 'Chip de l\'entrant affichée');
   {
     const apres = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
-    egal(apres[0].masse, 83571666 - 11000000 + 7250000, 'Masse Y22 après : −Bigras (11 M) +Fox (7,25 M)');
-    egal(apres[1].masse, 28371666, 'Y23 inchangée : les deux contrats expirent après Y22');
+    egal(apres[0].masse, 34600000 + 7250000, 'Masse Y22 après : Bigras (contrat échu, 0 au plafond) part, Fox (7,25 M) arrive');
+    egal(apres[1].masse, 19050000, 'Y23 inchangée : le contrat de Fox expire après Y22');
     ok(doc.getElementById('echSommaire').textContent.includes('Masse Y22 après'), 'Sommaire d\'impact rendu');
     ok(doc.getElementById('echSommaire').textContent.includes('OV moyen'), 'OV moyen avant/après affiché');
     egal(doc.querySelectorAll('#tableEchange tbody tr').length, 3, 'Projection sur trois saisons');
@@ -964,9 +961,10 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   doc.querySelector('nav button[data-vue="alignement"]').click();
   {
     let alertes = S.alertesDG();
-    ok(alertes.some(a=>a.niveau==='info' && a.texte.includes('15 contrats')),
-      'Alerte info : 15 contrats expirent à la fin de la saison');
-    ok(!alertes.some(a=>a.texte.includes('échu')), 'Aucun contrat échu dans l\'instantané de départ (le direct fait foi)');
+    ok(alertes.some(a=>a.niveau==='info' && a.texte.includes('7 contrats')),
+      'Alerte info : 7 contrats expirent à la fin de la saison');
+    ok(alertes.some(a=>a.niveau==='rouge' && a.texte.includes('15 contrats échus')),
+      'Entre-saison : les 15 contrats échus du site sont signalés en rouge');
     ok(doc.querySelectorAll('#alertesDG .alerte-ligne').length >= 1, 'Bandeau d\'alertes rendu');
     // contrat échu non prolongé → alerte rouge
     const jEchu = S.ETAT.roster.find(x=>!x.backup && x.po!=='G');
@@ -1192,21 +1190,28 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   {
     // OV exact affiché
     const bigrasT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Bigras');
-    egal(S.ovExact(bigrasT), '87,85', 'OV exact de Bigras (87,85)');
+    egal(S.ovExact(bigrasT), '87,98', 'OV exact de Bigras (87,98 — LD relevé du site)');
     egal(S.ovExact(S.joueursEquipe('TORONTO').find(j=>j.nom==='Chris Gibson')), null, 'Pas d\'OV exact pour un gardien');
     // la re-signature standard S'ENCHAÎNE après le contrat : on ne re-signe
     // pas un joueur encore sous contrat
     const bedardT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Connor Bedard');
-    const rsBedard = S.resignatureStandard(bedardT); // ct 1, re-signé à 21 ans → RFA 3 ans, OV 80
+    const rsBedard = S.resignatureStandard(bedardT); // contrat échu (site) → charte immédiate à 21 ans, OV 82
     tableauEgal([rsBedard.st, rsBedard.duree, rsBedard.apres, rsBedard.salaire],
-      ['RFA', 3, 1, 5750000], 'Re-signature standard de Bedard : après 1 an, RFA 5,75 M × 3');
-    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 0), 975000,
-      'Saison Y22 : son contrat réel (975 k), PAS la charte — il est encore sous contrat');
-    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 1), 5750000,
-      'Saison Y23 : la re-signature standard prend le relais (5,75 M)');
-    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 4), 0,
-      'Saison Y26 : après les 3 ans de la re-signature, plus rien');
-    egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Sans bascule : rien après son contrat');
+      ['RFA', 3, 0, 8750000], 'Re-signature standard de Bedard : échu → RFA 8,75 M × 3 dès maintenant');
+    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 0), 8750000,
+      'Saison Y22 : contrat échu → la charte s\'applique tout de suite');
+    egal(S.salaireSaisonEchange({...bedardT, _resigner:true}, 3), 0,
+      'Saison Y25 : après les 3 ans de la re-signature, plus rien');
+    egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Sans bascule : rien (contrat échu)');
+    // la CHAÎNE contrat réel puis charte, avec un joueur encore sous contrat (Mesar, 900 k × 1 an)
+    const mesarT = S.joueursEquipe('TORONTO').find(j=>j.nom==='Filip Mesar');
+    const rsMesar = S.resignatureStandard(mesarT); // re-signé à 23 ans → RFA, OV 77 → 950 k
+    tableauEgal([rsMesar.st, rsMesar.duree, rsMesar.apres, rsMesar.salaire],
+      ['RFA', 3, 1, 950000], 'Mesar : après son année de contrat, RFA 950 k × 3');
+    egal(S.salaireSaisonEchange({...mesarT, _resigner:true}, 0), 900000,
+      'Saison Y22 : son contrat réel (900 k), PAS la charte — il est encore sous contrat');
+    egal(S.salaireSaisonEchange({...mesarT, _resigner:true}, 1), 950000,
+      'Saison Y23 : la re-signature standard prend le relais (950 k)');
     // le statut est déduit de l'âge AU MOMENT de la re-signature (28 ans + 1 an de contrat → UFA)
     egal(S.resignatureStandard({nom:'X', po:'C', ov:80, age:28, salaire:1000000, ct:1}).st, 'UFA',
       '28 ans avec 1 an de contrat → re-signé à 29 ans : UFA');
@@ -1214,15 +1219,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     doc.querySelector('nav button[data-vue="echange"]').click();
     doc.getElementById('echSortant').value = 'Connor Bedard';
     doc.getElementById('echAjSortant').click();
-    ok(doc.getElementById('echSortants').textContent.includes('(80,27)'), 'OV exact sur la chip');
+    ok(doc.getElementById('echSortants').textContent.includes('(' + S.ovExact(bedardT) + ')'), 'OV exact sur la chip');
     ok(doc.getElementById('echSortants').textContent.includes('re-signé ensuite'), 'Bascule «re-signé ensuite» présente');
     const chk = doc.querySelector('#echSortants input[data-resign-camp="s"]');
     chk.checked = true; chk.dispatchEvent(new W.Event('change'));
-    ok(doc.getElementById('echSortants').textContent.includes('975 k × 1 an puis RFA 5,8 M × 3 ans'),
-      'Chip : contrat réel PUIS re-signature standard');
+    ok(doc.getElementById('echSortants').textContent.includes('RFA 8,8 M × 3 ans'),
+      'Chip : contrat échu → re-signature standard immédiate (8,75 M arrondi 8,8 M)');
     // un sortant basculé alourdit la masse AVANT (le garder = le re-signer)
     const avantResig = S.projectionEchange([], [], 3);
-    egal(avantResig[1].masse, 28371666 + 5750000, 'Avant : Y23 inclut la re-signature de Bedard si on le garde');
+    egal(avantResig[1].masse, 19050000 + 8750000, 'Avant : Y23 inclut la re-signature de Bedard si on le garde');
     // un entrant re-signé compte sa chaîne : contrat réel Y22, charte ensuite
     doc.getElementById('echEquipe').value = 'SANJOSE';
     doc.getElementById('echEquipe').dispatchEvent(new W.Event('change'));
@@ -1232,15 +1237,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     chkE.checked = true; chkE.dispatchEvent(new W.Event('change'));
     // Fox : ct 1 à 7,25 M, re-signé à 28 ans → RFA OV83 = 10,5 M × 3
     const apresResig = S.projectionEchange(S.ECHANGE.sortants, S.ECHANGE.entrants, 3);
-    egal(apresResig[0].masse, 83571666 - 975000 + 7250000,
+    egal(apresResig[0].masse, 34600000 + 7250000,
       'Y22 : Fox compte à son contrat RÉEL (7,25 M), Bedard parti');
-    egal(apresResig[1].masse, 28371666 + 10500000,
+    egal(apresResig[1].masse, 19050000 + 10500000,
       'Y23 : la re-signature standard de Fox (10,5 M) prend le relais, Bedard exclu');
     // cartes OV et âge gagnés / perdus
     ok(doc.getElementById('echSommaire').textContent.includes('OV gagné / perdu'), 'Carte OV gagné/perdu');
-    ok(doc.getElementById('echSommaire').textContent.includes('+3'), 'OV : sortants 80, entrants 83 → +3');
+    ok(doc.getElementById('echSommaire').textContent.includes('+1'), 'OV : sortants 82, entrants 83 → +1');
     ok(doc.getElementById('echSommaire').textContent.includes('Âge gagné / perdu'), 'Carte âge gagné/perdu');
-    ok(doc.getElementById('echSommaire').textContent.includes('+7,0'), 'Âge : 20 ans part, 27 ans arrive → +7,0');
+    ok(doc.getElementById('echSommaire').textContent.includes('+6,0'), 'Âge : 21 ans part, 27 ans arrive → +6,0');
     doc.getElementById('echVider').click();
     egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Vider remet aussi la bascule à zéro (drapeau nettoyé)');
   }
