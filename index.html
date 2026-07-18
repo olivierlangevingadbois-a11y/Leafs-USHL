@@ -247,6 +247,26 @@
   .alerte-ligne.jaune{border-left-color:var(--warn);}
   .alerte-ligne.jaune b{color:var(--warn);}
 
+  /* ---------- Transferts locaux ---------- */
+  .transf-bloc{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--warn); padding:10px 12px;}
+  .transf-titre{font-family:var(--font-data); font-size:.7rem; letter-spacing:1px; text-transform:uppercase;
+    color:var(--warn); cursor:help;}
+  .transf-bloc select{background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.74rem; padding:6px 8px; border-radius:2px; max-width:220px;}
+  .transf-bloc select:focus{outline:none; border-color:var(--warn);}
+  .transf-fleche{color:var(--txt-faint);}
+  #btnTransferer{font-family:var(--font-body); font-weight:600; font-size:.7rem; letter-spacing:1px; text-transform:uppercase;
+    background:transparent; border:1px solid var(--warn); color:var(--warn); padding:7px 14px; cursor:pointer; border-radius:2px;}
+  #btnTransferer:hover{background:var(--warn); color:#0a1a33;}
+  #transfListe{display:flex; gap:6px; flex-wrap:wrap; flex-basis:100%;}
+  #transfListe:empty{display:none;}
+  .transf-chip{display:inline-flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line);
+    border-left:3px solid var(--warn); padding:5px 10px; font-family:var(--font-data); font-size:.72rem;}
+  .transf-chip button{background:none; border:none; color:var(--bad); font-size:1rem; cursor:pointer; line-height:1; padding:0 2px;}
+  .tag-transfert{display:inline-block; font-size:.55rem; letter-spacing:.5px; padding:1px 5px; border-radius:8px;
+    background:#3a2f06; color:var(--warn); text-transform:uppercase; margin-left:6px;}
+
   /* ---------- Outils de l'alignement (recherche + export) ---------- */
   .align-outils{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center;}
   .align-outils input[type=search]{
@@ -434,6 +454,15 @@
     <div class="align-outils">
       <input type="search" id="rechercheAlign" placeholder="Filtrer par nom, position ou profil…" aria-label="Filtrer l'alignement">
       <button id="btnExportCSV" title="Télécharge l'alignement affiché en CSV (séparateur point-virgule, compatible Excel)">Exporter en CSV</button>
+    </div>
+    <div class="transf-bloc">
+      <span class="transf-titre" title="La base du site met parfois du temps à refléter un échange : déplace un joueur d'une équipe à l'autre DANS L'APPLICATION seulement, le temps que l'administration le traite. S'applique partout (masse, plafond, trios, ligue, recotes) et survit aux actualisations — retire-le quand le site est à jour.">Transfert local :</span>
+      <select id="transfDe" aria-label="Équipe source"></select>
+      <select id="transfJoueur" aria-label="Joueur à transférer"></select>
+      <span class="transf-fleche">→</span>
+      <select id="transfVers" aria-label="Équipe destination"></select>
+      <button id="btnTransferer">Transférer</button>
+      <div id="transfListe"></div>
     </div>
     <div class="table-wrap"><table id="tableAlignement"></table></div>
   </section>
@@ -720,7 +749,8 @@ const CLES_LS = {
   proxy: 'tml_proxy_prefere_v1',
   cache: 'tml_cache_v1',
   resign: 'tml_resignatures_v1',
-  trios: 'tml_trios_v1'
+  trios: 'tml_trios_v1',
+  transferts: 'tml_transferts_v1'
 };
 
 /* ------------------ DÉFINITION DES STATS ------------------ */
@@ -2218,11 +2248,49 @@ function decoderEquipe(code){
     return j;
   }).filter(j=>!estFictif(j.nom));
 }
-function joueursEquipe(code){
-  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!estFictif(j.nom) && !j.backup);
+function joueursEquipeBrut(code){
+  if (code === CONFIG.equipe) return ETAT.rosterBrut.filter(j=>!estFictif(j.nom) && !j.backup);
   const direct = ETAT.equipesLive.get(code);
   if (direct) return direct;
   return decoderEquipe(code);
+}
+function joueursEquipe(code){
+  if (code === CONFIG.equipe) return ETAT.roster.filter(j=>!estFictif(j.nom) && !j.backup);
+  return appliquerTransferts(code, joueursEquipeBrut(code));
+}
+
+/* ---------- Transferts locaux ----------
+   La base de données du site met parfois du temps à refléter un échange :
+   un transfert local déplace un joueur d'une équipe à l'autre DANS
+   L'APPLICATION SEULEMENT (persisté dans ce navigateur), le temps que
+   l'administration de la ligue le traite. Il s'applique partout —
+   alignement, masse, plafond, trios, ligue, recotes — et survit aux
+   actualisations : retire-le quand le site est à jour. */
+function litTransferts(){
+  try { return JSON.parse(localStorage.getItem(CLES_LS.transferts) || '[]'); }
+  catch { return []; }
+}
+function ecritTransferts(t){ localStorage.setItem(CLES_LS.transferts, JSON.stringify(t)); }
+function appliquerTransferts(code, joueurs){
+  const ts = litTransferts();
+  if (!ts.length) return joueurs;
+  const nn = normaliserNom;
+  const out = joueurs.filter(j=>!ts.some(t=>t.de===code && nn(t.nom)===nn(j.nom)));
+  for (const t of ts){
+    if (t.vers !== code) continue;
+    const src = joueursEquipeBrut(t.de).find(j=>nn(j.nom)===nn(t.nom));
+    if (src && !out.some(j=>nn(j.nom)===nn(src.nom))){
+      const c = Object.assign({}, src, {_transfert: t.de});
+      c._profil = determinerProfil(c);
+      out.push(c);
+    }
+  }
+  return out;
+}
+/* Recalcule la formation effective du club (rosterBrut + transferts). */
+function rafraichirRosterClub(){
+  ETAT.roster = appliquerTransferts(CONFIG.equipe, ETAT.rosterBrut.filter(j=>!estFictif(j.nom)));
+  preparerRoster();
 }
 </script>
 <script>
@@ -2588,7 +2656,8 @@ function modsEstime(evals){
 
 /* ---------- État global ---------- */
 const ETAT = {
-  roster: SECOURS_ROSTER.map(j=>({...j})),
+  rosterBrut: SECOURS_ROSTER.map(j=>({...j})), // formation telle que servie (site ou secours), AVANT transferts locaux
+  roster: SECOURS_ROSTER.map(j=>({...j})),     // formation effective = rosterBrut + transferts locaux
   scoring: {patineurs:[], gardiens:[]},
   xtra: SECOURS_Y21.map(x=>({...x})),
   xtraEstY21: true,
@@ -2794,7 +2863,7 @@ async function actualiserTout(){
     const {texte, essais} = await chercherSource('roster', validerPageEquipe);
     const joueurs = parseRoster(texte);
     if (joueurs.length >= 10){
-      ETAT.roster = joueurs; preparerRoster();
+      ETAT.rosterBrut = joueurs; rafraichirRosterClub();
       const f = extraireFiche(texte); if (f) ETAT.fiche = f;
       ETAT.source = 'ushl.ca — ' + new Date().toLocaleString('fr-CA');
       rapport.push('formation ✓ ('+joueurs.length+' joueurs'+((essais||1)>1?', bonne équipe obtenue après réessai':'')+')');
@@ -3025,6 +3094,10 @@ function alertesDG(){
   if (echus.length){
     alertes.push({niveau:'rouge', texte:`<b>${echus.length} contrat${echus.length>1?'s':''} échu${echus.length>1?'s':''} sans prolongation</b> : ${echus.map(j=>echap(j.nom)).join(', ')} — règle la situation dans la colonne Re-signer.`});
   }
+  const transferts = litTransferts();
+  if (transferts.length){
+    alertes.push({niveau:'info', texte:`<b>${transferts.length} transfert${transferts.length>1?'s':''} local${transferts.length>1?'aux':''} actif${transferts.length>1?'s':''}</b> (${transferts.map(t=>echap(t.nom)).join(', ')}) — retire-le${transferts.length>1?'s':''} quand la ligue aura traité l'échange.`});
+  }
   const expirants = actifs.filter(j=>j.ct===1);
   if (expirants.length){
     alertes.push({niveau:'info', texte:`<b>${expirants.length} contrat${expirants.length>1?'s':''}</b> expire${expirants.length>1?'nt':''} à la fin de la saison — planifie les re-signatures (onglet Plafond).`});
@@ -3067,10 +3140,40 @@ function rendreAlertes(){
   zone.innerHTML = alertesDG().map(a=>`<div class="alerte-ligne ${a.niveau}">${a.texte}</div>`).join('');
 }
 
+/* ---------- Bloc des transferts locaux (onglet Alignement) ---------- */
+function rendreTransferts(){
+  const selDe = document.getElementById('transfDe');
+  if (!selDe) return;
+  const selVers = document.getElementById('transfVers');
+  const opts = LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
+  const deAv = selDe.value, versAv = selVers.value;
+  if (!selDe.options.length){ selDe.innerHTML = opts; selVers.innerHTML = opts; }
+  selDe.value = deAv || LIGUE_EQUIPES.find(e=>e!==CONFIG.equipe);
+  selVers.value = versAv || CONFIG.equipe;
+  const selJ = document.getElementById('transfJoueur');
+  const jAv = selJ.value;
+  const joueurs = joueursEquipe(selDe.value);
+  selJ.innerHTML = joueurs.map(j=>`<option value="${echap(j.nom)}">${echap(j.nom)} (${j.po} · OV ${j.ovEstime?'~':''}${j.ov})</option>`).join('');
+  if (joueurs.some(j=>j.nom===jAv)) selJ.value = jAv;
+  document.getElementById('transfListe').innerHTML = litTransferts().map(t=>
+    `<span class="transf-chip">${echap(t.nom)} : ${t.de} → ${t.vers}
+      <button data-transf="${echap(t.nom)}" title="Annuler ce transfert local">×</button></span>`).join('');
+  document.querySelectorAll('#transfListe button[data-transf]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      ecritTransferts(litTransferts().filter(t=>t.nom!==b.dataset.transf));
+      rafraichirRosterClub();
+      toutRendre();
+      rendreTransferts();
+      flash('Transfert local annulé');
+    });
+  });
+}
+
 /* ---------- Alignement ---------- */
 let triAlign = {col:'ov', desc:true};
 function rendreAlignement(){
   rendreAlertes();
+  rendreTransferts();
   $('#ficheEquipe').textContent = ETAT.fiche;
   $('#sourceInfo').textContent = ETAT.source;
   const actifs = ETAT.roster.filter(j=>!j.backup);
@@ -3124,7 +3227,7 @@ function rendreAlignement(){
     const badge = j.po==='G' ? 'g' : (j.po==='D' ? 'd' : '');
     const tag = j.po==='G' ? 'g-tag' : (j.po==='D' ? 'd-tag' : '');
     html += `<tr class="${j.backup?'backup':''}${peutProlonger(j) && resign[normaliserNom(j.nom)]?' resigne':''}">`;
-    html += `<td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>`;
+    html += `<td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}${j._transfert?`<span class="tag-transfert" title="Transfert local : arrivé de ${j._transfert} (pas encore traité par la ligue)">via ${j._transfert}</span>`:''}</td>`;
     html += `<td>${j.no??'—'}</td><td>${j.po}</td><td>${j.age}</td>`;
     for (const c of ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld']){
       const v = j[c];
@@ -4525,6 +4628,24 @@ document.getElementById('compEqB').addEventListener('change', ()=>{
   actualiserEquipe(document.getElementById('compEqB').value, ()=>{ peuplerComparateur(); rendreComparateur(); });
 });
 document.getElementById('btnExportCSV').addEventListener('click', telechargerCSV);
+document.getElementById('transfDe').addEventListener('change', ()=>{
+  rendreTransferts();
+  actualiserEquipe(document.getElementById('transfDe').value, rendreTransferts);
+});
+document.getElementById('btnTransferer').addEventListener('click', ()=>{
+  const de = document.getElementById('transfDe').value;
+  const vers = document.getElementById('transfVers').value;
+  const nom = document.getElementById('transfJoueur').value;
+  if (!nom){ flash('Choisis un joueur'); return; }
+  if (de === vers){ flash('Choisis deux équipes différentes'); return; }
+  const ts = litTransferts().filter(t=>t.nom!==nom); // un seul transfert actif par joueur
+  ts.push({nom, de, vers, date: new Date().toISOString().slice(0,10)});
+  ecritTransferts(ts);
+  rafraichirRosterClub();
+  toutRendre();
+  rendreTransferts();
+  flash(nom + ' transféré localement : ' + de + ' → ' + vers);
+});
 document.getElementById('btnTriosAuto').addEventListener('click', ()=>{ autoTrios(); flash('Trios remplis par OV'); });
 document.getElementById('btnTriosVider').addEventListener('click', ()=>{
   if (confirm('Vider tous les trios ?')){ ecritTrios({}); rendreTrios(); flash('Trios vidés'); }
@@ -4641,7 +4762,7 @@ $('#sourcesTexte').innerHTML =
    remplacée par la valeur réelle à la première actualisation.`;
 $('#dateSecours').textContent = DATE_SECOURS;
 
-preparerRoster();
+rafraichirRosterClub(); // formation effective = secours (ou site) + transferts locaux
 rendreSelectMatrice();
 rendreMatrice();
 toutRendre();
@@ -4777,6 +4898,7 @@ if (typeof window !== 'undefined'){
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
     parseFicheAttributs, chargerFiche, urlFicheJoueur, telechargerFichesEquipe,
     decoderEquipe, classementRecotes, texteClassementRecotes, rendreClassementRecotes,
+    litTransferts, ecritTransferts, appliquerTransferts, rafraichirRosterClub, joueursEquipeBrut, rendreTransferts,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }
 </script>

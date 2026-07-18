@@ -1304,6 +1304,53 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     egal(S.salaireSaisonEchange(bedardT, 1), 0, 'Vider remet aussi la bascule à zéro (drapeau nettoyé)');
   }
 
+  console.log('— Transferts locaux (échange pas encore traité par la ligue)');
+  {
+    W.localStorage.removeItem('tml_transferts_v1');
+    doc.querySelector('nav button[data-vue="alignement"]').click();
+    ok(!!doc.getElementById('btnTransferer'), 'Bloc de transfert présent dans l\'alignement');
+    // acquisition : Adam Fox arrive de SANJOSE
+    doc.getElementById('transfDe').value = 'SANJOSE';
+    doc.getElementById('transfDe').dispatchEvent(new W.Event('change'));
+    doc.getElementById('transfJoueur').value = 'Adam Fox';
+    doc.getElementById('transfVers').value = 'TORONTO';
+    doc.getElementById('btnTransferer').click();
+    egal(S.ETAT.roster.filter(j=>!j.backup).length, 26, 'Fox rejoint le club : 26 joueurs');
+    const foxT = S.ETAT.roster.find(j=>j.nom==='Adam Fox');
+    ok(!!foxT && foxT._transfert==='SANJOSE', 'Fox porte la provenance du transfert');
+    ok(!S.joueursEquipe('SANJOSE').some(j=>j.nom==='Adam Fox'), 'Fox retiré de SANJOSE partout dans l\'application');
+    ok(doc.querySelector('#tableAlignement tbody').textContent.includes('Adam Fox'), 'Fox dans la table d\'alignement');
+    ok(doc.querySelector('#tableAlignement tbody').textContent.includes('via SANJOSE'), 'Badge «via SANJOSE» affiché');
+    egal(S.calculerMasse({}).masse, 34600000 + 7250000, 'La masse du club inclut le salaire de Fox (7,25 M, CT 1)');
+    ok(S.alertesDG().some(a=>a.texte.includes('transfert') && a.texte.includes('Adam Fox')),
+      'Alerte du Bureau : transfert local actif, à retirer quand la ligue aura traité');
+    ok(doc.getElementById('transfListe').textContent.includes('Adam Fox : SANJOSE → TORONTO'), 'Chip du transfert affichée');
+    // départ : Bigras part vers SANJOSE (deux transferts cumulés)
+    doc.getElementById('transfDe').value = 'TORONTO';
+    doc.getElementById('transfDe').dispatchEvent(new W.Event('change'));
+    doc.getElementById('transfJoueur').value = 'Chris Bigras';
+    doc.getElementById('transfVers').value = 'SANJOSE';
+    doc.getElementById('btnTransferer').click();
+    egal(S.ETAT.roster.filter(j=>!j.backup).length, 25, 'Bigras parti : retour à 25 joueurs');
+    ok(S.joueursEquipe('SANJOSE').some(j=>j.nom==='Chris Bigras'), 'Bigras apparaît chez SANJOSE');
+    egal(S.litTransferts().length, 2, 'Deux transferts persistés dans le navigateur');
+    // survit à une actualisation de la formation
+    S.rafraichirRosterClub();
+    ok(S.ETAT.roster.some(j=>j.nom==='Adam Fox') && !S.ETAT.roster.some(j=>j.nom==='Chris Bigras'),
+      'Les transferts survivent au recalcul de la formation (actualisation)');
+    // dépistage : la Ligue voit les joueurs dans leur nouvelle équipe
+    ok(S.joueursLigue().find(j=>j.nom==='Adam Fox').equipe==='TORONTO', 'Onglet Ligue : Fox listé chez TORONTO');
+    egal(S.joueursLigue().length, 821 - 39, 'Aucun joueur dupliqué dans la ligue'); // 782 réels (fictifs exclus)
+    // annulation par les chips
+    let garde = 0;
+    while (doc.querySelector('#transfListe button[data-transf]') && garde++ < 5){
+      doc.querySelector('#transfListe button[data-transf]').click();
+    }
+    egal(S.litTransferts().length, 0, 'Transferts annulés par leurs chips');
+    egal(S.ETAT.roster.filter(j=>!j.backup).length, 25, 'Formation redevenue normale');
+    ok(S.ETAT.roster.some(j=>j.nom==='Chris Bigras'), 'Bigras de retour au club');
+  }
+
   console.log('— PWA (installation et hors ligne)');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
