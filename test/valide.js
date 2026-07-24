@@ -1351,6 +1351,108 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(S.ETAT.roster.some(j=>j.nom==='Chris Bigras'), 'Bigras de retour au club');
   }
 
+  console.log('— Mise à jour des matrices depuis la page officielle de la ligue');
+  {
+    W.localStorage.removeItem('tml_matrices_v1');
+    // reconnaissance des noms
+    egal(S.reconnaitre('Profil : Elite', S.ALIAS_MATRICES), 'ELITE', 'Profil «Elite» reconnu');
+    egal(S.reconnaitre('DElite Shutdown', S.ALIAS_MATRICES), 'DELITESD', 'Profil «DElite Shutdown» reconnu');
+    egal(S.reconnaitre('Gardien partant', S.ALIAS_MATRICES), 'STARTER', 'Variante française du gardien partant reconnue');
+    egal(S.reconnaitre('points accumulés', S.ALIAS_STATS), 'pts', 'Statistique «points accumulés» reconnue');
+    egal(S.reconnaitre('mises en échecs complétées', S.ALIAS_STATS), 'hits', 'Statistique «mises en échec» reconnue');
+    egal(S.reconnaitre('buts gagnants', S.ALIAS_STATS), 'gwg', 'Statistique «buts gagnants» reconnue');
+    egal(S.nombreCellule('12,5'), 12.5, 'Nombre à virgule décimale');
+    egal(S.nombreCellule('1 838'), 1838, 'Nombre avec espace de milliers');
+    egal(S.nombreCellule('85 %'), 85, 'Pourcentage');
+    egal(S.nombreCellule('—'), null, 'Cellule vide → null');
+    // page fictive calquée sur MATRICES DES PROFILS (deux profils, trois stats)
+    const page = `<html><body>
+      <h1>MATRICES DES PROFILS</h1>
+      <h2>Elite</h2>
+      <h3>points</h3>
+      <table>
+        <tr><th>OV</th><th>Mémorable</th><th>Excellente</th><th>Satisfaisante</th><th>Correcte</th><th>Décevante</th><th>À oublier</th></tr>
+        <tr><td>75</td><td>25</td><td>22</td><td>19</td><td>16</td><td>10</td><td>-1</td></tr>
+        <tr><td>83</td><td>105</td><td>93</td><td>80</td><td>68</td><td>40</td><td>-1</td></tr>
+        <tr><td>90</td><td>125</td><td>111</td><td>96</td><td>82</td><td>48</td><td>-1</td></tr>
+      </table>
+      <h3>buts gagnants</h3>
+      <table>
+        <tr><th>OV</th><th>Mémorable</th><th>Excellente</th><th>Satisfaisante</th><th>Correcte</th><th>Décevante</th><th>À oublier</th></tr>
+        <tr><td>83</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>-6</td></tr>
+        <tr><td>90</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>-4</td></tr>
+      </table>
+      <h2>Starter Goalie</h2>
+      <h3>pourcentage d'arrêt cumulé</h3>
+      <table>
+        <tr><th>OV</th><th>Mémorable</th><th>Excellente</th><th>Satisfaisante</th><th>Correcte</th><th>Décevante</th><th>À oublier</th></tr>
+        <tr><td>83</td><td>0,895</td><td>0,891</td><td>0,886</td><td>0,882</td><td>0,878</td><td>-1,000</td></tr>
+        <tr><td>90</td><td>0,905</td><td>0,901</td><td>0,896</td><td>0,892</td><td>0,887</td><td>-1,000</td></tr>
+      </table></body></html>`;
+    const docM = new W.DOMParser().parseFromString(page, 'text/html');
+    const {matrices, rapport} = S.parseMatricesUshl(null, docM);
+    egal(Object.keys(matrices).length, 2, 'Deux profils reconnus dans la page');
+    ok(!!matrices.ELITE && !!matrices.STARTER, 'Elite et Starter Goalie extraits');
+    tableauEgal(Object.keys(matrices.ELITE).sort(), ['gwg','pts'], 'Deux statistiques pour Elite');
+    // bandes d'overall étendues à chaque OV, comme les matrices Y17
+    tableauEgal(matrices.ELITE.pts[75], [25,22,19,16,10,-1], 'Rangée OV 75 (bande 73-75)');
+    tableauEgal(matrices.ELITE.pts[73], [25,22,19,16,10,-1], 'La bande couvre aussi l\'OV 73');
+    tableauEgal(matrices.ELITE.pts[83], [105,93,80,68,40,-1], 'Rangée OV 83');
+    tableauEgal(matrices.ELITE.pts[80], [105,93,80,68,40,-1], 'OV 80 tombe dans la bande 76-83');
+    tableauEgal(matrices.ELITE.pts[90], [125,111,96,82,48,-1], 'Dernière bande jusqu\'à 90');
+    tableauEgal(matrices.STARTER.svpct[90], [0.905,0.901,0.896,0.892,0.887,-1], 'Décimales à virgule du gardien');
+    egal(rapport.filter(r=>!r.ignore).length, 3, 'Trois tables importées (rapport)');
+    // import effectif : les nouveaux seuils remplacent Y17 dans l'évaluation
+    const av = S.seuilsPour(S.ETAT.roster.find(j=>j._profil.mat==='ELITE') || {ov:83, nom:'x', _profil:{mat:'ELITE'}}, 'pts', {}, {});
+    tableauEgal(av.seuils, [97,86,74,63,37,-1], 'Avant import : seuils Y17 (OV 83)');
+    const res = S.importerMatricesUshl(page);
+    egal(res.profils, 2, 'Import : deux profils');
+    ok(res.rangees > 30, 'Import : toutes les rangées d\'overall (' + res.rangees + ')');
+    const jTest = {nom:'Test Elite', ov:83, po:'C', _profil:{mat:'ELITE'}};
+    const ap = S.seuilsPour(jTest, 'pts', S.chargerMatrices(), {});
+    tableauEgal(ap.seuils, [105,93,80,68,40,-1], 'Après import : les seuils de la ligue s\'appliquent');
+    egal(ap.source, 'personnalisée', 'Source = rangée personnalisée (remplace Y17)');
+    // un Mémorable se juge maintenant sur le nouveau seuil
+    egal(S.statutSelonSeuils(106, ap.seuils), 'memorable', '106 pts > 105 → Mémorable selon la nouvelle matrice');
+    egal(S.statutSelonSeuils(98, ap.seuils), 'excellente', '98 pts (Mémorable sous Y17) → seulement Excellente maintenant');
+    // interface
+    doc.querySelector('nav button[data-vue="reglages"]').click();
+    ok(!!doc.getElementById('btnMajMatrices'), 'Bouton «Mettre à jour depuis ushl.ca» présent');
+    ok(S.CONFIG.urls.matrices.includes('MATRICES%20DES%20PROFILS'), 'URL de la page officielle configurée');
+    // import par collage dans la zone de texte
+    S.sauverMatrices({});
+    doc.getElementById('zoneJson').value = page;
+    doc.getElementById('btnImportMat').click();
+    ok(Object.keys(S.chargerMatrices()).length === 2, 'Coller la page dans la zone et cliquer «Importer» fonctionne');
+    ok(doc.getElementById('etatMatrices').textContent.includes('profils'), 'Compte-rendu affiché après import');
+    // copier-coller du tableau en TEXTE (cas le plus courant depuis un navigateur)
+    S.sauverMatrices({});
+    const colle = [
+      'MATRICES DES PROFILS',
+      'Sniper',
+      'but accumulés',
+      'OV\tMémorable\tExcellente\tSatisfaisante\tCorrecte\tDécevante\tÀ oublier',
+      '83\t46\t41\t35\t30\t16\t-1',
+      '90\t55\t49\t42\t36\t19\t-1',
+      'Grinder',
+      'mises en échecs complétées par tranche de 20 minutes',
+      'OV\tMémorable\tExcellente\tSatisfaisante\tCorrecte\tDécevante\tÀ oublier',
+      '83\t3,05\t2,85\t2,65\t2,45\t2,25\t-1'
+    ].join('\n');
+    const rTxt = S.importerMatricesUshl(colle);
+    egal(rTxt.profils, 2, 'Texte collé : deux profils importés');
+    tableauEgal(S.chargerMatrices().SNIPER.goals[83], [46,41,35,30,16,-1], 'Sniper : buts, rangée OV 83 (texte)');
+    tableauEgal(S.chargerMatrices().GRINDER.hits20[90], [3.05,2.85,2.65,2.45,2.25,-1],
+      'Grinder : MEÉ/20 avec décimales à virgule, dernière bande étendue à 90');
+    // le JSON reste accepté
+    S.sauverMatrices({});
+    doc.getElementById('zoneJson').value = JSON.stringify({ELITE:{pts:{83:[1,2,3,4,5,6]}}});
+    doc.getElementById('btnImportMat').click();
+    tableauEgal(S.chargerMatrices().ELITE.pts[83], [1,2,3,4,5,6], 'Import JSON toujours fonctionnel');
+    S.sauverMatrices({});
+    doc.querySelector('nav button[data-vue="alignement"]').click();
+  }
+
   console.log('— PWA (installation et hors ligne)');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');

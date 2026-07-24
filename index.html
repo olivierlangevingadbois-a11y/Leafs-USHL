@@ -675,6 +675,8 @@
       <p>Les matrices sont préremplies avec les valeurs officielles de la recote de l'été 2022 (Y17), transcrites du document
       «&nbsp;Attentes.docx&nbsp;». La ligue précise qu'elles sont fournies à titre indicatif et réévaluées à chaque saison :
       toute cellule modifiée ici remplace la valeur Y17 (conservé dans ce navigateur, exportable en JSON).
+      <strong>La ligue republie ses attentes à chaque saison :</strong> le bouton «&nbsp;Mettre à jour depuis ushl.ca&nbsp;» lit la page officielle
+      <em>MATRICES DES PROFILS</em> et remplace les seuils par les siens (rangée par rangée, profil par profil).
       Colonnes = seuils à <em>dépasser strictement</em> pour chaque degré ; la colonne Satisfaisante correspond à l'attente de base (100&nbsp;%).</p>
       <div>
         <label>Matrice (profil)</label>
@@ -684,11 +686,13 @@
       </div>
       <div class="table-wrap" style="margin-top:12px"><table class="matrice" id="tableMatrice"></table></div>
       <div class="regl-actions">
-        <button id="btnExportMat">Exporter les matrices (JSON)</button>
-        <button id="btnImportMat" class="secondaire">Importer un JSON</button>
+        <button id="btnMajMatrices" title="Télécharge la page officielle «MATRICES DES PROFILS» de ushl.ca et remplace les seuils par ceux publiés par la ligue">Mettre à jour depuis ushl.ca</button>
+        <button id="btnExportMat" class="secondaire">Exporter les matrices (JSON)</button>
+        <button id="btnImportMat" class="secondaire">Importer (JSON ou page collée)</button>
         <button id="btnViderMat" class="secondaire">Revenir aux valeurs Y17</button>
+        <span id="etatMatrices" style="font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); align-self:center"></span>
       </div>
-      <textarea id="zoneJson" placeholder="Colle ici un JSON de matrices puis clique «Importer un JSON». L'export apparaît aussi ici."></textarea>
+      <textarea id="zoneJson" placeholder="Colle ici un JSON de matrices — ou le contenu de la page «MATRICES DES PROFILS» (copier-coller du tableau ou code HTML) — puis clique «Importer». L'export apparaît aussi ici."></textarea>
     </div>
 
     <div class="regl-bloc">
@@ -728,7 +732,8 @@ const CONFIG = {
   urls: {
     roster:  'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamRosters.php?team=TORONTO',
     scoring: 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamScoring.php?team=TORONTO',
-    xtra:    'https://ushl.ca/ushl/menu_sim/USHL-pro/USHLxtrastats.html'
+    xtra:    'https://ushl.ca/ushl/menu_sim/USHL-pro/USHLxtrastats.html',
+    matrices:'https://ushl.ca/ushl/menu_ushl/la_ligue/reglements/MATRICES%20DES%20PROFILS.htm'
   },
   proxys: [
     u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
@@ -2447,6 +2452,226 @@ function parseScoring(html, doc){
     }
   }
   return {patineurs, gardiens};
+}
+
+/* ---------- Parseur : page officielle des MATRICES DES PROFILS ----------
+   La ligue republie ses attentes à chaque saison. Cette page est lue telle
+   quelle : on repère toute table dont l'en-tête porte les six degrés de
+   satisfaction, on rattache la table au profil et à la statistique nommés
+   juste avant (ou dans la table), puis on convertit les rangées d'overall
+   en rangées personnalisées qui remplacent les valeurs Y17. */
+function normTxt(s){
+  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\s\u00a0]+/g,' ').trim().toLowerCase();
+}
+/* Alias des profils → code de matrice. */
+const ALIAS_MATRICES = (()=>{
+  const a = {};
+  const ajoute = (txt, cle)=>{ const n = normTxt(txt); if (n) a[n] = cle; };
+  for (const [cle, nom] of Object.entries(NOMS_MATRICES)){ ajoute(nom, cle); ajoute(cle, cle); }
+  // variantes rencontrées dans les règlements (tableaux 10-11-12) et sur le site
+  const extra = {
+    ELITE:['elite','joueur elite','attaquant elite','junior elite','prospect elite'],
+    PLAYMAKER:['playmaker','fabricant de jeu','junior playmaker','prospect playmaker'],
+    POWERFWD:['power forward','powerforward','attaquant de puissance','junior power forward','prospect power forward'],
+    TWOWAY:['two-way forward','two way forward','twoway','attaquant a deux sens','junior two-way','prospect two-way forward'],
+    SNIPER:['sniper','franc-tireur','junior sniper','prospect sniper'],
+    GRINDER:['grinder','junior grinder','prospect grinder'],
+    DEFFWD:['defensive forward','attaquant defensif','defensive','junior defensive','prospect defensive'],
+    DEPTHFWD:['depth forward','attaquant de soutien','junior depth forward','prospect depth forward'],
+    DELITEQB:['delite qb','deliteqb','d elite qb','defenseur elite qb','quart-arriere','junior deliteqb','prospect deliteqb'],
+    DELITESD:['delite shutdown','delitesd','deliteshutdown','d elite shutdown','defenseur elite shutdown','junior deliteshutdown','prospect deliteshutdown'],
+    DOFF:['doffensive','d offensive','defenseur offensif','junior doffensive','prospect doffensive'],
+    DDEF:['ddefensive','d defensive','defenseur defensif','junior ddefensive','prospect ddefensive'],
+    DDEPTH:['ddepth defense','ddepth','d depth','defenseur de soutien','dtwo-way','d two-way','junior dtwo-way','prospect dtwo-way'],
+    STARTER:['starter goalie','gardien partant','partant','starter'],
+    BACKUP:['backup goalie','gardien auxiliaire','auxiliaire','backup']
+  };
+  for (const [cle, liste] of Object.entries(extra)) for (const t of liste) ajoute(t, cle);
+  return a;
+})();
+/* Alias des statistiques → clé interne, bâtis sur les titres officiels déjà
+   transcrits dans MATRICES et sur les noms d'affichage. */
+const ALIAS_STATS = (()=>{
+  const a = {};
+  const ajoute = (txt, cle)=>{ const n = normTxt(txt); if (n && !a[n]) a[n] = cle; };
+  for (const stats of Object.values(MATRICES))
+    for (const [cle, def] of Object.entries(stats)) ajoute(def.titre, cle);
+  for (const [cle, def] of Object.entries(STATS_DEF)){ ajoute(def.nom, cle); ajoute(def.court, cle); ajoute(cle, cle); }
+  const extra = {
+    pts:['points','points accumules','points accumulees','nombre points','nombre de points','p'],
+    goals:['buts','but comptes','buts comptes','but accumules','buts accumules','nombre de buts','b','g'],
+    assists:['passes','passes accumulees','aides','mentions d aide','a'],
+    hits:['mises en echec','mises en echecs completees','mises en echec completees','mise en echec','mee'],
+    shots:['tirs','tirs au but','tirs au but effectues','nombre tirs au but','nombre de tirs'],
+    shotpct:['pctg','% de tirs','pourcentage de tirs','pourcentage de tir','efficacite'],
+    gwg:['buts gagnants','but gagnant','buts gagants','bg','gw'],
+    ppg:['nombre but en pp','buts en pp','but en avantage numerique','buts en avantage numerique','pp','ban'],
+    pmrang:['rang +/- dans le club','rang differentiel','rang du differentiel','rang +/-'],
+    hits20:['mises en echecs completees par tranche de 20 minutes','mee par 20 minutes','mee/20','mises en echec par 20 minutes'],
+    shots20:['tirs au but par tranche de 20 minutes','tirs par 20 minutes','t/20'],
+    mg:['minutes par match joues','minutes par matchs joues','minutes par match','min/m','minutes par partie'],
+    mp:['minutes jouees','minutes','min'],
+    hs:['head stand','headstand','hs'],
+    qggp:['ratio nombre parties qualites par parties jouees','nombre de parties de qualite','departs de qualite','dq/m','parties de qualite'],
+    ming:['parties jouees sur maximum de parties permises','parties sur maximum permis','mj/max'],
+    psv:['statistiques de perseverance','perseverance','psv'],
+    svpct:['pourcentage d arret cumule','pourcentage d arrets','% d arrets','sv%','%a'],
+    plusminus:['differentiel','+/-']
+  };
+  for (const [cle, liste] of Object.entries(extra)) for (const t of liste) ajoute(t, cle);
+  return a;
+})();
+function reconnaitre(texte, alias){
+  const n = normTxt(texte);
+  if (!n) return null;
+  if (alias[n]) return alias[n];
+  let trouve = null, meilleur = 0;
+  for (const [cle, val] of Object.entries(alias)){
+    if (cle.length > 3 && cle.length > meilleur && n.includes(cle)){ trouve = val; meilleur = cle.length; }
+  }
+  return trouve;
+}
+/* Nombre d'une cellule de matrice : gère «12,5», «85 %», «1 838», «-1». */
+function nombreCellule(txt){
+  const t = String(txt ?? '').replace(/[ \s%]/g,'').replace(',', '.');
+  if (!t || /^(na|nd|-|—)$/i.test(t)) return null;
+  const m = t.match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+const DEGRES_CLES = ['memorable','excellente','satisfaisante','correcte','decevante','oublier'];
+/* Analyse la page des matrices. Retourne {matrices, rapport}. */
+function parseMatricesUshl(html, doc){
+  const d = doc || new DOMParser().parseFromString(html, 'text/html');
+  const matrices = {}, rapport = [];
+  let profilCourant = null, statCourante = null;
+  const pile = [d.body || d.documentElement].filter(Boolean);
+  const noeuds = [];
+  (function collecter(n){
+    for (const enfant of Array.from(n.childNodes)){
+      if (enfant.nodeType === 3){ noeuds.push({texte: enfant.textContent}); continue; }
+      if (enfant.nodeType !== 1) continue;
+      const nom = enfant.tagName.toLowerCase();
+      if (nom === 'table'){ noeuds.push({table: enfant}); continue; } // pas de descente : traitée en bloc
+      if (nom === 'script' || nom === 'style') continue;
+      collecter(enfant);
+    }
+  })(pile[0]);
+
+  for (const n of noeuds){
+    if (n.texte !== undefined){
+      const p = reconnaitre(n.texte, ALIAS_MATRICES);
+      if (p) profilCourant = p;
+      const s = reconnaitre(n.texte, ALIAS_STATS);
+      if (s) statCourante = s;
+      continue;
+    }
+    const lignes = Array.from(n.table.querySelectorAll('tr'));
+    if (lignes.length < 2) continue;
+    // en-tête : la rangée qui nomme les six degrés
+    let iEntete = -1, colonnes = null;
+    for (let i = 0; i < Math.min(lignes.length, 4); i++){
+      const cel = Array.from(lignes[i].querySelectorAll('th,td')).map(c=>normTxt(c.textContent));
+      const map = {};
+      DEGRES_CLES.forEach((deg,di)=>{
+        const j = cel.findIndex(t => t.includes(deg) || (deg==='oublier' && t.includes('a oublier')));
+        if (j >= 0) map[di] = j;
+      });
+      if (Object.keys(map).length >= 5){ iEntete = i; colonnes = map; break; }
+    }
+    if (iEntete < 0) continue;
+    // profil et statistique : contexte courant, ou texte des rangées de titre
+    let profil = profilCourant, stat = statCourante;
+    for (let i = 0; i < iEntete; i++){
+      const t = lignes[i].textContent;
+      profil = reconnaitre(t, ALIAS_MATRICES) || profil;
+      stat = reconnaitre(t, ALIAS_STATS) || stat;
+    }
+    const bandes = [];
+    for (let i = iEntete + 1; i < lignes.length; i++){
+      const cel = Array.from(lignes[i].querySelectorAll('th,td')).map(c=>c.textContent);
+      if (!cel.length) continue;
+      // une rangée peut renommer la statistique (tableau multi-stats)
+      const sLigne = reconnaitre(cel[0], ALIAS_STATS);
+      const ovLigne = nombreCellule(cel[0]);
+      if (ovLigne === null){ if (sLigne) stat = sLigne; continue; }
+      const seuils = DEGRES_CLES.map((_,di)=> colonnes[di] === undefined ? null : nombreCellule(cel[colonnes[di]]));
+      if (seuils.every(v=>v===null)) continue;
+      bandes.push([Math.round(ovLigne), seuils]);
+    }
+    if (!profil || !stat || !bandes.length){
+      rapport.push({profil, stat, rangees:0, ignore:true});
+      continue;
+    }
+    // bandes d'overall → une rangée par OV (comme seuilsMatrice)
+    matrices[profil] = matrices[profil] || {};
+    const parOv = matrices[profil][stat] = etendreBandes(bandes);
+    rapport.push({profil, stat, rangees: Object.keys(parOv).length, bandes: bandes.length});
+  }
+  return {matrices, rapport};
+}
+/* Étend des bandes d'overall [[ovMax, seuils], …] en une rangée par OV. */
+function etendreBandes(bandes){
+  const parOv = {};
+  bandes.sort((a,b)=>a[0]-b[0]);
+  let debut = OV_MIN;
+  bandes.forEach(([ovMax, seuils], i)=>{
+    const fin = (i === bandes.length - 1) ? OV_MAX : Math.min(ovMax, OV_MAX);
+    for (let ov = Math.max(OV_MIN, Math.min(debut, OV_MAX)); ov <= fin; ov++) parOv[ov] = seuils.slice();
+    debut = ovMax + 1;
+  });
+  return parOv;
+}
+/* Variante texte : la page copiée-collée depuis le navigateur arrive en
+   lignes de colonnes séparées par des tabulations ou des espaces. */
+function parseMatricesTexte(texte){
+  const matrices = {}, rapport = {};
+  let profil = null, stat = null;
+  for (const ligne of String(texte).split(/\r?\n/)){
+    const brut = ligne.trim();
+    if (!brut) continue;
+    const cellules = brut.split(/\t+| {2,}|\s*\|\s*/).map(c=>c.trim()).filter(c=>c!=='');
+    const nombres = cellules.map(nombreCellule);
+    // une rangée de données : overall + au moins cinq seuils
+    if (cellules.length >= 6 && nombres[0] !== null && nombres.slice(1,6).every(v=>v!==null)){
+      if (!profil || !stat) continue;
+      const cle = profil + '|' + stat;
+      (rapport[cle] = rapport[cle] || []).push([Math.round(nombres[0]), nombres.slice(1,7).map(v=>v===undefined?null:v)]);
+      continue;
+    }
+    const p = reconnaitre(brut, ALIAS_MATRICES);
+    if (p){ profil = p; const s0 = reconnaitre(brut, ALIAS_STATS); if (s0) stat = s0; continue; }
+    const s = reconnaitre(brut, ALIAS_STATS);
+    if (s) stat = s;
+  }
+  const detail = [];
+  for (const [cle, bandes] of Object.entries(rapport)){
+    const [mat, st] = cle.split('|');
+    matrices[mat] = matrices[mat] || {};
+    matrices[mat][st] = etendreBandes(bandes);
+    detail.push({profil:mat, stat:st, rangees:Object.keys(matrices[mat][st]).length, bandes:bandes.length});
+  }
+  return {matrices, rapport: detail};
+}
+
+/* Fusionne les matrices importées avec les rangées personnalisées existantes.
+   Accepte la page HTML de la ligue ou son copier-coller en texte. */
+function importerMatricesUshl(html){
+  let {matrices, rapport} = parseMatricesUshl(html);
+  if (!Object.keys(matrices).length){
+    ({matrices, rapport} = parseMatricesTexte(html));
+  }
+  const profils = Object.keys(matrices);
+  if (!profils.length) throw new Error('aucune matrice reconnue dans la page');
+  const actuel = chargerMatrices();
+  for (const [mat, stats] of Object.entries(matrices)){
+    actuel[mat] = actuel[mat] || {};
+    for (const [stat, rangees] of Object.entries(stats)) actuel[mat][stat] = rangees;
+  }
+  sauverMatrices(actuel);
+  const nbStats = rapport.filter(r=>!r.ignore).length;
+  const nbRangees = rapport.reduce((s,r)=>s+(r.rangees||0),0);
+  return {profils: profils.length, stats: nbStats, rangees: nbRangees, rapport};
 }
 
 /* ---------- Parseur : fiche d'un joueur (CareerStatsPlayer.php) ----------
@@ -4730,13 +4955,41 @@ $('#btnExportMat').addEventListener('click', ()=>{
   $('#zoneJson').value = JSON.stringify(chargerMatrices(), null, 2);
   flash('Matrices exportées dans la zone de texte');
 });
+/* Import : JSON de matrices, ou contenu de la page officielle collé
+   (HTML ou tableau copié) — on essaie le JSON, puis le parseur de la ligue. */
 $('#btnImportMat').addEventListener('click', ()=>{
+  const brut = $('#zoneJson').value.trim();
+  if (!brut){ flash('Colle un JSON ou le contenu de la page des matrices'); return; }
   try{
-    const m = JSON.parse($('#zoneJson').value);
+    const m = JSON.parse(brut);
     if (typeof m !== 'object' || m===null) throw new Error('format inattendu');
     sauverMatrices(m); rendreMatrice(); rendreProgression();
+    $('#etatMatrices').textContent = 'JSON importé';
     flash('Matrices importées');
+    return;
+  }catch(e){ /* pas du JSON : on tente la page de la ligue */ }
+  try{
+    const r = importerMatricesUshl(brut);
+    rendreMatrice(); rendreProgression();
+    $('#etatMatrices').textContent = `${r.profils} profils · ${r.stats} statistiques · ${r.rangees} rangées`;
+    flash('Matrices de la ligue importées');
   }catch(e){ flash('Import impossible : '+e.message); }
+});
+/* Téléchargement direct de la page officielle des matrices (via les relais). */
+$('#btnMajMatrices').addEventListener('click', async ()=>{
+  const btn = $('#btnMajMatrices'), etat = $('#etatMatrices');
+  btn.disabled = true; etat.textContent = 'téléchargement de la page des matrices…';
+  try{
+    const texte = await chercherViaProxy(CONFIG.urls.matrices, {timeout:20000});
+    const r = importerMatricesUshl(texte);
+    rendreMatrice(); rendreProgression(); rendreAlertes();
+    etat.textContent = `à jour : ${r.profils} profils · ${r.stats} statistiques · ${r.rangees} rangées`;
+    flash('Matrices mises à jour depuis ushl.ca');
+  }catch(e){
+    etat.textContent = 'échec : ' + e.message + ' — copie la page dans la zone ci-dessous et clique «Importer»';
+    flash('Mise à jour impossible : ' + e.message);
+  }
+  btn.disabled = false;
 });
 $('#btnViderMat').addEventListener('click', ()=>{
   if (confirm('Effacer toutes les rangées personnalisées et revenir aux matrices Y17 ?')){
@@ -4756,7 +5009,7 @@ $('#sourcesTexte').innerHTML =
    Production : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.scoring}" target="_blank" rel="noopener">TeamScoring.php</a> ·
    Minutes et mises en échec : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.xtra}" target="_blank" rel="noopener">USHLxtrastats.html</a> ·
    Limites d'utilisation des gardiens : <a style="color:var(--bleu-vif)" href="${CONFIG.urlLimites}" target="_blank" rel="noopener">limites.json</a> (projet gestiongardiens) ·
-   Profils : règlements USHL, tableaux 10-11-12 · Matrices et modificateurs : section 6.2 et «Attentes.docx» (recote été 2022, Y17).
+   Profils : règlements USHL, tableaux 10-11-12 · Matrices : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.matrices}" target="_blank" rel="noopener">MATRICES DES PROFILS</a> (page officielle, importable en un clic dans les Réglages) — valeurs Y17 d'«Attentes.docx» par défaut · Modificateurs : section 6.2.
    <br>Données de secours : alignement TORONTO extrait des fichiers FHL officiels de la ligue (USHL21.ros, recote Y22).
    L'OV des patineurs y est calculé par la formule du calculateur ; celui des gardiens est une <b>estimation</b>
    remplacée par la valeur réelle à la première actualisation.`;
@@ -4897,6 +5150,8 @@ if (typeof window !== 'undefined'){
     resignatureStandard, salaireSaisonEchange, ovExact, nettoyerLigneXtra,
     COTES_Y21, cotesY21De, recotesEquipe, rendreRecotes, parseXtraLigue, rendreMeneurs,
     parseFicheAttributs, chargerFiche, urlFicheJoueur, telechargerFichesEquipe,
+    parseMatricesUshl, importerMatricesUshl, normTxt, reconnaitre, nombreCellule,
+    ALIAS_MATRICES, ALIAS_STATS, chargerMatrices, sauverMatrices,
     decoderEquipe, classementRecotes, texteClassementRecotes, rendreClassementRecotes,
     litTransferts, ecritTransferts, appliquerTransferts, rafraichirRosterClub, joueursEquipeBrut, rendreTransferts,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
