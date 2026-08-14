@@ -1453,6 +1453,89 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     doc.querySelector('nav button[data-vue="alignement"]').click();
   }
 
+  console.log('— OV détaillé : profil et permutations de cotes');
+  {
+    // catégories de la ligue
+    tableauEgal(S.CATEGORIES_COTES.A, ['sp','st','en','du','sk'], 'Catégorie A : SP ST EN DU SK');
+    tableauEgal(S.CATEGORIES_COTES.B, ['pa','pc','df','sc'], 'Catégorie B : PA PC DF SC');
+    tableauEgal(S.CATEGORIES_COTES.C, ['it','di','ex','ld'], 'Catégorie C : IT DI EX LD');
+    // profil calculé sur des cotes libres
+    const versCotes2 = t => Object.fromEntries(S.OV_ORDRE.map((k,i)=>[k,t[i]]));
+    const zadina = versCotes2([63,89,76,92,80,84,91,78,78,55,87,69,59]);
+    const pz = S.profilDeCotes(zadina, 'F', 27);
+    egal(pz.profil, 'Elite', 'Zadina (27 ans) → Elite');
+    egal(pz.mat, 'ELITE', 'Matrice ELITE');
+    egal(pz.ov, 83, 'OV arrondi calculé par la formule détaillée (83 ; le site affiche 82 sur ses propres cotes)');
+    // l'âge change la catégorie de profil
+    egal(S.profilDeCotes(zadina, 'F', 20).profil, 'Junior Elite', 'Même cotes à 20 ans → Junior Elite');
+    egal(S.profilDeCotes(zadina, 'F', 23).profil, 'Prospect Elite', 'À 23 ans → Prospect Elite');
+    // vecteurs de transfert : somme nulle, coût respecté
+    const vecs = S.transfertsCategorie(['pa','pc','df','sc'], 3);
+    ok(vecs.length > 0, 'Transferts de 3 points générés (' + vecs.length + ')');
+    ok(vecs.every(v=>v.reduce((a,b)=>a+b,0) === 0), 'Chaque transfert conserve la somme de la catégorie');
+    ok(vecs.every(v=>v.filter(d=>d>0).reduce((a,b)=>a+b,0) === 3), 'Chaque transfert déplace exactement 3 points');
+    ok(vecs.some(v=>JSON.stringify(v)===JSON.stringify([3,0,0,-3])), 'Le transfert PA +3 / SC −3 est envisagé');
+    // permutations : un Two-Way Forward qui bascule vers un autre profil
+    {
+      // Sniper exige SP+SK ≥ 140 et SC ≥ 78 ; on part juste sous le seuil
+      const presqueSniper = versCotes2([70,74,72,80,76,78,64,74,74,60,79,60,55]); // SP 74 + SK 64 = 138
+      const base = S.profilDeCotes(presqueSniper, 'F', 27);
+      const {options} = S.permutationsProfil(presqueSniper, 'F', 27, 3);
+      ok(options.every(o=>o.profil !== base.profil), 'Aucune option ne répète le profil de départ');
+      ok(options.every(o=>o.mouvement.reduce((s,m)=>s+m.delta,0) === 0),
+        'Chaque suggestion conserve la somme de sa catégorie');
+      ok(options.every(o=>{
+        const cat = S.CATEGORIES_COTES[o.categorie];
+        return o.mouvement.every(m=>cat.includes(m.cle));
+      }), 'Chaque suggestion reste dans une seule catégorie');
+      ok(options.every(o=>o.cout >= 1 && o.cout <= 3), 'Coût borné par le maximum demandé');
+      const sniper = options.find(o=>o.profil === 'Sniper');
+      ok(!!sniper, 'Le passage à Sniper est détecté');
+      if (sniper){
+        egal(sniper.categorie, 'A', 'Sniper s\'obtient dans la catégorie A (SP/SK)');
+        ok(sniper.cout <= 2, 'Coût minimal trouvé (' + sniper.cout + ' pt) : SP + SK doivent atteindre 140');
+        // vérification indépendante : les cotes proposées donnent bien ce profil
+        egal(S.profilDeCotes(sniper.cotes, 'F', 27).profil, 'Sniper', 'Les cotes suggérées produisent bien Sniper');
+      }
+      // un budget plus large ne perd aucune option
+      const large = S.permutationsProfil(presqueSniper, 'F', 27, 4);
+      ok(large.options.length >= options.length, 'Un budget de 4 points offre au moins autant d\'options');
+    }
+    // bornes 1..99 respectées
+    {
+      const extreme = versCotes2([99,99,99,99,99,99,99,50,50,50,50,50,50]);
+      const {options} = S.permutationsProfil(extreme, 'F', 27, 3);
+      ok(options.every(o=>Object.values(o.cotes).every(v=>v>=1 && v<=99)), 'Aucune cote ne sort de 1..99');
+    }
+    // interface
+    doc.querySelector('nav button[data-vue="ovdetail"]').click();
+    doc.getElementById('ovdEquipe').value = 'TORONTO';
+    doc.getElementById('ovdEquipe').dispatchEvent(new W.Event('change'));
+    doc.getElementById('ovdJoueur').value = 'Filip Zadina';
+    doc.getElementById('ovdJoueur').dispatchEvent(new W.Event('change'));
+    egal(doc.getElementById('ovdAge').value, '27', 'L\'âge du joueur est chargé');
+    egal(doc.getElementById('ovdProfil').textContent, 'Elite', 'Profil affiché dans le calculateur');
+    ok(doc.getElementById('ovdProfilLib').textContent.includes('pro'), 'La catégorie d\'âge est indiquée');
+    ok(doc.getElementById('ovdProfilLib').textContent.includes('ELITE'), 'La matrice est indiquée');
+    ok(!!doc.getElementById('ovdPermut'), 'Zone des permutations présente');
+    const texteP = doc.getElementById('ovdPermut').textContent;
+    ok(texteP.length > 0, 'Les permutations sont calculées et rendues');
+    ok(/catégorie [ABC]|stable/.test(texteP), 'Chaque suggestion nomme sa catégorie (ou déclare le profil stable)');
+    // changer l'âge recalcule le profil sans toucher aux cotes
+    doc.getElementById('ovdAge').value = '20';
+    doc.getElementById('ovdAge').dispatchEvent(new W.Event('input'));
+    egal(doc.getElementById('ovdProfil').textContent, 'Junior Elite', 'L\'âge modifie le profil affiché');
+    ok(doc.getElementById('ovdProfilLib').textContent.includes('junior'), 'Catégorie junior indiquée');
+    doc.getElementById('ovdAge').value = '27';
+    doc.getElementById('ovdAge').dispatchEvent(new W.Event('input'));
+    // le budget de points est réglable
+    doc.getElementById('ovdPoints').value = '1';
+    doc.getElementById('ovdPoints').dispatchEvent(new W.Event('input'));
+    ok(!/\b[23] pts\b/.test(doc.getElementById('ovdPermut').textContent), 'Budget 1 point : aucune suggestion à 2 ou 3 points');
+    doc.getElementById('ovdPoints').value = '3';
+    doc.getElementById('ovdPoints').dispatchEvent(new W.Event('input'));
+  }
+
   console.log('— PWA (installation et hors ligne)');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');

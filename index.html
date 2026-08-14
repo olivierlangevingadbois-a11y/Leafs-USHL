@@ -215,6 +215,24 @@
   .ovd-badge .val{font-family:var(--font-data); font-size:2rem; color:var(--accent-vif); display:block;}
   .ovd-badge .lib{font-size:.64rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--txt-faint);}
   .ovd-note{font-size:.78rem; color:var(--txt-dim); align-self:center; max-width:460px; line-height:1.55;}
+  .ovd-badge.profil{border-color:var(--bleu-vif); min-width:200px;}
+  .ovd-badge.profil .val{font-family:var(--font-body); font-size:1.15rem; color:var(--txt); font-weight:600; letter-spacing:.5px;}
+  .ovd-permut{margin-top:20px; border-top:1px dashed var(--line); padding-top:16px;}
+  .ovd-permut h4{font-family:var(--font-body); font-weight:600; text-transform:uppercase; letter-spacing:1.5px;
+    font-size:.78rem; color:var(--accent-vif); margin-bottom:8px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .ovd-cout{font-family:var(--font-data); font-size:.68rem; text-transform:none; letter-spacing:0; color:var(--txt-faint);}
+  .ovd-cout input{width:52px; background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt);
+    font-family:var(--font-data); font-size:.72rem; padding:3px 6px; border-radius:2px; text-align:center;}
+  .ovd-permut-note{font-size:.74rem; color:var(--txt-faint); line-height:1.6; margin-bottom:12px; max-width:820px;}
+  .permut-liste{display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:10px;}
+  .permut-carte{background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--bleu); padding:10px 12px;}
+  .permut-carte .pc-tete{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+  .permut-carte .pc-profil{font-family:var(--font-body); font-weight:600; font-size:.95rem; color:var(--bleu-vif);}
+  .permut-carte .pc-cout{font-family:var(--font-data); font-size:.66rem; color:var(--txt-faint); margin-left:auto;}
+  .permut-carte .pc-move{font-family:var(--font-data); font-size:.76rem; color:var(--txt);}
+  .permut-carte .pc-move .moins{color:var(--bad);} .permut-carte .pc-move .plus{color:var(--ok);}
+  .permut-carte .pc-ov{font-family:var(--font-data); font-size:.68rem; color:var(--txt-dim); margin-top:4px;}
+  .permut-vide{font-family:var(--font-data); font-size:.76rem; color:var(--txt-faint);}
 
   /* ---------- Réglages ---------- */
   .regl-bloc{background:var(--panel); border:1px solid var(--line); padding:18px 20px; margin-bottom:18px;}
@@ -655,12 +673,23 @@
             <option value="D">Défenseur</option>
           </select>
         </label>
+        <label>Âge
+          <input type="number" id="ovdAge" min="18" max="45" value="25" style="background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt); font-family:var(--font-data); font-size:.82rem; padding:7px 10px; border-radius:2px; width:80px">
+        </label>
       </div>
       <div class="ovd-grille" id="ovdGrille"></div>
       <div class="ovd-resultat">
         <div class="ovd-badge"><span class="val" id="ovdValeur">—</span><span class="lib">OV détaillé</span></div>
         <div class="ovd-badge"><span class="val" id="ovdArrondi">—</span><span class="lib">OV affiché (arrondi)</span></div>
+        <div class="ovd-badge profil"><span class="val" id="ovdProfil">—</span><span class="lib" id="ovdProfilLib">Profil</span></div>
         <div class="ovd-note" id="ovdNote"></div>
+      </div>
+      <div class="ovd-permut">
+        <h4>Changements de profil par permutation de cotes
+          <span class="ovd-cout">jusqu'à <input type="number" id="ovdPoints" min="1" max="6" value="3"> points déplacés</span>
+        </h4>
+        <p class="ovd-permut-note">Les points se déplacent <strong>à l'intérieur d'une même catégorie</strong> — A&nbsp;: SP&nbsp;ST&nbsp;EN&nbsp;DU&nbsp;SK · B&nbsp;: PA&nbsp;PC&nbsp;DF&nbsp;SC · C&nbsp;: IT&nbsp;DI&nbsp;EX&nbsp;LD. Chaque suggestion indique le profil obtenu, le coût en points et l'effet sur l'OV.</p>
+        <div id="ovdPermut"></div>
       </div>
     </div>
   </section>
@@ -5093,24 +5122,123 @@ function chargerJoueurOvd(){
   const j = joueursEquipe(document.getElementById('ovdEquipe').value).find(x => x.nom === nom);
   if (!j) return;
   document.getElementById('ovdGroupe').value = (j.po === 'D') ? 'D' : 'F';
+  document.getElementById('ovdAge').value = j.age ?? 25;
   OV_ORDRE.forEach(k => { document.getElementById('ovd_' + k).value = j[k]; });
   calculerOvd();
 }
+
+/* ------------------ PROFIL ET PERMUTATIONS DE COTES ------------------
+   Les cotes se déplacent par catégorie (règle de la ligue) : les points
+   retirés à une cote reviennent à une autre cote DE LA MÊME CATÉGORIE. */
+const CATEGORIES_COTES = {
+  A: ['sp','st','en','du','sk'],
+  B: ['pa','pc','df','sc'],
+  C: ['it','di','ex','ld']
+};
+/* Profil d'un jeu de cotes : l'overall vient de la formule détaillée, la
+   catégorie d'âge des règlements (junior ≤20, prospect ≤24, pro ensuite). */
+function profilDeCotes(cotes, groupe, age){
+  const r = ovDetaille(cotes, groupe);
+  if (!r) return null;
+  const j = Object.assign({}, cotes, {ov: r.arrondi, po: groupe === 'D' ? 'D' : 'C', age: age ?? 25});
+  const p = determinerProfil(j);
+  return {profil: p.profil, mat: p.mat, stats: p.stats, ov: r.arrondi, ovExact: r.valeur};
+}
+/* Vecteurs de transfert d'une catégorie : somme nulle, `cout` points déplacés.
+   Chaque cote reste dans 1..99. */
+function transfertsCategorie(cles, cout){
+  const out = [];
+  const deltas = new Array(cles.length).fill(0);
+  (function poser(i, restePlus, resteMoins){
+    if (i === cles.length){
+      if (restePlus === 0 && resteMoins === 0) out.push(deltas.slice());
+      return;
+    }
+    const max = Math.min(restePlus, cout), min = -Math.min(resteMoins, cout);
+    for (let d = min; d <= max; d++){
+      deltas[i] = d;
+      poser(i + 1, restePlus - Math.max(0, d), resteMoins - Math.max(0, -d));
+    }
+    deltas[i] = 0;
+  })(0, cout, cout);
+  return out.filter(v => v.some(d => d !== 0));
+}
+/* Profils atteignables en déplaçant au plus `maxPoints` points dans UNE
+   catégorie. Retourne une entrée par profil différent, la moins coûteuse. */
+function permutationsProfil(cotes, groupe, age, maxPoints){
+  const base = profilDeCotes(cotes, groupe, age);
+  if (!base) return {base: null, options: []};
+  const trouves = new Map();
+  for (let cout = 1; cout <= (maxPoints || 3); cout++){
+    for (const [cat, cles] of Object.entries(CATEGORIES_COTES)){
+      for (const vec of transfertsCategorie(cles, cout)){
+        const essai = Object.assign({}, cotes);
+        let valide = true;
+        cles.forEach((k, i)=>{
+          const v = (cotes[k] ?? 0) + vec[i];
+          if (v < 1 || v > 99) valide = false;
+          essai[k] = v;
+        });
+        if (!valide) continue;
+        const p = profilDeCotes(essai, groupe, age);
+        if (!p || p.profil === base.profil) continue;
+        const deja = trouves.get(p.profil);
+        if (deja && deja.cout <= cout) continue;
+        trouves.set(p.profil, {
+          profil: p.profil, mat: p.mat, cout, categorie: cat,
+          mouvement: cles.map((k,i)=>({cle:k, delta:vec[i]})).filter(m=>m.delta !== 0),
+          ov: p.ov, ovExact: p.ovExact, dOv: p.ovExact - base.ovExact, cotes: essai
+        });
+      }
+    }
+  }
+  const options = [...trouves.values()].sort((a,b)=> a.cout - b.cout || b.dOv - a.dOv);
+  return {base, options};
+}
+
 function calculerOvd(){
   const cotes = {};
   OV_ORDRE.forEach(k => { cotes[k] = parseFloat(document.getElementById('ovd_' + k).value); });
-  const r = ovDetaille(cotes, document.getElementById('ovdGroupe').value);
+  const groupe = document.getElementById('ovdGroupe').value;
+  const age = parseInt(document.getElementById('ovdAge').value, 10) || 25;
+  const r = ovDetaille(cotes, groupe);
   const elV = document.getElementById('ovdValeur');
   const elA = document.getElementById('ovdArrondi');
   const elN = document.getElementById('ovdNote');
+  const elP = document.getElementById('ovdProfil');
+  const elPL = document.getElementById('ovdProfilLib');
+  const elPerm = document.getElementById('ovdPermut');
   if (!r){
-    elV.textContent = '—'; elA.textContent = '—';
+    elV.textContent = '—'; elA.textContent = '—'; elP.textContent = '—';
+    elPL.textContent = 'Profil';
     elN.textContent = 'Complète les 13 cotes (valeurs numériques) pour obtenir l\'OV détaillé.';
+    elPerm.innerHTML = '';
     return;
   }
   elV.textContent = r.valeur.toFixed(2).replace('.', ',');
   elA.textContent = String(r.arrondi);
   elN.textContent = 'Formule ' + r.formule + '. L\'OV affiché sur ushl.ca est l\'arrondi au plus proche de l\'OV détaillé.';
+  const base = profilDeCotes(cotes, groupe, age);
+  elP.textContent = base.profil;
+  elPL.textContent = 'Profil · ' + (age <= 20 ? 'junior' : (age <= 24 ? 'prospect' : 'pro')) + ' · matrice ' + base.mat;
+  // permutations
+  const maxPts = Math.max(1, Math.min(6, parseInt(document.getElementById('ovdPoints').value, 10) || 3));
+  const {options} = permutationsProfil(cotes, groupe, age, maxPts);
+  if (!options.length){
+    elPerm.innerHTML = `<p class="permut-vide">Aucun changement de profil en déplaçant jusqu'à ${maxPts} point${maxPts>1?'s':''} à l'intérieur d'une catégorie — le profil <strong>${echap(base.profil)}</strong> est stable.</p>`;
+    return;
+  }
+  elPerm.innerHTML = '<div class="permut-liste">' + options.map(o=>{
+    const move = o.mouvement.map(m=>
+      `<span class="${m.delta<0?'moins':'plus'}">${OVD_LIBELLES[m.cle]} ${m.delta>0?'+':''}${m.delta}</span>`).join(' · ');
+    const dov = o.dOv >= 0 ? '+' + o.dOv.toFixed(2).replace('.',',') : o.dOv.toFixed(2).replace('.',',');
+    return `<div class="permut-carte">
+      <div class="pc-tete"><span class="pc-profil">${echap(o.profil)}</span>
+        <span class="pc-cout">${o.cout} pt${o.cout>1?'s':''} · catégorie ${o.categorie}</span></div>
+      <div class="pc-move">${move}</div>
+      <div class="pc-ov">OV ${o.ov} (${dov}) · matrice ${o.mat}</div>
+    </div>`;
+  }).join('') + '</div>';
 }
 function construireOvd(){
   const grille = document.getElementById('ovdGrille');
@@ -5120,6 +5248,8 @@ function construireOvd(){
      <input type="number" min="1" max="99" step="1" id="ovd_${k}" value="75"></div>`).join('');
   OV_ORDRE.forEach(k => document.getElementById('ovd_' + k).addEventListener('input', calculerOvd));
   document.getElementById('ovdGroupe').addEventListener('change', calculerOvd);
+  document.getElementById('ovdAge').addEventListener('input', calculerOvd);
+  document.getElementById('ovdPoints').addEventListener('input', calculerOvd);
   document.getElementById('ovdJoueur').addEventListener('change', chargerJoueurOvd);
   document.getElementById('ovdEquipe').addEventListener('change', ()=>{
     document.getElementById('ovdJoueur').value = '';
@@ -5142,6 +5272,7 @@ if (typeof window !== 'undefined'){
     ouvrirProlongation, fermerProlongation, calculerMasse, PLAFOND, echelonEffectif, peutProlonger,
     MATRICES, STATS_PAR_MATRICE, NIVEAUX, SECOURS_ROSTER, SECOURS_Y21, PROFILS, STATS_DEF,
     ovDetaille, OV_POIDS, OV_ORDRE, peuplerJoueursOvd, calculerOvd,
+    CATEGORIES_COTES, profilDeCotes, permutationsProfil, transfertsCategorie,
     echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond,
     LIGUE, LIGUE_EQUIPES, joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
