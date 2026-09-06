@@ -725,6 +725,19 @@
     </div>
 
     <div class="regl-bloc">
+      <h3>Instantané de la ligue</h3>
+      <p id="instantaneEtat"></p>
+      <p>Le site ne peut pas être lu à l'avance : c'est cette page, dans ton navigateur, qui télécharge les alignements.
+      Ce qu'elle rapporte est <strong>conservé ici et devient la référence par défaut</strong> — cotes, contrats et surtout
+      l'équipe de chaque joueur, à la date du téléchargement. «&nbsp;Actualiser toute la ligue&nbsp;» (onglet Ligue) met tout à jour d'un coup.</p>
+      <div class="regl-actions">
+        <button id="btnMajLigueReglages">Actualiser toute la ligue maintenant</button>
+        <button id="btnExportInstantane" class="secondaire" title="Produit le bloc de code de l'instantané, à graver dans le fichier pour qu'il serve aussi sur un autre appareil">Exporter l'instantané (code)</button>
+        <button id="btnViderInstantane" class="secondaire">Oublier l'instantané conservé</button>
+      </div>
+    </div>
+
+    <div class="regl-bloc">
       <h3>Cibles Mémorable individuelles (surcharges)</h3>
       <p>Sur chaque carte de l'onglet Progression, le champ de saisie fixe un seuil <strong>Mémorable</strong> propre au joueur,
       qui remplace celui de la matrice (les cinq autres degrés restent ceux de la matrice). Le bouton ci-dessous efface toutes ces surcharges.</p>
@@ -784,7 +797,8 @@ const CLES_LS = {
   cache: 'tml_cache_v1',
   resign: 'tml_resignatures_v1',
   trios: 'tml_trios_v1',
-  transferts: 'tml_transferts_v1'
+  transferts: 'tml_transferts_v1',
+  instantane: 'tml_instantane_ligue_v1'
 };
 
 /* ------------------ DÉFINITION DES STATS ------------------ */
@@ -2265,27 +2279,66 @@ function estFictif(nom){
   return /^(backup|rachat|retenue?)/i.test(String(nom).replace(/[\s_]/g,''));
 }
 
-/* Décode l'équipe demandée. Priorités :
-   1. le club → la formation vivante (ETAT.roster, actualisée à l'ouverture) ;
-   2. un alignement téléchargé en direct de ushl.ca (chargerEquipe) ;
-   3. sinon, l'instantané intégré des fichiers de la ligue (LIGUE_DATE). */
-/* Décode l'instantané intégré d'une équipe (fichiers de la ligue = état
-   final S21), même quand un alignement en direct est disponible — c'est la
-   BASE DE COMPARAISON du suivi des recotes. */
-function decoderEquipe(code){
-  const cles = ['nom','po','hd','no','it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld','ov','age','salaire','ct'];
-  return (LIGUE[code]||[]).map(t=>{
-    const j = Object.fromEntries(cles.map((k,i)=>[k,t[i]]));
-    if (j.po==='G'){ j.df = null; j.sc = null; j.ovEstime = true; }
-    j._instantane = true;
+/* ---------- Instantané de la ligue conservé dans ce navigateur ----------
+   Le site ne peut pas être lu d'avance : c'est l'application, dans ton
+   navigateur, qui télécharge les alignements. Ce qu'elle rapporte est
+   CONSERVÉ ICI et devient la nouvelle référence par défaut — chiffres,
+   contrats et surtout ÉQUIPE de chaque joueur, à la date du téléchargement.
+   L'instantané des fichiers de la ligue (LIGUE, état S21) ne sert plus que
+   de dernier recours et de base de comparaison pour les recotes. */
+const CLES_JOUEUR = ['nom','po','hd','no','it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld','ov','age','salaire','ct'];
+function litInstantane(){
+  try { return JSON.parse(localStorage.getItem(CLES_LS.instantane) || 'null'); }
+  catch { return null; }
+}
+function ecritInstantane(o){
+  try { localStorage.setItem(CLES_LS.instantane, JSON.stringify(o)); }
+  catch (e){ /* quota dépassé : on garde l'instantané intégré */ }
+}
+/* Enregistre l'alignement d'une équipe (format compact, comme LIGUE). */
+function memoriserEquipe(code, joueurs){
+  const snap = litInstantane() || {date: null, equipes: {}};
+  snap.equipes[code] = joueurs.map(j => CLES_JOUEUR.map(k => j[k] ?? null));
+  snap.date = new Date().toISOString().slice(0,10);
+  ecritInstantane(snap);
+}
+function dateInstantane(){
+  const s = litInstantane();
+  if (!s || !s.date) return null;
+  const [a,m,j] = s.date.split('-');
+  const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  return `${+j} ${mois[+m-1]} ${a}`;
+}
+function equipesInstantane(){
+  const s = litInstantane();
+  return s ? Object.keys(s.equipes) : [];
+}
+/* Décode une équipe depuis un tableau compact (instantané intégré ou conservé). */
+function decoderTableau(tab, marque, ovEstime){
+  return (tab||[]).map(t=>{
+    const j = Object.fromEntries(CLES_JOUEUR.map((k,i)=>[k,t[i]]));
+    // les gardiens n'ont ni DF ni OF (0 dans les fichiers, NA sur le site)
+    if (j.po==='G'){ j.df = null; j.sc = null; if (ovEstime) j.ovEstime = true; }
+    if (marque) j[marque] = true;
     j._profil = determinerProfil(j);
     return j;
   }).filter(j=>!estFictif(j.nom));
 }
+/* Décode l'instantané INTÉGRÉ (fichiers de la ligue, état final S21) — même
+   quand un alignement plus récent existe : c'est la base de comparaison du
+   suivi des recotes. */
+function decoderEquipe(code){
+  // OV des gardiens estimé : l'instantané intégré vient des fichiers, pas du site
+  return decoderTableau(LIGUE[code], '_instantane', true);
+}
+/* Alignement de référence d'une équipe : direct de la session > instantané
+   conservé dans ce navigateur > instantané intégré des fichiers. */
 function joueursEquipeBrut(code){
   if (code === CONFIG.equipe) return ETAT.rosterBrut.filter(j=>!estFictif(j.nom) && !j.backup);
   const direct = ETAT.equipesLive.get(code);
   if (direct) return direct;
+  const snap = litInstantane();
+  if (snap && snap.equipes[code]) return decoderTableau(snap.equipes[code], '_conserve');
   return decoderEquipe(code);
 }
 function joueursEquipe(code){
@@ -3053,6 +3106,7 @@ async function chargerEquipe(code, forcer){
   if (joueurs.length < 10) throw new Error('table de ' + code + ' introuvable');
   joueurs.forEach(j=>{ j._profil = determinerProfil(j); });
   ETAT.equipesLive.set(code, joueurs);
+  memoriserEquipe(code, joueurs);   // devient la nouvelle référence par défaut
   return joueurs;
 }
 /* ---------- Fiche d'un joueur (historique des attributs, ushl.ca) ---------- */
@@ -3118,6 +3172,7 @@ async function actualiserTout(){
     const joueurs = parseRoster(texte);
     if (joueurs.length >= 10){
       ETAT.rosterBrut = joueurs; rafraichirRosterClub();
+      memoriserEquipe(CONFIG.equipe, joueurs);   // le club aussi : chiffres du jour conservés
       const f = extraireFiche(texte); if (f) ETAT.fiche = f;
       ETAT.source = 'ushl.ca — ' + new Date().toLocaleString('fr-CA');
       rapport.push('formation ✓ ('+joueurs.length+' joueurs'+((essais||1)>1?', bonne équipe obtenue après réessai':'')+')');
@@ -3843,7 +3898,7 @@ function rendreComparateur(){
   const statsDe = j => (j._profil.stats||[]).map(cle=>STATS_DEF[cle].nom).join(', ');
   const provenances = [...new Set([a, b].filter(j=>j._equipe !== CONFIG.equipe).map(j =>
     `${j._equipe} : ${j._instantane
-      ? `fichiers de la ligue du ${LIGUE_DATE} — actualisation ushl.ca en cours…`
+      ? (j._conserve ? `instantané conservé du ${dateInstantane()}` : `fichiers de la ligue du ${LIGUE_DATE} — actualisation ushl.ca en cours…`)
       : 'cotes en direct de ushl.ca'}`))];
   html += `<div class="comp-pied">
     Statistiques évaluées — ${echap(a.nom)} (${a._profil.profil}) : ${statsDe(a)}<br>
@@ -3942,7 +3997,8 @@ async function telechargerLigue(etatId, rafraichir){
   }
   boutons.forEach(b=>{ b.disabled = false; });
   rafraichir();
-  flash('Alignements de la ligue actualisés (' + ETAT.equipesLive.size + ' équipes en direct)');
+  const nb = equipesInstantane().length;
+  flash(`Ligue actualisée : ${nb} équipe${nb>1?'s':''} enregistrée${nb>1?'s':''} au ${dateInstantane()} — ces chiffres deviennent la référence par défaut`);
 }
 function telechargerFiches(){ return telechargerLigue('classEtat', rendreClassement); }
 
@@ -4866,7 +4922,7 @@ document.querySelectorAll('nav button[data-vue]').forEach(b=>{
     if (b.dataset.vue==='recotes'){ rendreRecotes(); rendreClassementRecotes(); }
     if (b.dataset.vue==='plafond') rendrePlafond();
     if (b.dataset.vue==='ovdetail') peuplerJoueursOvd();
-    if (b.dataset.vue==='reglages') rendreMatrice();
+    if (b.dataset.vue==='reglages'){ rendreMatrice(); rendreEtatInstantane(); }
   });
 });
 document.getElementById('compA').addEventListener('change', rendreComparateur);
@@ -5025,6 +5081,30 @@ $('#btnViderMat').addEventListener('click', ()=>{
     sauverMatrices({}); rendreMatrice(); rendreProgression(); flash('Retour aux matrices Y17');
   }
 });
+function rendreEtatInstantane(){
+  const el = document.getElementById('instantaneEtat');
+  if (!el) return;
+  const d = dateInstantane(), n = equipesInstantane().length;
+  el.innerHTML = d
+    ? `Instantané conservé du <b>${d}</b> — <b>${n}</b> équipe${n>1?'s':''} sur ${LIGUE_EQUIPES.length}. Ces chiffres servent de référence par défaut à l'ouverture, même hors ligne.`
+    : `Aucun instantané conservé : l'application s'appuie sur les fichiers de la ligue du ${LIGUE_DATE} (état S21) en attendant la première actualisation.`;
+}
+document.getElementById('btnMajLigueReglages').addEventListener('click', ()=>
+  telechargerLigue('instantaneEtat', ()=>{ rendreEtatInstantane(); toutRendre(); }));
+document.getElementById('btnExportInstantane').addEventListener('click', ()=>{
+  const snap = litInstantane();
+  if (!snap){ flash('Aucun instantané à exporter — actualise la ligue d\'abord'); return; }
+  const lignes = Object.entries(snap.equipes).map(([code, tab]) =>
+    ` '${code}': [` + tab.map(t=>'['+t.map(v=>typeof v==='string'?JSON.stringify(v):(v===null?'null':v)).join(',')+']').join(',') + ']');
+  $('#zoneJson').value = `const LIGUE_DATE = '${dateInstantane()}';\nconst LIGUE = {\n` + lignes.join(',\n') + '\n};';
+  flash('Instantané exporté dans la zone de texte ci-dessous');
+});
+document.getElementById('btnViderInstantane').addEventListener('click', ()=>{
+  if (confirm('Oublier l\'instantané conservé et revenir aux fichiers intégrés ?')){
+    localStorage.removeItem(CLES_LS.instantane);
+    rendreEtatInstantane(); flash('Instantané oublié');
+  }
+});
 $('#btnViderOverrides').addEventListener('click', ()=>{
   if (confirm('Effacer toutes les attentes individuelles ?')){
     sauverOverrides({}); rendreProgression(); flash('Attentes individuelles effacées');
@@ -5044,7 +5124,17 @@ $('#sourcesTexte').innerHTML =
    remplacée par la valeur réelle à la première actualisation.`;
 $('#dateSecours').textContent = DATE_SECOURS;
 
-rafraichirRosterClub(); // formation effective = secours (ou site) + transferts locaux
+// Au démarrage, la formation du club repart du dernier instantané conservé
+// (chiffres du jour de la dernière actualisation) plutôt que des données
+// intégrées ; l'actualisation automatique la remplacera si le site répond.
+{
+  const snapClub = litInstantane();
+  if (snapClub && snapClub.equipes[CONFIG.equipe] && snapClub.equipes[CONFIG.equipe].length >= 10){
+    ETAT.rosterBrut = decoderTableau(snapClub.equipes[CONFIG.equipe]);
+    ETAT.source = 'instantané conservé du ' + dateInstantane();
+  }
+}
+rafraichirRosterClub(); // formation effective = instantané + transferts locaux
 rendreSelectMatrice();
 rendreMatrice();
 toutRendre();
@@ -5285,6 +5375,7 @@ if (typeof window !== 'undefined'){
     ALIAS_MATRICES, ALIAS_STATS, chargerMatrices, sauverMatrices,
     decoderEquipe, classementRecotes, texteClassementRecotes, rendreClassementRecotes,
     litTransferts, ecritTransferts, appliquerTransferts, rafraichirRosterClub, joueursEquipeBrut, rendreTransferts,
+    litInstantane, ecritInstantane, memoriserEquipe, dateInstantane, equipesInstantane, decoderTableau, CLES_JOUEUR,
     percentileLigue, distributionsLigue, fichesConnues, rendreClassement};
 }
 </script>

@@ -763,6 +763,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     // retour à l'instantané pour la suite des tests
     S.ETAT.equipesLive.delete('SANJOSE');
     W.localStorage.removeItem('tml_cache_v1');
+    W.localStorage.removeItem('tml_instantane_ligue_v1'); // l'alignement téléchargé est conservé : on l'oublie ici
     selEqB0.value = 'TORONTO'; selEqB0.dispatchEvent(new W.Event('change'));
   }
 
@@ -1534,6 +1535,59 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(!/\b[23] pts\b/.test(doc.getElementById('ovdPermut').textContent), 'Budget 1 point : aucune suggestion à 2 ou 3 points');
     doc.getElementById('ovdPoints').value = '3';
     doc.getElementById('ovdPoints').dispatchEvent(new W.Event('input'));
+  }
+
+  console.log('— Instantané de la ligue conservé (chiffres du jour par défaut)');
+  {
+    W.localStorage.removeItem('tml_instantane_ligue_v1');
+    egal(S.dateInstantane(), null, 'Aucun instantané au départ');
+    tableauEgal(S.equipesInstantane(), [], 'Aucune équipe conservée au départ');
+    // un alignement téléchargé est mémorisé et devient la référence par défaut
+    const sanjoseSite = S.decoderEquipe('SANJOSE').map(j=>{
+      const c = {...j}; delete c._instantane;
+      if (c.nom === 'Adam Fox'){ c.pa = 91; c.ov = 86; }   // recote du site
+      return c;
+    });
+    S.memoriserEquipe('SANJOSE', sanjoseSite);
+    ok(!!S.dateInstantane(), 'Instantané daté après mémorisation (' + S.dateInstantane() + ')');
+    tableauEgal(S.equipesInstantane(), ['SANJOSE'], 'SANJOSE enregistrée dans l\'instantané');
+    // sans alignement en direct, joueursEquipe sert désormais l'instantané conservé
+    S.ETAT.equipesLive.delete('SANJOSE');
+    const fox = S.joueursEquipe('SANJOSE').find(j=>j.nom==='Adam Fox');
+    egal(fox.pa, 91, 'La cote conservée du site remplace celle des fichiers');
+    egal(fox.ov, 86, 'L\'OV conservé du site est servi par défaut');
+    egal(fox._conserve, true, 'Le joueur porte le drapeau «instantané conservé»');
+    ok(!fox._instantane, 'Il ne vient plus des fichiers intégrés');
+    // l'instantané INTÉGRÉ reste intact : c'est la base de comparaison des recotes
+    const foxFichiers = S.decoderEquipe('SANJOSE').find(j=>j.nom==='Adam Fox');
+    egal(foxFichiers.pa, 86, 'decoderEquipe sert toujours l\'état S21 des fichiers (base des recotes)');
+    egal(foxFichiers._instantane, true, 'Drapeau «fichiers intégrés» conservé');
+    // les gardiens gardent DF et OF à null dans les deux cas
+    const gInt = S.decoderEquipe('SANJOSE').find(j=>j.po==='G');
+    egal(gInt.df, null, 'Gardien de l\'instantané intégré : DF null');
+    egal(gInt.ovEstime, true, 'Gardien de l\'instantané intégré : OV estimé');
+    const gCons = S.joueursEquipe('SANJOSE').find(j=>j.po==='G');
+    egal(gCons.df, null, 'Gardien de l\'instantané conservé : DF null');
+    ok(!gCons.ovEstime, 'Gardien conservé : OV du site, plus une estimation');
+    // les transferts locaux s'appliquent par-dessus l'instantané conservé
+    S.ecritTransferts([{nom:'Adam Fox', de:'SANJOSE', vers:'TORONTO', date:'2026-08-01'}]);
+    S.rafraichirRosterClub();
+    ok(S.ETAT.roster.some(j=>j.nom==='Adam Fox' && j.pa===91),
+      'Un joueur transféré arrive avec ses cotes conservées du site');
+    ok(!S.joueursEquipe('SANJOSE').some(j=>j.nom==='Adam Fox'), 'Et quitte son ancienne équipe');
+    S.ecritTransferts([]); S.rafraichirRosterClub();
+    // export du bloc de code
+    doc.querySelector('nav button[data-vue="reglages"]').click();
+    ok(doc.getElementById('instantaneEtat').textContent.includes('1'), 'État de l\'instantané affiché dans les Réglages');
+    doc.getElementById('btnExportInstantane').click();
+    const code = doc.getElementById('zoneJson').value;
+    ok(code.startsWith('const LIGUE_DATE'), 'Export : bloc de code prêt à graver dans le fichier');
+    ok(code.includes("'SANJOSE'") && code.includes('"Adam Fox"'), 'Export : équipe et joueurs présents');
+    // oubli
+    W.localStorage.removeItem('tml_instantane_ligue_v1');
+    egal(S.joueursEquipe('SANJOSE').find(j=>j.nom==='Adam Fox').pa, 86,
+      'Instantané oublié → retour aux fichiers intégrés');
+    doc.querySelector('nav button[data-vue="alignement"]').click();
   }
 
   console.log('— PWA (installation et hors ligne)');
