@@ -715,13 +715,13 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   console.log('— Base de données de la ligue (chiffres du site + base S21)');
   egal(S.LIGUE_EQUIPES.length, 32, '32 équipes dans la base de la ligue');
   ok(S.LIGUE_EQUIPES.includes('TORONTO') && S.LIGUE_EQUIPES.includes('ST.LOUIS'), 'TORONTO et ST.LOUIS présents');
-  egal(Object.values(S.LIGUE).reduce((a,t)=>a+t.length,0), 439, '439 joueurs relevés sur le site le 6 septembre');
+  egal(Object.values(S.LIGUE).reduce((a,t)=>a+t.length,0), 609, '609 joueurs relevés sur le site le 6 septembre');
+  egal(Object.keys(S.LIGUE).length, 32, 'Le relevé du site couvre les 32 équipes');
   egal(Object.values(S.LIGUE_S21).reduce((a,t)=>a+t.length,0), 821, '821 joueurs dans la base S21 des fichiers');
   egal(S.LIGUE_DATE, '6 septembre 2026', 'Date du relevé du site');
   egal(S.DATE_S21, '10 juillet 2026', 'Date des fichiers de la ligue');
-  tableauEgal(S.EQUIPES_PERIMEES,
-    ['PITTSBURGH','BUFFALO','TAMPABAY','WASHINGTON','DETROIT','ST.LOUIS','NASHVILLE','COLUMBUS','PHILLY'],
-    'Les 9 équipes absentes du relevé restent sur les fichiers S21');
+  tableauEgal(S.EQUIPES_PERIMEES, [], 'Aucune équipe périmée : le relevé est complet');
+  ok(S.LIGUE_EQUIPES.every(e=>S.cotesDuSite(e)), 'Les 32 équipes servent des cotes venues du site');
   egal(S.joueursEquipe('TORONTO').length, 20, 'Mon club : la formation vivante (ETAT.roster) fait foi');
   const sanjose = S.joueursEquipe('SANJOSE');
   ok(sanjose.every(j=>!/^backup/i.test(j.nom.replace(/[\s_]/g,''))), 'Les joueurs Backup_ sont exclus du décodage');
@@ -736,15 +736,25 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(desrosiersSJ.df, null, 'DF des gardiens décodé à null');
   egal(desrosiersSJ.ovEstime, undefined, 'OV du gardien relevé du site : plus une estimation');
   egal(desrosiersSJ._instantane, true, 'Les joueurs du relevé intégré portent le drapeau _instantane');
-  // équipe absente du relevé : repli sur les fichiers S21, dûment marqué
-  const tampa = S.joueursEquipe('TAMPABAY');
-  ok(tampa.length > 0, 'Une équipe périmée reste consultable');
-  ok(tampa.every(j=>j._fichiers === true), 'Ses joueurs portent le drapeau _fichiers');
-  const dansk = tampa.find(j=>j.po==='G');
+  // le repli sur les fichiers S21 reste en place pour un futur relevé partiel :
+  // on l'exerce directement, aucune équipe n'étant périmée aujourd'hui
+  const tampaS21 = S.decoderEquipe('TAMPABAY');
+  ok(tampaS21.length > 0, 'La base S21 reste consultable équipe par équipe');
+  ok(tampaS21.every(j=>j._fichiers === true), 'Ses joueurs portent le drapeau _fichiers');
+  const dansk = tampaS21.find(j=>j.po==='G');
   egal(dansk.ovEstime, true, 'OV des gardiens des fichiers S21 marqué estimé');
-  // un joueur passé depuis à une équipe à jour ne doit pas rester dans l'équipe périmée
-  ok(!tampa.some(j=>j.nom==='Cam York'), 'Cam York (TAMPABAY en S21) ne figure plus que chez TORONTO');
-  ok(!tampa.some(j=>j.nom==='Fabian Lysell'), 'Fabian Lysell non plus');
+  ok(tampaS21.some(j=>j.nom==='Cam York'), 'Cam York était bien à TAMPABAY en S21');
+  // le repli écarte tout joueur encore actif ailleurs dans la ligue aujourd'hui
+  const tampaRepli = S.decoderEquipePerimee('TAMPABAY');
+  ok(!tampaRepli.some(j=>j.nom==='Cam York'), 'Cam York, aujourd\'hui à TORONTO, n\'est pas servi par le repli');
+  ok(!tampaRepli.some(j=>j.nom==='Fabian Lysell'), 'Fabian Lysell non plus');
+  {
+    const actifs = new Set();
+    for (const eq of S.LIGUE_EQUIPES)
+      for (const j of S.joueursEquipe(eq)) actifs.add(S.normaliserNom(j.nom));
+    ok(S.LIGUE_EQUIPES.every(eq=>S.decoderEquipePerimee(eq).every(j=>!actifs.has(S.normaliserNom(j.nom)))),
+      'Aucun joueur encore actif dans la ligue ne peut revenir par le repli S21');
+  }
   {
     const vus = new Map();
     let doublons = 0;
@@ -756,7 +766,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     egal(doublons, 0, 'Aucun joueur listé dans deux équipes à la fois');
   }
   egal(S.cotesDuSite('SANJOSE'), true, 'SANJOSE : cotes du site');
-  egal(S.cotesDuSite('TAMPABAY'), false, 'TAMPABAY : encore sur les fichiers S21');
+  egal(S.cotesDuSite('EQUIPE_INCONNUE'), false, 'Une équipe sans relevé ni fichiers : pas de cotes du site');
   egal(S.provenanceDe(foxSJ), 'chiffres du site du 6 septembre 2026', 'Provenance du relevé intégré');
   egal(S.provenanceDe(dansk), 'fichiers de la ligue du 10 juillet 2026 — périmé, à actualiser',
     'Provenance des fichiers S21');
@@ -1069,10 +1079,20 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     // le relevé du site est intégré : les recotes se calculent SANS téléchargement
     const recSJdirect = S.recotesEquipe('SANJOSE');
     ok(recSJdirect.some(r=>!r.absent), 'SANJOSE : recotes servies d\'emblée par le relevé intégré');
-    // une équipe absente du relevé, elle, attend son actualisation
-    const recTB = S.recotesEquipe('TAMPABAY');
-    ok(recTB.every(r=>r.absent), 'TAMPABAY (périmée) : recotes en attente des cotes du site');
-    ok(recTB.some(r=>r.noteAbsent.includes('fichiers S21')), 'La ligne explique qu\'il faut actualiser l\'équipe');
+    // une équipe qui manquerait au relevé attendrait son actualisation : on
+    // retire TAMPABAY du relevé le temps de l'assertion (cotesDuSite et
+    // joueursEquipeBrut lisent LIGUE à l'appel), puis on la remet
+    {
+      const garde = S.LIGUE.TAMPABAY;
+      delete S.LIGUE.TAMPABAY;
+      egal(S.cotesDuSite('TAMPABAY'), false, 'Équipe retirée du relevé : plus de cotes du site');
+      const recTB = S.recotesEquipe('TAMPABAY');
+      ok(recTB.every(r=>r.absent), 'Équipe périmée : recotes en attente des cotes du site');
+      ok(!S.classementRecotes().some(r=>r.eq==='TAMPABAY'),
+        'Une équipe périmée n\'est pas classée — pas de faux chiffres');
+      S.LIGUE.TAMPABAY = garde;
+      egal(S.cotesDuSite('TAMPABAY'), true, 'Relevé restauré');
+    }
     // simulons l'alignement du site : on repart de la base S21, Kotkaniemi recoté +1 PA, +2 SC
     let recSJ;
     const enDirectSJ = S.decoderEquipe('SANJOSE').map(j=>{
@@ -1094,15 +1114,15 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     egal(inchange.somme, 0, 'Joueur non recoté : Δ total 0');
     const gardienSJ = recSJ.find(r=>r.j.po==='G' && !r.absent);
     ok(!!gardienSJ && gardienSJ.ovDelta===null, 'Gardien : pas de delta d\'OV (formule non couverte), cotes comparées quand même');
-    // classement des recotes : seules les équipes en direct sont classées
+    // classement des recotes : le relevé étant complet, les 32 équipes y sont
     const rangs = S.classementRecotes();
+    egal(rangs.length, 32, 'Les 32 équipes classées sans le moindre téléchargement');
     ok(rangs.some(r=>r.eq==='SANJOSE'), 'SANJOSE (en direct) est classée');
     const rSJ = rangs.find(r=>r.eq==='SANJOSE');
     ok(rSJ.moy > 0 && rSJ.top.nom==='Jesperi Kotkaniemi', 'Gain moyen positif, meilleure progression = Kotkaniemi');
-    ok(!rangs.some(r=>r.eq==='TAMPABAY'), 'TAMPABAY (encore sur les fichiers S21) n\'est pas classée — pas de faux chiffres');
     const txt = S.texteClassementRecotes();
     ok(txt.includes('SANJOSE') && txt.includes('Kotkaniemi'), 'Export texte du classement');
-    ok(txt.includes('télécharge les manquantes'), 'L\'export signale les équipes manquantes');
+    ok(!txt.includes('télécharge les manquantes'), 'Classement complet : aucune mention d\'équipe manquante');
     // rendu de la table de classement
     doc.querySelector('nav button[data-vue="recotes"]').click();
     ok(doc.querySelectorAll('#tableRecClassement tbody tr').length >= 1, 'Table du classement rendue');
@@ -1395,7 +1415,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
       'Les transferts survivent au recalcul de la formation (actualisation)');
     // dépistage : la Ligue voit les joueurs dans leur nouvelle équipe
     ok(S.joueursLigue().find(j=>j.nom==='Adam Fox').equipe==='TORONTO', 'Onglet Ligue : Fox listé chez TORONTO');
-    egal(S.joueursLigue().length, 647, 'Aucun joueur dupliqué dans la ligue'); // relevé du site + fichiers S21 dédoublonnés
+    egal(S.joueursLigue().length, 609, 'Aucun joueur dupliqué dans la ligue'); // le relevé complet du site, rien d'autre
     // annulation par les chips
     let garde = 0;
     while (doc.querySelector('#transfListe button[data-transf]') && garde++ < 5){
