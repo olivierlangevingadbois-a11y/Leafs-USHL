@@ -377,7 +377,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(S.fmtArgentCourt(900000), '900 k', 'fmtArgentCourt 900 k');
 
   console.log('— Fenêtre «Prolongation de contrat» : éligibilité, ouverture, bornage, impact, retrait');
-  W.localStorage.removeItem('tml_resignatures_v1');
+  W.localStorage.removeItem('tml_resignatures_v1:TORONTO');
   doc.querySelector('[data-vue="alignement"]')?.click();
   // Aucun joueur sous contrat n'offre de bouton : seuls les contrats échus (0 an) se prolongent
   const jSous = S.ETAT.roster.find(x=>!x.backup && x.ct > 0);
@@ -500,7 +500,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   doc.getElementById('mpAnnuler').click();
   gMut.ct = ctG;
   doc.querySelector('#tableAlignement thead th[data-col="ov"]')?.click(); // retour à l'état initial
-  W.localStorage.removeItem('tml_resignatures_v1');
+  W.localStorage.removeItem('tml_resignatures_v1:TORONTO');
 
   console.log('— Divers');
   egal(S.matchsEquipe(), 0, 'Fiche 0-0-0 → 0 match d\'équipe');
@@ -855,7 +855,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   egal(doc.getElementById('ovdJoueur').options.length, 18, 'Retour au club : 17 patineurs + saisie manuelle');
 
   console.log('— Bâtisseur de trios');
-  W.localStorage.removeItem('tml_trios_v1');
+  W.localStorage.removeItem('tml_trios_v1:TORONTO');
   doc.querySelector('nav button[data-vue="trios"]').click();
   egal(doc.querySelectorAll('#triosZone .trio-bloc').length, 12, '12 blocs : 4 trios, 3 paires, gardiens, 2 AN, 2 IN');
   egal(doc.querySelectorAll('#triosZone select[data-slot]').length, 38, '38 postes à combler (20 + 18 unités spéciales)');
@@ -912,7 +912,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(txt.includes('AN 1 : Connor Bedard'), 'Export texte : avantage numérique');
   ok(/IN 2 : .+ — .+ — .+ — .+/.test(txt), 'Export texte : deuxième unité d\'infériorité complète');
   // persistance
-  ok(W.localStorage.getItem('tml_trios_v1').includes('Barrett Hayton'), 'Trios persistés dans le navigateur');
+  ok(W.localStorage.getItem('tml_trios_v1:TORONTO').includes('Barrett Hayton'), 'Trios persistés dans le navigateur');
   S.ecritTrios({}); S.rendreTrios();
   egal(doc.getElementById('triosEtat').textContent, '0/12 attaquants · 0/6 défenseurs · 0/2 gardiens · 0/18 unités spéciales',
     'Vidage : compteur remis à zéro');
@@ -1381,7 +1381,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
   console.log('— Transferts locaux (échange pas encore traité par la ligue)');
   {
-    W.localStorage.removeItem('tml_transferts_v1');
+    W.localStorage.removeItem('tml_transferts_v1:TORONTO');
     doc.querySelector('nav button[data-vue="alignement"]').click();
     ok(!!doc.getElementById('btnTransferer'), 'Bloc de transfert présent dans l\'alignement');
     // acquisition : Adam Fox arrive de SANJOSE
@@ -1668,14 +1668,111 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   {
     const lire = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
     const manifest = JSON.parse(lire('manifest.webmanifest'));
-    egal(manifest.short_name, 'Leafs DG', 'Manifest : nom court');
-    egal(manifest.theme_color, '#00205B', 'Manifest : couleur du club');
+    egal(manifest.short_name, 'DG USHL', 'Manifest : nom court, neutre (l\'application sert les 32 clubs)');
+    egal(manifest.theme_color, '#0e2f63', 'Manifest : couleur neutre — la page prend celle du club à l\'ouverture');
     ok(manifest.icons.length >= 1 && manifest.icons[0].src === 'icon.svg', 'Manifest : icône déclarée');
-    ok(lire('icon.svg').includes('#00205B'), 'Icône aux couleurs du club');
+    ok(lire('icon.svg').includes('#0e2f63'), 'Icône neutre de la ligue');
     const sw = lire('sw.js');
     ok(sw.includes("addEventListener('fetch'") && sw.includes('caches'), 'Service worker : cache hors ligne');
     ok(html.includes('rel="manifest"'), 'La page déclare le manifest');
     ok(html.includes("location.protocol === 'https:'"), 'Enregistrement du service worker réservé au HTTPS');
+  }
+
+  console.log('— Le club du DG : les 32 postes servis par la même page');
+  {
+    // le club par défaut reste TORONTO, et la page en porte les couleurs
+    tableauEgal(Object.keys(S.CLUBS).slice().sort(), S.LIGUE_EQUIPES.slice().sort(),
+      'Un club décrit pour chacune des 32 équipes de la ligue, ni plus ni moins');
+    ok(Object.values(S.CLUBS).every(c=>c.nom && /^#[0-9A-Fa-f]{6}$/.test(c.couleur) && c.emoji),
+      'Chaque club a un nom, une couleur et un emblème');
+    egal(S.CONFIG.equipe, 'TORONTO', 'Club par défaut : TORONTO');
+    egal(doc.title, 'Maple Leafs de Toronto — Tableau de bord du DG', 'Titre de la page aux couleurs du club');
+    egal(doc.getElementById('titreClub').textContent, 'MAPLE LEAFS DE TORONTO', 'En-tête au nom du club');
+    egal(doc.querySelector('meta[name="theme-color"]').content, '#00205B', 'Couleur de thème du club');
+    egal(doc.documentElement.style.getPropertyValue('--club'), '#00205B', 'Variable CSS --club posée');
+    ok(doc.querySelector('link[rel="icon"]').href.includes('%2300205B'), 'Favicon aux couleurs du club');
+    // les clés propres au club portent son code : rien ne déborde d'un DG à l'autre
+    egal(S.CLES_LS.trios, 'tml_trios_v1:TORONTO', 'Trios rangés sous le code du club');
+    egal(S.CLES_LS.resign, 'tml_resignatures_v1:TORONTO', 'Prolongations rangées sous le code du club');
+    egal(S.CLES_LS.transferts, 'tml_transferts_v1:TORONTO', 'Transferts rangés sous le code du club');
+    egal(S.CLES_LS.instantane, 'tml_instantane_ligue_v1', 'L\'instantané de la ligue reste commun à tous');
+    // sélecteur des Réglages
+    doc.querySelector('nav button[data-vue="reglages"]').click();
+    const selClub = doc.getElementById('clubDG');
+    egal(selClub.options.length, 32, 'Les 32 clubs proposés dans les Réglages');
+    egal(selClub.value, 'TORONTO', 'Le club actif est sélectionné');
+    ok(doc.getElementById('clubEtat').textContent.includes('Maple Leafs de Toronto'), 'État du club affiché');
+    doc.querySelector('nav button[data-vue="alignement"]').click();
+  }
+
+  // une deuxième page, ouverte par un autre DG dans son propre navigateur
+  const ouvrirPour = async (avant) => {
+    const d = new JSDOM(html, {
+      runScripts:'dangerously', url:'https://example.org/', pretendToBeVisual:true,
+      beforeParse(window){
+        window.__TML_SANS_AUTO__ = true;
+        window.fetch = () => Promise.reject(new Error('réseau désactivé en test'));
+        avant(window);
+      }
+    });
+    d.window.fetch = () => Promise.reject(new Error('réseau désactivé en test'));
+    await new Promise(r => setTimeout(r, 300));
+    return d;
+  };
+
+  console.log('— Un autre DG : les Islanders sur la même page');
+  {
+    const d = await ouvrirPour(w => w.localStorage.setItem('tml_club_v1', 'ISLANDERS'));
+    const D = d.window.document, SI = d.window.__TML__;
+    egal(SI.CONFIG.equipe, 'ISLANDERS', 'Le club conservé dans ce navigateur est repris à l\'ouverture');
+    ok(SI.CONFIG.urls.roster.endsWith('TeamRosters.php?team=ISLANDERS'), 'Formation téléchargée pour son club');
+    ok(SI.CONFIG.urls.scoring.endsWith('TeamScoring.php?team=ISLANDERS'), 'Production téléchargée pour son club');
+    egal(D.title, 'Islanders de New York — Tableau de bord du DG', 'Titre au nom des Islanders');
+    egal(D.getElementById('titreClub').textContent, 'ISLANDERS DE NEW YORK', 'En-tête au nom des Islanders');
+    egal(D.querySelector('meta[name="theme-color"]').content, '#00539B', 'Couleurs des Islanders');
+    // la formation servie est bien la sienne, tirée du relevé du site
+    const effectif = SI.LIGUE.ISLANDERS.length;
+    egal(SI.ETAT.roster.length, effectif, 'Formation de départ = son alignement du relevé du site');
+    egal(D.querySelectorAll('#tableAlignement tbody tr').length, effectif, 'Sa formation est rendue dans la table');
+    ok(SI.ETAT.roster.some(j=>j.nom==='Jack Hughes'), 'Jack Hughes est chez lui, pas chez les Leafs');
+    ok(!SI.ETAT.roster.some(j=>j.nom==='Connor Bedard'), 'Aucun joueur des Leafs dans sa formation');
+    egal(SI.ETAT.fiche, 'ISLANDERS 0-0-0', 'Fiche du club à son nom');
+    egal(SI.ETAT.roster.filter(j=>j.po==='G').every(j=>j.df===null), true, 'Ses gardiens décodés sans DF ni OF');
+    ok(SI.ETAT.roster.every(j=>!j.ovEstime), 'OV du site : aucune estimation pour son club');
+    // tout le reste de l'application suit
+    D.querySelector('nav button[data-vue="recotes"]').click();
+    egal(D.getElementById('recEquipe').value, 'ISLANDERS', 'Recotes : son club par défaut');
+    D.querySelector('nav button[data-vue="echange"]').click();
+    ok(![...D.getElementById('echEquipe').options].some(o=>o.value==='ISLANDERS'),
+      'Échange : on ne négocie pas avec soi-même');
+    ok([...D.getElementById('echEquipe').options].some(o=>o.value==='TORONTO'),
+      'Échange : TORONTO est un partenaire comme un autre');
+    D.querySelector('nav button[data-vue="trios"]').click();
+    SI.autoTrios();
+    const t = SI.litTrios();
+    egal(t['g.g1'], 'Connor Hellebuyck', 'Ses trios se remplissent avec SES joueurs');
+    egal(d.window.localStorage.getItem('tml_trios_v1:TORONTO'), null,
+      'Ses trios n\'écrasent pas ceux d\'un DG de TORONTO');
+    ok(!!d.window.localStorage.getItem('tml_trios_v1:ISLANDERS'), 'Ses trios sont rangés sous son code');
+    // la ligue, elle, reste la même pour tout le monde
+    egal(SI.joueursLigue().length, 609, 'Même ligue de 609 joueurs pour tous les DG');
+    egal(SI.classementRecotes().length, 32, 'Même classement des recotes');
+    d.window.close();
+  }
+
+  console.log('— Reprise des données enregistrées avant le choix du club');
+  {
+    const d = await ouvrirPour(w => {
+      w.localStorage.setItem('tml_trios_v1', '{"t1.c":"Connor Bedard"}');
+      w.localStorage.setItem('tml_transferts_v1', '[]');
+    });
+    const LS = d.window.localStorage;
+    egal(LS.getItem('tml_trios_v1'), null, 'L\'ancienne clé sans club est retirée');
+    egal(LS.getItem('tml_trios_v1:TORONTO'), '{"t1.c":"Connor Bedard"}',
+      'Son contenu revient à TORONTO, le club d\'avant le choix');
+    egal(LS.getItem('tml_transferts_v1:TORONTO'), '[]', 'Même reprise pour les transferts locaux');
+    egal(d.window.__TML__.CONFIG.equipe, 'TORONTO', 'Sans choix enregistré, on reste sur TORONTO');
+    d.window.close();
   }
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maple Leafs de Toronto — Tableau de bord du DG</title>
+<title>Poste du DG — USHL Pro</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#00205B">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%2300205B%22/><text x=%2250%22 y=%2268%22 font-size=%2256%22 text-anchor=%22middle%22>🍁</text></svg>">
@@ -27,7 +27,7 @@
   /* ---------- En-tête ---------- */
   header{
     background:linear-gradient(115deg, #000 0%, var(--bleu-nuit) 40%, var(--bleu-fonce) 75%, var(--bleu) 100%);
-    border-bottom:3px solid var(--accent);
+    border-bottom:3px solid var(--club, var(--accent));
     padding:22px 28px 18px; position:relative; overflow:hidden;
   }
   header::before{content:''; position:absolute; inset:0;
@@ -429,7 +429,7 @@
 <header>
   <div class="head-row">
     <div class="head-titles">
-      <h1>MAPLE LEAFS DE TORONTO</h1>
+      <h1 id="titreClub">MAPLE LEAFS DE TORONTO</h1>
     </div>
     <div class="head-meta">
       <div class="fiche" id="ficheEquipe">—</div>
@@ -466,7 +466,7 @@
   <!-- ================= ALIGNEMENT ================= -->
   <section class="vue actif" id="vue-alignement">
     <h2>Alignement professionnel</h2>
-    <div class="h2-sous" id="alignSous">Cotes, salaires et contrats — source : TeamRosters.php (TORONTO)</div>
+    <div class="h2-sous" id="alignSous">Cotes, salaires et contrats — source : TeamRosters.php</div>
     <div id="alertesDG"></div>
     <div class="sommaire" id="alignSommaire"></div>
     <div class="align-outils">
@@ -562,7 +562,7 @@
   <!-- ================= MENEURS ================= -->
   <section class="vue" id="vue-meneurs">
     <h2>Meneurs de la ligue</h2>
-    <div class="h2-sous" id="menSous">Classements des patineurs de toute la ligue, tirés de la page XtraStats téléchargée à l'actualisation. Tes Leafs sont surlignés.</div>
+    <div class="h2-sous" id="menSous">Classements des patineurs de toute la ligue, tirés de la page XtraStats téléchargée à l'actualisation. Les joueurs de ton club sont surlignés.</div>
     <div class="comp-choix" style="margin-bottom:14px">
       <label>Catégorie
         <select id="menCategorie">
@@ -582,7 +582,7 @@
           <option value="D">Défenseurs</option>
         </select>
       </label>
-      <label class="lig-chk" style="align-self:flex-end; padding-bottom:8px"><input type="checkbox" id="menLeafs"> mes Leafs seulement</label>
+      <label class="lig-chk" style="align-self:flex-end; padding-bottom:8px"><input type="checkbox" id="menLeafs"> mon club seulement</label>
     </div>
     <div class="table-wrap"><table id="tableMeneurs"></table></div>
   </section>
@@ -697,7 +697,23 @@
   <!-- ================= RÉGLAGES ================= -->
   <section class="vue" id="vue-reglages">
     <h2>Réglages</h2>
-    <div class="h2-sous">Matrices d'attentes, sauvegarde et sources de données</div>
+    <div class="h2-sous">Club du DG, matrices d'attentes, sauvegarde et sources de données</div>
+
+    <div class="regl-bloc">
+      <h3>Mon club</h3>
+      <p>Ce tableau de bord sert les 32 clubs de la USHL&nbsp;Pro. Choisis le tien&nbsp;: l'alignement, la production,
+      les trios, le plafond, les échanges et les alertes du Bureau du DG basculent sur ta formation, et la page
+      prend tes couleurs. Le choix est conservé dans ce navigateur — chaque DG a donc le sien.
+      Les prolongations, les trios et les transferts locaux sont enregistrés <em>par club</em>&nbsp;: changer de club
+      ne mélange rien.</p>
+      <div>
+        <label>Club</label>
+        <select id="clubDG"></select>
+      </div>
+      <div class="regl-actions">
+        <span class="det" id="clubEtat"></span>
+      </div>
+    </div>
 
     <div class="regl-bloc">
       <h3>Matrices des profils (article 6.2.6)</h3>
@@ -762,18 +778,70 @@
 
 <script>
 /* =====================================================================
-   MAPLE LEAFS DE TORONTO — TABLEAU DE BORD DU DG (USHL)
+   POSTE DU DG — USHL PRO (tableau de bord, un club au choix parmi les 32)
    Monofichier vanilla HTML/CSS/JS — aucune dépendance, aucun build.
    Sources en direct : TeamRosters.php, TeamScoring.php, USHLxtrastats.html
    ===================================================================== */
 'use strict';
 
+/* ------------------ LES 32 CLUBS DE LA USHL PRO ------------------
+   Le tableau de bord n'appartient à aucun club en particulier : chaque DG
+   choisit le sien dans les Réglages et l'application s'habille à ses couleurs.
+   Le choix est conservé dans le navigateur, une installation par DG. */
+const CLUBS = {
+  'TORONTO':    {nom:'Maple Leafs de Toronto',    couleur:'#00205B', emoji:'🍁'},
+  'BOSTON':     {nom:'Bruins de Boston',          couleur:'#FFB81C', emoji:'🐻'},
+  'OTTAWA':     {nom:"Sénateurs d'Ottawa",        couleur:'#C8102E', emoji:'🏛️'},
+  'NEWJERSEY':  {nom:'Devils du New Jersey',      couleur:'#CE1126', emoji:'😈'},
+  'NYRANGERS':  {nom:'Rangers de New York',       couleur:'#0038A8', emoji:'🗽'},
+  'ISLANDERS':  {nom:'Islanders de New York',     couleur:'#00539B', emoji:'🏝️'},
+  'MONTREAL':   {nom:'Canadiens de Montréal',     couleur:'#AF1E2D', emoji:'⚜️'},
+  'FLORIDE':    {nom:'Panthers de la Floride',    couleur:'#C8102E', emoji:'🐆'},
+  'CAROLINA':   {nom:'Hurricanes de la Caroline', couleur:'#CC0000', emoji:'🌀'},
+  'CHICAGO':    {nom:'Blackhawks de Chicago',     couleur:'#CF0A2C', emoji:'🪶'},
+  'COLORADO':   {nom:'Avalanche du Colorado',     couleur:'#6F263D', emoji:'🏔️'},
+  'VANCOUVER':  {nom:'Canucks de Vancouver',      couleur:'#00205B', emoji:'🐋'},
+  'CALGARY':    {nom:'Flames de Calgary',         couleur:'#D2001C', emoji:'🔥'},
+  'EDMONTON':   {nom:"Oilers d'Edmonton",         couleur:'#FF4C00', emoji:'🛢️'},
+  'MINNESOTA':  {nom:'Wild du Minnesota',         couleur:'#154734', emoji:'🌲'},
+  'LOSANGELES': {nom:'Kings de Los Angeles',      couleur:'#A2AAAD', emoji:'👑'},
+  'SANJOSE':    {nom:'Sharks de San Jose',        couleur:'#006D75', emoji:'🦈'},
+  'ANAHEIM':    {nom:"Ducks d'Anaheim",           couleur:'#F47A38', emoji:'🦆'},
+  'DALLAS':     {nom:'Stars de Dallas',           couleur:'#006847', emoji:'⭐'},
+  'UTAH':       {nom:"Mammoth de l'Utah",         couleur:'#71AFE5', emoji:'🦣'},
+  'WINNIPEG':   {nom:'Jets de Winnipeg',          couleur:'#041E42', emoji:'✈️'},
+  'VEGAS':      {nom:'Golden Knights de Vegas',   couleur:'#B4975A', emoji:'⚔️'},
+  'SEATTLE':    {nom:'Kraken de Seattle',         couleur:'#99D9D9', emoji:'🐙'},
+  'PITTSBURGH': {nom:'Penguins de Pittsburgh',    couleur:'#FCB514', emoji:'🐧'},
+  'BUFFALO':    {nom:'Sabres de Buffalo',         couleur:'#003087', emoji:'🦬'},
+  'ST.LOUIS':   {nom:'Blues de Saint-Louis',      couleur:'#002F87', emoji:'🎵'},
+  'NASHVILLE':  {nom:'Predators de Nashville',    couleur:'#FFB81C', emoji:'🎸'},
+  'WASHINGTON': {nom:'Capitals de Washington',    couleur:'#C8102E', emoji:'🦅'},
+  'DETROIT':    {nom:'Red Wings de Detroit',      couleur:'#CE1126', emoji:'🛞'},
+  'COLUMBUS':   {nom:'Blue Jackets de Columbus',  couleur:'#002654', emoji:'🐝'},
+  'PHILLY':     {nom:'Flyers de Philadelphie',    couleur:'#F74902', emoji:'🟠'},
+  'TAMPABAY':   {nom:'Lightning de Tampa Bay',    couleur:'#1B72D0', emoji:'⚡'}
+};
+const CLUB_DEFAUT = 'TORONTO';
+const CLE_CLUB = 'tml_club_v1';
+/* Club du DG assis devant l'écran (localStorage indisponible → club par défaut). */
+function litClubChoisi(){
+  try {
+    const c = localStorage.getItem(CLE_CLUB);
+    if (c && CLUBS[c]) return c;
+  } catch (e){ /* stockage refusé : on reste sur le club par défaut */ }
+  return CLUB_DEFAUT;
+}
+const CLUB_ACTIF = litClubChoisi();
+const BASE_SIM = 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/';
+
 /* ------------------ CONFIGURATION ------------------ */
 const CONFIG = {
-  equipe: 'TORONTO',
+  equipe: CLUB_ACTIF,
+  club: CLUBS[CLUB_ACTIF],
   urls: {
-    roster:  'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamRosters.php?team=TORONTO',
-    scoring: 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/TeamScoring.php?team=TORONTO',
+    roster:  BASE_SIM + 'TeamRosters.php?team=' + CLUB_ACTIF,
+    scoring: BASE_SIM + 'TeamScoring.php?team=' + CLUB_ACTIF,
     xtra:    'https://ushl.ca/ushl/menu_sim/USHL-pro/USHLxtrastats.html',
     matrices:'https://ushl.ca/ushl/menu_ushl/la_ligue/reglements/MATRICES%20DES%20PROFILS.htm'
   },
@@ -790,16 +858,33 @@ const CONFIG = {
   matchsSaison: 82
 };
 
+/* Clés de stockage. Les matrices, la cache et l'instantané de la ligue valent
+   pour toute la USHL ; les prolongations, les trios et les transferts locaux
+   appartiennent à UN club et portent donc son code — un DG ne doit jamais
+   hériter des unités spéciales ou des échanges d'un autre. */
 const CLES_LS = {
   matrices: 'tml_matrices_v1',
   overrides: 'tml_attentes_joueurs_v1',
   proxy: 'tml_proxy_prefere_v1',
   cache: 'tml_cache_v1',
-  resign: 'tml_resignatures_v1',
-  trios: 'tml_trios_v1',
-  transferts: 'tml_transferts_v1',
-  instantane: 'tml_instantane_ligue_v1'
+  instantane: 'tml_instantane_ligue_v1',
+  club: CLE_CLUB,
+  resign: 'tml_resignatures_v1:' + CLUB_ACTIF,
+  trios: 'tml_trios_v1:' + CLUB_ACTIF,
+  transferts: 'tml_transferts_v1:' + CLUB_ACTIF
 };
+/* Avant le choix du club, ces trois clés n'existaient qu'en une version, celle
+   de TORONTO : on la lui attribue une fois pour toutes plutôt que de la perdre. */
+(function migrerClesDuClub(){
+  try {
+    for (const base of ['tml_resignatures_v1','tml_trios_v1','tml_transferts_v1']){
+      const v = localStorage.getItem(base);
+      if (v === null) continue;
+      if (localStorage.getItem(base + ':TORONTO') === null) localStorage.setItem(base + ':TORONTO', v);
+      localStorage.removeItem(base);
+    }
+  } catch (e){ /* stockage refusé : rien à migrer */ }
+})();
 
 /* ------------------ DÉFINITION DES STATS ------------------ */
 const STATS_DEF = {
@@ -3042,17 +3127,30 @@ function modsEstime(evals){
   return Math.round(avec.reduce((a,e)=>a+e.ev.mods,0)/avec.length);
 }
 
+/* Formation de départ du club choisi. TORONTO garde le bloc SECOURS_ROSTER
+   (mêmes chiffres que le relevé, plus les numéros de chandail relevés à la
+   main) ; les 31 autres clubs partent de leur entrée du relevé du site. */
+function formationDeSecours(){
+  if (CONFIG.equipe === 'TORONTO') return SECOURS_ROSTER.map(j=>({...j}));
+  const duSite = LIGUE[CONFIG.equipe] && LIGUE[CONFIG.equipe].length;
+  return decoderTableau(duSite ? LIGUE[CONFIG.equipe] : LIGUE_S21[CONFIG.equipe], null, !duSite);
+}
+function dateFormationDeSecours(){
+  return CONFIG.equipe === 'TORONTO' || (LIGUE[CONFIG.equipe] && LIGUE[CONFIG.equipe].length)
+    ? DATE_SECOURS : DATE_S21;
+}
+
 /* ---------- État global ---------- */
 const ETAT = {
-  rosterBrut: SECOURS_ROSTER.map(j=>({...j})), // formation telle que servie (site ou secours), AVANT transferts locaux
-  roster: SECOURS_ROSTER.map(j=>({...j})),     // formation effective = rosterBrut + transferts locaux
+  rosterBrut: formationDeSecours(), // formation telle que servie (site ou secours), AVANT transferts locaux
+  roster: formationDeSecours(),     // formation effective = rosterBrut + transferts locaux
   scoring: {patineurs:[], gardiens:[]},
   xtra: SECOURS_Y21.map(x=>({...x})),
   xtraEstY21: true,
   xtraDate: null,
   modeY21: false,   // mode vérification : jamais conservé, retour à la saison courante à l'ouverture
-  fiche: 'TORONTO 0-0-0',
-  source: 'données intégrées (' + DATE_SECOURS + ')',
+  fiche: CONFIG.equipe + ' 0-0-0',
+  source: 'données intégrées (' + dateFormationDeSecours() + ')',
   filtreProg: 'tous',
   rechercheAlign: '',  // filtre texte de la table d'alignement
   limites: new Map(),  // limites d'utilisation des gardiens (gestiongardiens)
@@ -4100,7 +4198,7 @@ function rendreMeneurs(){
   }
   sous.textContent = 'Classements des patineurs de toute la ligue (XtraStats'
     + (ETAT.xtraDate ? ' du ' + ETAT.xtraDate : '') + (ETAT.xtraEstY21 ? ' — archive de la saison Y21' : '')
-    + '). Tes Leafs sont surlignés.';
+    + '). Les joueurs de ' + CONFIG.equipe + ' sont surlignés.';
   let liste = ETAT.xtraLigue.filter(x=>x.gp>0);
   if (po==='F') liste = liste.filter(x=>x.pos!=='D' && x.pos!=='G');
   if (po==='D') liste = liste.filter(x=>x.pos==='D');
@@ -5176,6 +5274,44 @@ $('#btnViderMat').addEventListener('click', ()=>{
     sauverMatrices({}); rendreMatrice(); rendreProgression(); flash('Retour aux matrices Y17');
   }
 });
+/* ---------- Club du DG : habillage et sélecteur ---------- */
+function habillerClub(){
+  const c = CONFIG.club;
+  document.title = c.nom + ' — Tableau de bord du DG';
+  const h1 = document.getElementById('titreClub');
+  if (h1) h1.textContent = c.nom.toUpperCase();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = c.couleur;
+  const icone = document.querySelector('link[rel="icon"]');
+  if (icone) icone.href = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+    '<rect width="100" height="100" rx="18" fill="' + c.couleur + '"/>' +
+    '<text x="50" y="68" font-size="56" text-anchor="middle">' + c.emoji + '</text></svg>');
+  document.documentElement.style.setProperty('--club', c.couleur);
+  const sous = document.getElementById('alignSous');
+  if (sous) sous.textContent = `Cotes, salaires et contrats — source : TeamRosters.php (${CONFIG.equipe})`;
+}
+function rendreChoixClub(){
+  const sel = document.getElementById('clubDG');
+  if (!sel) return;
+  sel.innerHTML = Object.keys(CLUBS)
+    .map(code=>`<option value="${code}"${code===CONFIG.equipe?' selected':''}>${echap(CLUBS[code].nom)} (${code})</option>`)
+    .join('');
+  const etat = document.getElementById('clubEtat');
+  if (etat) etat.textContent = `Club actif : ${CONFIG.club.nom} — ${CONFIG.equipe}.`;
+}
+document.getElementById('clubDG')?.addEventListener('change', e=>{
+  const code = e.target.value;
+  if (!CLUBS[code] || code === CONFIG.equipe) return;
+  if (!confirm(`Passer au poste de DG des ${CLUBS[code].nom} ? La page se recharge à ses couleurs.`)){
+    e.target.value = CONFIG.equipe;
+    return;
+  }
+  try { localStorage.setItem(CLE_CLUB, code); }
+  catch (err){ alert("Ce navigateur refuse d'enregistrer le choix du club."); return; }
+  location.reload();
+});
+
 function rendreEtatInstantane(){
   const el = document.getElementById('instantaneEtat');
   if (!el) return;
@@ -5218,10 +5354,10 @@ $('#sourcesTexte').innerHTML =
    Minutes et mises en échec : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.xtra}" target="_blank" rel="noopener">USHLxtrastats.html</a> ·
    Limites d'utilisation des gardiens : <a style="color:var(--bleu-vif)" href="${CONFIG.urlLimites}" target="_blank" rel="noopener">limites.json</a> (projet gestiongardiens) ·
    Profils : règlements USHL, tableaux 10-11-12 · Matrices : <a style="color:var(--bleu-vif)" href="${CONFIG.urls.matrices}" target="_blank" rel="noopener">MATRICES DES PROFILS</a> (page officielle, importable en un clic dans les Réglages) — valeurs Y17 d'«Attentes.docx» par défaut · Modificateurs : section 6.2.
-   <br>Données de secours : alignement TORONTO extrait des fichiers FHL officiels de la ligue (USHL21.ros, recote Y22).
-   L'OV des patineurs y est calculé par la formule du calculateur ; celui des gardiens est une <b>estimation</b>
-   remplacée par la valeur réelle à la première actualisation.`;
-$('#dateSecours').textContent = DATE_SECOURS;
+   <br>Données de secours : alignement de ${CONFIG.equipe} relevé sur ushl.ca le ${dateFormationDeSecours()}, intégré à la page.
+   L'OV des patineurs y est calculé par la formule du calculateur ; celui des gardiens vient du site (ou, à défaut,
+   d'une <b>estimation</b> remplacée par la valeur réelle à la première actualisation).`;
+$('#dateSecours').textContent = dateFormationDeSecours();
 
 // Au démarrage, la formation du club repart du dernier instantané conservé
 // (chiffres du jour de la dernière actualisation) plutôt que des données
@@ -5233,6 +5369,8 @@ $('#dateSecours').textContent = DATE_SECOURS;
     ETAT.source = 'instantané conservé du ' + dateInstantane();
   }
 }
+habillerClub();         // titre, couleurs et icône du club choisi
+rendreChoixClub();
 rafraichirRosterClub(); // formation effective = instantané + transferts locaux
 rendreSelectMatrice();
 rendreMatrice();
@@ -5257,7 +5395,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.__
    ligue (26 équipes, recote du 8 juillet 2026) et sur les 17 OV détaillés de
    référence produits par la fonction overall() du classeur Excel.
    Validation : 17/17 références au centième (±0,005), 697/697 arrondis de la
-   ligue du 8 juillet. L'OV des patineurs des données de secours TORONTO est
+   ligue du 8 juillet. L'OV des patineurs des données de secours du club est
    d'ailleurs calculé par cette même formule à partir des cotes des fichiers
    FHL de la ligue. Les défenseurs utilisent deux pondérations :
    offensive lorsque PA + SC ≥ DF + ST, défensive sinon. Les gardiens ont une
@@ -5463,6 +5601,7 @@ if (typeof window !== 'undefined'){
     ovDetaille, OV_POIDS, OV_ORDRE, peuplerJoueursOvd, calculerOvd,
     CATEGORIES_COTES, profilDeCotes, permutationsProfil, transfertsCategorie,
     echap, exporterCSV, projectionPlafond, rendreComparateur, peuplerComparateur, rendrePlafond,
+    CLUBS, CLES_LS, habillerClub, rendreChoixClub, formationDeSecours, dateFormationDeSecours,
     LIGUE, LIGUE_S21, LIGUE_DATE, DATE_S21, LIGUE_EQUIPES, EQUIPES_PERIMEES, cotesDuSite, provenanceDe,
     joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
