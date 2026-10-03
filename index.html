@@ -412,18 +412,10 @@
 
   /* ---------- Repêchage Y22 (SECTION TEMPORAIRE — à retirer après le repêchage) ---------- */
   nav button.nav-temp{color:var(--warn);}
+  main:has(> #vue-repechage.actif){max-width:1560px;}   /* tableau large : la page s'élargit pour cet onglet */
   nav button.nav-temp.actif{color:var(--warn); border-bottom-color:var(--warn);}
   .tag-temp{display:inline-block; vertical-align:middle; font-family:var(--font-data); font-size:.6rem; letter-spacing:1px;
     text-transform:uppercase; padding:2px 8px; border:1px dashed var(--warn); color:var(--warn); border-radius:2px; margin-left:8px;}
-  .rep-source{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;}
-  .rep-source a{font-family:var(--font-data); font-size:.72rem; color:var(--bleu-vif);}
-  .rep-source input[type=file]{font-family:var(--font-data); font-size:.7rem; color:var(--txt-dim); max-width:240px;}
-  #repEtat{font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); flex-basis:100%;}
-  #repEtat.alerte{color:var(--warn);}
-  #repColler{margin-bottom:14px;}
-  #repColler summary{cursor:pointer; font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim);}
-  #repColler textarea{width:100%; min-height:120px; margin:8px 0; background:var(--bleu-nuit); border:1px solid var(--line);
-    color:var(--txt); font-family:var(--font-data); font-size:.74rem; padding:8px 10px; border-radius:2px;}
   .rep-btn{font-family:var(--font-body); font-weight:600; font-size:.7rem; letter-spacing:1px; text-transform:uppercase;
     background:var(--bleu); color:#fff; border:1px solid var(--bleu); padding:8px 14px; cursor:pointer; border-radius:2px;}
   .rep-btn.secondaire{background:transparent; border-color:var(--line); color:var(--txt-dim);}
@@ -543,19 +535,8 @@
   <!-- ================= REPÊCHAGE Y22 (SECTION TEMPORAIRE) ================= -->
   <section class="vue" id="vue-repechage">
     <h2>Repêchage Y22 <span class="tag-temp">temporaire</span></h2>
-    <div class="h2-sous">Liste officielle des prospects (Draft_Y22_Vfinal). <strong>OV exact</strong> au centième par la formule du simulateur ; <strong>profil</strong> selon les règlements (junior ≤ 20 ans, prospect ≤ 24) ; <strong>atteignable</strong> = profils obtenus en déplaçant jusqu'à 3 points <em>à l'intérieur d'une même catégorie</em> (A&nbsp;: SP&nbsp;ST&nbsp;EN&nbsp;DU&nbsp;SK · B&nbsp;: PA&nbsp;PC&nbsp;DF&nbsp;OF · C&nbsp;: IN&nbsp;DI&nbsp;EX&nbsp;LD). Clique une rangée pour le détail des permutations ; «&nbsp;Repêché&nbsp;» noircit le joueur dès qu'une équipe le choisit (conservé dans ce navigateur).</div>
+    <div class="h2-sous">Liste officielle des prospects (<a href="https://ushl.ca/ushl/menu_ushl/gestion_dg/Draft/Y22/Draft_Y22_Vfinal.htm" target="_blank" rel="noopener" style="color:var(--bleu-vif)">Draft_Y22_Vfinal</a>, relevée le 3 octobre 2026 — intégrée à la page, rien à charger). <strong>OV exact</strong> au centième par la formule du simulateur (≠ : l'OV de la ligue diffère de l'arrondi) ; <strong>profil</strong> de la ligue ; <strong>atteignable</strong> = profils obtenus en déplaçant jusqu'à 3 points <em>à l'intérieur d'une même catégorie</em> (A&nbsp;: SP&nbsp;ST&nbsp;EN&nbsp;DU&nbsp;SK · B&nbsp;: PA&nbsp;PC&nbsp;DF&nbsp;SC · C&nbsp;: IT&nbsp;DI&nbsp;EX&nbsp;LD). Clique une rangée pour le détail ; «&nbsp;Repêché&nbsp;» noircit le joueur dès qu'une équipe le choisit (conservé dans ce navigateur).</div>
     <div class="sommaire" id="repSommaire"></div>
-    <div class="rep-source">
-      <button class="rep-btn" id="repCharger">Charger depuis ushl.ca</button>
-      <a id="repLien" target="_blank" rel="noopener">Ouvrir la page officielle ↗</a>
-      <label class="lig-chk">ou importer le fichier <input type="file" id="repFichier" accept=".htm,.html,.txt,.csv,.tsv"></label>
-      <span id="repEtat"></span>
-    </div>
-    <details id="repColler">
-      <summary>Coller la liste (si le téléchargement échoue : ouvre la page, clique dans le tableau, Ctrl+A, Ctrl+C, colle ici)</summary>
-      <textarea id="repTexte" placeholder="Colle ici le contenu de la page (tableau copié depuis le navigateur ou code HTML)…"></textarea>
-      <button class="rep-btn" id="repImporter">Importer la liste collée</button>
-    </details>
     <div class="ligue-filtres">
       <input type="search" id="repNom" placeholder="Nom…" aria-label="Filtrer par nom">
       <select id="repPo" aria-label="Position">
@@ -5718,225 +5699,249 @@ if (typeof window !== 'undefined'){
 <script>
 /* =====================================================================
    REPÊCHAGE Y22 — SECTION TEMPORAIRE (à retirer après le repêchage)
-   Liste officielle : gestion_dg/Draft/Y22/Draft_Y22_Vfinal.htm.
-   Tout le repêchage tient dans ce bloc, la section #vue-repechage, son
-   bouton de navigation et le bloc CSS «Repêchage Y22» : les retirer
-   suffit à faire disparaître l'onglet sans toucher au reste.
+   Liste officielle Draft_Y22_Vfinal (relevée le 3 octobre 2026) intégrée
+   telle quelle : le repêchage est un événement unique, les joueurs ne
+   changent pas, rien n'est téléchargé. Tout le repêchage tient dans ce
+   bloc, la section #vue-repechage, son bouton de navigation et le bloc
+   CSS «Repêchage Y22» : les retirer suffit à faire disparaître l'onglet.
    Moteurs réutilisés : ovDetaille (OV exact), profilDeCotes et
    permutationsProfil (déplacements de points par catégorie).
    ===================================================================== */
 const REP = {
   url: 'https://ushl.ca/ushl/menu_ushl/gestion_dg/Draft/Y22/Draft_Y22_Vfinal.htm',
-  cleListe: 'tml_repechage_liste_v1',   // liste importée (survit au rechargement de la page)
-  cleChoix: 'tml_repechage_choix_v1',   // joueurs repêchés et cibles du DG
-  ageDefaut: 18                          // âge présumé si la page n'en publie pas (junior)
+  date: '3 octobre 2026',
+  cleChoix: 'tml_repechage_choix_v1'   // joueurs repêchés et cibles du DG (ce navigateur)
 };
-const ETAT_REP = {liste: [], date: null, source: null, tri: {col: null, desc: true},
-  ouvert: null, chargement: false, essaye: false};
+/* Rd, nom, PO (LW → AG, RW → AD), taille (po), poids (lb),
+   IT SP ST EN DU DI SK PA PC DF SC EX LD, OV, âge, nationalité, profil de la ligue.
+   159 joueurs : le Rd 63 ne figure pas sur la liste. */
+const REPECHAGE_Y22 = [
+  [1,'Gavin McKenna','AG',71,170,67,75,63,75,76,71,75,77,78,61,75,40,40,76,19,'CAN','Junior Elite'],
+  [2,'Ivar Stenberg','AG',71,183,69,72,67,73,73,75,75,76,77,64,72,35,35,75,19,'SWE','Junior Elite'],
+  [3,'Caleb Malhotra','C',74,182,68,65,66,70,71,72,67,74,72,68,67,30,30,72,18,'CAN','Junior Playmaker'],
+  [8,'Viggo Bjorck','C',69,177,68,68,61,66,70,70,71,70,68,68,66,30,30,71,18,'SWE','Junior Playmaker'],
+  [10,'Wyatt Cullen','AG',73,176,65,69,58,69,71,74,70,71,73,56,70,30,30,71,18,'USA','Junior Playmaker'],
+  [24,'Adam Novotny','AG',73,205,67,69,68,69,72,66,69,63,67,63,66,35,35,70,19,'CZE','Junior Power Forward'],
+  [92,'Benjamin Wilmott','C',73,188,70,68,66,67,69,60,67,67,60,57,69,40,40,69,20,'USA','Junior Power Forward'],
+  [11,'Tynan Lawrence','C',73,185,65,67,66,68,72,72,66,64,62,65,67,30,30,69,18,'CAN','Junior Two-Way Forward'],
+  [25,'Jonas Lagerberg Hoen','AD',74,185,68,67,64,68,56,71,68,65,62,54,71,35,35,69,19,'SWE','Junior Sniper'],
+  [40,'Simas Ignatavicius','AD',75,198,71,67,68,68,71,58,62,68,68,56,63,35,35,69,19,'USA','Junior Grinder'],
+  [35,'Ryan Roobroeck','AG',75,209,64,64,70,70,72,57,64,67,62,55,69,35,35,69,19,'CAN','Junior Sniper'],
+  [14,'Oscar Hemming','AG',76,193,63,66,68,70,71,65,65,65,64,61,66,30,30,69,18,'FIN','Junior Two-Way Forward'],
+  [36,'Chase Harrington','AG',73,194,70,64,69,67,71,58,61,65,66,62,64,35,35,69,19,'CAN','Junior Grinder'],
+  [12,'Alexander Command','C',73,183,68,66,64,66,68,70,66,66,63,64,64,30,30,69,18,'SWE','Junior Two-Way Forward'],
+  [17,'Ethan Belchetz','AG',77,228,68,64,71,68,70,64,64,63,60,62,67,30,30,69,18,'CAN','Junior Power Forward'],
+  [37,'Matias Vanhanen','AG',71,176,67,68,64,72,71,62,67,67,65,59,62,35,35,69,19,'FIN','Junior Playmaker'],
+  [46,'Liam Lefebvre','C',75,203,70,62,73,64,70,63,61,65,61,57,68,35,35,69,19,'CAN','Junior Power Forward'],
+  [15,'Nikita Klepov','AD',72,180,64,67,61,68,67,65,69,66,67,57,65,30,30,68,18,'USA','Junior Playmaker'],
+  [16,'Maddox Dagenais','C',76,196,69,65,66,70,69,63,66,61,61,60,68,30,30,68,18,'CAN','Junior Power Forward'],
+  [20,'Ilia Morozov','C',75,200,68,64,69,64,70,67,65,63,62,66,61,30,30,68,18,'RUS','Junior Grinder'],
+  [116,'Zach Wooten','AG',74,205,68,63,71,69,71,61,63,62,62,51,67,40,40,68,20,'USA','Junior Power Forward'],
+  [100,'Egor Barabanov','C',72,177,58,68,53,69,66,71,66,68,70,55,65,40,40,68,20,'RUS','Junior Playmaker'],
+  [129,'Connor Davis','AD',68,174,61,68,59,64,68,67,67,65,65,56,67,35,35,68,20,'USA','Junior Sniper'],
+  [72,'Adam Nemec','AG',72,173,60,68,58,68,68,60,62,68,62,62,66,35,35,68,19,'SVK','Junior Two-Way Forward'],
+  [19,'Elton Hermansson','AD',73,181,59,65,63,68,70,65,66,65,62,57,68,30,30,68,18,'SWE','Junior Sniper'],
+  [18,'Oliver Suvanto','C',75,207,70,63,72,65,67,61,61,67,56,67,60,30,30,68,18,'FIN','Junior Grinder'],
+  [26,'Gleb Pugachyov','AD',75,198,70,68,69,67,70,58,64,63,59,52,66,30,30,67,18,'KAZ','Junior Power Forward'],
+  [22,'Liam Ruck','AD',72,177,59,66,59,64,65,70,65,67,66,55,67,30,30,67,18,'CAN','Junior Sniper'],
+  [81,'Tomas Chrenko','C',71,172,53,68,53,64,55,68,69,69,68,56,66,35,35,67,19,'SVK','Junior Playmaker'],
+  [33,'Brooks Rogowski','C',79,235,73,61,74,62,70,60,62,60,65,58,61,30,30,67,18,'USA','Junior Grinder'],
+  [32,'Jaxon Cover','AD',74,183,58,65,62,66,66,62,67,66,69,57,62,30,30,67,18,'USA','Junior Playmaker'],
+  [23,'JP Hurlbert','AG',72,183,56,66,63,62,62,65,66,68,67,51,66,30,30,67,18,'USA','Junior Playmaker'],
+  [48,'Ryder Cali','C',74,219,69,65,69,63,62,64,61,62,60,61,63,30,30,67,18,'SWI','Junior Grinder'],
+  [38,'Casey Mutryn','AD',75,200,64,62,70,65,68,68,63,65,60,61,61,30,30,67,18,'USA','Junior Grinder'],
+  [50,'Mathis Preston','AD',71,173,57,69,60,65,64,68,68,61,62,55,69,30,30,67,18,'CAN','Junior Sniper'],
+  [43,'Egor Shilov','C',73,177,54,68,61,68,68,69,65,69,67,57,60,30,30,67,18,'RUS','Junior Playmaker'],
+  [82,'Rian Chudzinski','AD',73,191,70,67,65,68,65,55,69,60,58,59,62,35,35,67,19,'USA','Junior Grinder'],
+  [30,'Jack Hextall','C',73,188,64,63,60,68,66,65,63,66,63,58,64,30,30,67,18,'USA','Junior Two-Way Forward'],
+  [39,'Markus Ruck','C',72,167,61,65,60,65,68,69,62,68,65,58,62,30,30,67,18,'CAN','Junior Two-Way Forward'],
+  [28,'Marcus Nordmark','AG',74,180,52,63,58,68,70,62,65,69,61,52,70,30,30,67,18,'SWE','Junior Sniper'],
+  [97,'Yaroslav Bryzgalov','AG',75,216,69,57,70,65,63,65,55,66,63,51,65,35,35,66,19,'BLR','Junior Power Forward'],
+  [58,'Rudolfs Berzkalns','C',76,204,62,65,67,65,67,65,68,58,62,62,61,30,30,66,18,'LVA','Junior Defensive'],
+  [52,'Oleg Kulebyakin','AD',70,178,60,63,60,66,68,65,65,64,66,55,64,30,30,66,18,'RUS','Junior Depth Forward'],
+  [55,'Alan Shaikhlislamov','AD',73,187,65,63,62,64,65,62,65,61,62,56,66,30,30,66,18,'RUS','Junior Sniper'],
+  [47,'Victor Plante','AG',70,163,62,65,57,67,69,65,65,64,61,58,65,30,30,66,18,'USA','Junior Sniper'],
+  [102,'Spencer Bowes','AG',72,172,66,65,57,63,66,58,61,65,62,55,66,35,35,66,19,'CAN','Junior Depth Forward'],
+  [83,'Adam Andersson','C',76,205,68,62,69,68,67,70,62,61,58,65,57,30,30,66,18,'SWE','Junior Grinder'],
+  [61,'Wiggo Sorensson','C',70,178,60,66,57,68,61,64,67,66,66,53,60,30,30,66,18,'SWE','Junior Playmaker'],
+  [118,'Justin Graf','AG',73,174,67,63,61,67,70,62,62,62,60,57,62,35,35,66,19,'USA','Junior Depth Forward'],
+  [119,'Lavr Gashilov','C',75,170,59,60,61,64,67,65,60,66,65,56,62,35,35,66,19,'RUS','Junior Depth Forward'],
+  [121,'Evan Jardine','AG',72,185,56,64,63,61,66,56,65,66,63,55,61,35,35,66,19,'USA','Junior Depth Forward'],
+  [41,'Niklas Aaram-Olsen','AG',73,183,59,64,59,66,68,64,64,65,60,53,65,30,30,66,18,'NOR','Junior Sniper'],
+  [80,'Blake Zielinski','C',72,188,59,63,58,68,68,67,61,66,57,58,64,30,30,65,18,'USA','Junior Two-Way Forward'],
+  [84,'Malcom Gastrin','AG',72,174,61,63,58,67,68,67,62,66,55,58,64,30,30,65,18,'SWE','Junior Two-Way Forward'],
+  [68,'Zachary Lansard','AD',72,173,67,64,59,66,68,63,64,58,57,56,66,30,30,65,18,'CAN','Junior Sniper'],
+  [65,'Joe Iginla','AD',70,170,65,63,60,62,65,68,62,64,63,56,60,30,30,65,18,'CAN','Junior Depth Forward'],
+  [138,'Philip Hemmyr','AG',73,170,62,64,59,63,67,60,65,62,61,56,62,35,35,65,19,'SWE','Junior Depth Forward'],
+  [134,'Morgan Anderberg','C',71,174,61,66,56,69,71,68,66,61,61,56,61,35,35,65,19,'SWE','Junior Depth Forward'],
+  [96,'Adam Valentini','C',69,190,66,63,63,66,67,55,63,62,60,60,58,30,30,65,18,'CAN','Junior Defensive'],
+  [136,'Kent Sauer','C',75,202,71,61,69,66,60,54,59,56,58,56,63,35,35,65,19,'USA','Junior Grinder'],
+  [88,'Nils Bartholdsson','AD',70,175,62,64,57,63,65,56,64,62,60,54,65,30,30,65,18,'SWE','Junior Sniper'],
+  [87,'Oscar Holmertz','C',72,187,58,67,53,62,65,55,65,66,66,53,61,30,30,65,18,'SWE','Junior Playmaker'],
+  [86,'Pierce Mbuyi','AG',70,163,61,64,57,63,67,65,66,61,58,52,66,30,30,65,18,'CAN','Junior Sniper'],
+  [73,'Zach Olsen','AD',73,202,65,66,69,65,61,58,65,56,54,56,62,30,30,65,18,'CAN','Junior Grinder'],
+  [74,'Beckett Hamilton','C',71,170,68,60,64,62,66,54,65,60,58,56,60,30,30,65,18,'USA','Junior Grinder'],
+  [147,'Florent Houle','AD',72,191,65,62,64,61,66,52,60,61,63,55,59,35,35,65,19,'CAN','Junior Depth Forward'],
+  [113,'Jonah Sivertson','AD',75,194,64,59,65,69,69,70,59,61,54,55,63,30,30,64,18,'CAN','Junior Depth Forward'],
+  [105,'Michael Berchild','AG',70,180,55,66,51,67,67,65,66,65,67,50,60,30,30,64,18,'USA','Junior Playmaker'],
+  [91,'Louis Felix Bourque','AD',74,214,63,62,67,65,60,60,63,57,56,56,62,30,30,64,18,'CAN','Junior Grinder'],
+  [94,'Alessandro Di Iorio','C',72,188,63,60,67,66,65,60,60,58,61,59,58,30,30,64,18,'CAN','Junior Grinder'],
+  [112,'Kayden Lemire','AD',76,188,66,59,68,62,65,57,58,62,57,57,59,30,30,64,18,'CAN','Junior Grinder'],
+  [101,'Tyus Sparks','C',72,180,67,65,58,63,60,57,67,61,55,54,61,30,30,64,18,'USA','Junior Depth Forward'],
+  [103,'Thomas Vandenberg','C',72,178,66,60,64,65,63,58,63,57,56,57,61,30,30,64,18,'CAN','Junior Grinder'],
+  [104,'Matvei Kotkov','AD',73,185,60,61,63,66,66,58,59,59,58,53,63,30,30,64,18,'RUS','Junior Depth Forward'],
+  [122,'Oscar Olsson','AG',76,187,65,63,62,64,62,62,60,58,61,53,59,30,30,64,18,'SWE','Junior Depth Forward'],
+  [124,'Olivers Murnieks','C',72,200,64,58,66,62,60,63,62,56,56,61,59,30,30,64,18,'LVA','Junior Grinder'],
+  [108,'Adam Levac','C',72,176,63,62,56,65,61,66,63,58,58,57,61,30,30,64,18,'CAN','Junior Depth Forward'],
+  [99,'Viktor Fedorov','C',70,176,57,65,54,65,63,63,64,63,58,55,60,30,30,64,18,'RUS','Junior Depth Forward'],
+  [156,'Doman Szongoth','C',73,195,58,59,63,66,65,57,57,57,59,59,61,30,30,63,18,'HUN','Junior Depth Forward'],
+  [158,'Cooper Williams','C',73,164,56,62,49,65,65,71,60,62,61,58,61,30,30,63,18,'CAN','Junior Depth Forward'],
+  [132,'Simon Katolicky','AG',76,202,65,60,69,66,66,53,58,55,56,53,60,30,30,63,18,'CZE','Junior Depth Forward'],
+  [150,'Carter Stevens','AD',74,195,60,57,65,63,66,58,60,59,60,51,60,30,30,63,18,'CAN','Junior Depth Forward'],
+  [155,'Reed Brown','C',71,161,61,62,55,58,61,66,62,62,57,55,58,30,30,63,18,'CAN','Junior Depth Forward'],
+  [143,'Beckham Edwards','C',73,187,64,60,62,62,64,66,58,58,55,58,57,30,30,63,18,'CAN','Junior Depth Forward'],
+  [154,'Cooper Soller','C',70,172,55,61,55,65,62,60,60,64,57,56,58,30,30,63,18,'USA','Junior Depth Forward'],
+  [7,'Chase Reid','D',75,195,69,73,69,75,72,71,76,69,70,71,66,35,35,74,19,'USA','Junior DEliteShutdown'],
+  [5,'Alberts Smits','D',75,205,72,72,75,72,71,61,74,59,59,72,63,35,35,73,19,'LVA','Junior DEliteShutdown'],
+  [4,'Daxon Rudolph','D',75,206,62,67,69,71,69,65,68,71,71,62,67,30,30,71,18,'CAN','Junior DOffensive'],
+  [6,'Carson Carels','D',74,198,68,70,70,74,75,71,70,63,60,70,59,30,30,71,18,'CAN','Junior DDefensive'],
+  [90,'Tomas Kralovic','D',75,203,61,71,72,74,72,61,63,69,65,60,68,43,43,71,21,'RUS','Prospect DOffensive'],
+  [54,'Tomas Galvas','D',70,168,67,73,58,69,66,65,72,69,69,55,64,40,40,71,20,'CZE','Junior DOffensive'],
+  [9,'Keaton Verhoeff','D',76,196,69,61,69,68,69,67,65,68,65,66,72,30,30,70,18,'CAN','Junior DOffensive'],
+  [34,'Xavier Villeneuve','D',71,162,69,68,55,70,63,69,68,71,68,62,61,35,35,70,19,'CAN','Junior DOffensive'],
+  [31,'Thomas Bleyl','D',72,165,62,73,57,67,64,70,70,69,66,62,61,35,35,70,19,'USA','Junior DOffensive'],
+  [93,'Cooper Cleaves','D',75,203,74,63,75,64,68,52,63,56,56,72,54,40,40,69,20,'USA','Junior DDefensive'],
+  [13,'Malte Gustafsson','D',76,200,68,67,71,70,70,69,65,61,58,69,59,30,30,69,18,'SWE','Junior DDefensive'],
+  [69,'Ethan Mackenzie','D',73,188,70,65,72,70,72,71,62,55,58,71,59,40,40,69,20,'CAN','Junior DDefensive'],
+  [44,'Nikita Shcherbakov','D',75,187,70,63,71,67,68,65,67,57,55,73,53,35,35,69,19,'RUS','Junior DDefensive'],
+  [51,'William Hakansson','D',76,207,70,66,73,69,68,61,65,55,54,70,53,35,35,69,19,'SWE','Junior DDefensive'],
+  [45,'Jayden Kurtz','D',75,194,68,65,67,68,65,62,66,62,58,66,63,35,35,69,19,'USA','Junior DDefensive'],
+  [21,'Ryan Lin','D',71,178,61,69,64,73,67,72,67,62,61,69,57,30,30,68,18,'CAN','Junior DDefensive'],
+  [57,'Timofei Runtso','D',74,186,62,67,61,68,67,68,68,66,62,62,62,35,35,68,19,'USA','Junior DOffensive'],
+  [111,'Parker VonRichter','D',73,185,68,65,70,72,70,55,65,55,50,70,55,40,40,68,20,'CAN','Junior DDefensive'],
+  [27,'Maksim Sokolovskii','D',79,238,70,65,75,73,75,60,61,52,54,68,51,30,30,68,18,'KAZ','Junior DDefensive'],
+  [29,'Juho Piiparinen','D',73,201,67,65,69,65,66,62,65,59,55,65,54,30,30,67,18,'FIN','Junior DDefensive'],
+  [77,'Charlie Morrison','D',75,198,70,63,71,67,60,63,62,55,50,67,52,35,35,67,19,'CAN','Junior DDefensive'],
+  [53,'Brek Liske','D',73,190,66,66,64,63,64,66,67,59,58,63,58,30,30,66,18,'CAN','Junior DDefensive'],
+  [49,'Adam Goljer','D',75,194,68,63,66,62,62,60,66,58,57,63,57,30,30,66,18,'SVK','Junior DDefensive'],
+  [109,'Lincoln Kuehne','D',74,203,66,66,70,69,67,57,63,55,53,65,49,35,35,66,19,'USA','Junior DDefensive'],
+  [107,'Landon Nycz','D',74,201,66,68,70,63,68,50,70,58,59,55,57,35,35,66,19,'USA','Junior DDefensive'],
+  [148,'Luken Huff','D',75,198,63,66,65,64,64,64,66,60,60,58,60,40,40,66,20,'USA','Junior DDepth Defense'],
+  [117,'Brayden Klimpke','D',72,174,60,68,52,68,60,69,67,63,65,57,55,35,35,66,19,'CAN','Junior DOffensive'],
+  [59,'Jakub Vanecek','D',74,194,61,61,66,68,65,59,63,58,58,62,62,30,30,65,18,'CZE','Junior DDefensive'],
+  [60,'Alexander Bilecki','D',73,180,59,64,60,62,68,64,65,62,62,58,61,30,30,65,18,'CAN','Junior DOffensive'],
+  [64,'Benjamin Macbeath','D',74,188,55,68,56,61,66,63,67,64,60,57,59,30,30,65,18,'CAN','Junior DOffensive'],
+  [75,'Luke Schairer','D',75,195,67,65,68,66,66,60,66,51,49,66,50,30,30,65,18,'USA','Junior DDefensive'],
+  [141,'Vladimir Dravecky','D',71,192,67,63,65,62,70,54,66,50,52,67,54,35,35,65,19,'USA','Junior DDefensive'],
+  [140,'Cole Tuminaro','D',76,225,65,61,68,68,73,57,63,50,50,66,57,35,35,65,19,'USA','Junior DDefensive'],
+  [66,'Samu Alalauri','D',74,203,62,68,66,64,67,61,67,52,50,66,52,30,30,65,18,'FIN','Junior DDefensive'],
+  [76,'Mans Gudmundsson','D',74,185,68,59,66,66,59,67,60,54,53,68,45,30,30,65,18,'SWE','Junior DDefensive'],
+  [95,'Sean Burick','D',80,214,69,59,73,68,70,50,57,50,50,66,48,30,30,65,18,'USA','Junior DDefensive'],
+  [106,'Jakub Floris','D',75,198,64,66,61,65,64,60,68,61,56,54,59,30,30,65,18,'SVK','Junior DOffensive'],
+  [145,'Vertti Svensk','D',72,169,63,66,55,69,68,61,66,59,65,53,55,35,35,65,19,'FIN','Junior DOffensive'],
+  [98,'Jonas Kemps','D',78,195,63,55,69,63,68,54,57,55,53,63,56,30,30,64,18,'USA','Junior DDefensive'],
+  [128,'Axel Elofsson','D',70,164,52,65,49,67,70,68,67,62,60,52,57,30,30,64,18,'SWE','Junior DOffensive'],
+  [153,'Giorgos Pantelas','D',74,210,62,57,68,66,67,51,57,52,56,65,47,30,30,63,18,'CAN','Junior DDefensive'],
+  [131,'Finn Kearns','D',75,212,63,63,66,61,66,56,59,54,50,62,54,30,30,63,18,'CAN','Junior DDefensive'],
+  [151,'Harris Pangretitsch','D',76,219,66,55,68,64,65,58,51,54,53,64,51,30,30,63,18,'CAN','Junior DDefensive'],
+  [146,'Eric Frossard','D',78,206,63,61,66,65,68,57,60,50,52,63,52,30,30,63,18,'CAN','Junior DDefensive'],
+  [130,'Theodor Knights','D',76,194,65,59,64,64,62,51,58,51,51,65,53,30,30,63,18,'SWE','Junior DDefensive'],
+  [133,'Andrew Robinson','D',72,190,67,60,65,60,67,52,57,52,50,64,51,30,30,63,18,'CAN','Junior DDefensive'],
+  [144,'Brian Mcfadden','D',77,183,65,59,67,68,69,52,63,51,48,62,47,30,30,63,18,'USA','Junior DDefensive'],
+  [135,'Alexandre Taillefer','D',72,164,56,64,48,69,62,64,66,58,59,54,58,30,30,63,18,'CAN','Junior DOffensive'],
+  [139,'Nicholas Bogas','D',72,183,60,62,61,66,68,70,62,56,52,61,50,30,30,63,18,'USA','Junior DDefensive'],
+  [157,'Jacob Vandeven','D',77,183,66,56,66,63,62,60,56,51,47,62,55,30,30,63,18,'CAN','Junior DDefensive'],
+  [159,'Will Mclaughlin','D',74,168,61,59,50,65,65,60,63,60,57,51,60,30,30,62,18,'CAN','Junior DOffensive'],
+  [152,'Theodore Lechner','D',74,164,64,64,52,65,66,61,60,59,59,53,53,30,30,62,18,'USA','Junior DOffensive'],
+  [42,'Tobias Trejbal','G',76,190,73,76,80,75,77,75,75,58,77,0,0,35,35,70,19,'CZE','Junior Goalie'],
+  [115,'Carl Axelsson','G',76,183,78,79,65,70,69,80,73,48,74,0,0,40,40,69,20,'SWE','Junior Goalie'],
+  [67,'Danai Shaiikov','G',74,192,71,74,75,78,73,70,72,63,70,0,0,35,35,68,19,'KAZ','Junior Goalie'],
+  [79,'Michal Orsulak','G',76,225,72,71,81,78,80,72,67,61,75,0,0,35,35,67,19,'CZE','Junior Goalie'],
+  [89,'Yegor Rybkin','G',79,207,70,75,73,67,65,70,74,63,70,0,0,35,35,67,19,'RUS','Junior Goalie'],
+  [56,'Yuri Ivanov','G',74,165,73,72,77,76,70,74,74,53,71,0,0,30,30,67,18,'RUS','Junior Goalie'],
+  [62,'Martin Psohlavec','G',77,185,74,69,71,77,75,67,78,57,67,0,0,30,30,66,18,'CZE','Junior Goalie'],
+  [70,'Dmitri Borichev','G',74,194,68,72,75,70,71,68,71,64,67,0,0,30,30,66,18,'RUS','Junior Goalie'],
+  [126,'Tobias Tvrznik','G',75,180,70,72,69,63,75,68,71,57,72,0,0,35,35,65,19,'CZE','Junior Goalie'],
+  [85,'Juuso Ainasto','G',76,198,74,71,73,67,70,76,69,58,68,0,0,30,30,65,18,'FIN','Junior Goalie'],
+  [71,'Samuel Hrenak','G',75,190,70,71,74,67,68,72,74,54,67,0,0,30,30,65,18,'SVK','Junior Goalie'],
+  [78,'Dmitri Ivchenko','G',75,179,75,69,70,64,62,70,70,50,77,0,0,30,30,65,18,'RUS','Junior Goalie'],
+  [110,'Elliot Lennon','G',75,181,76,73,68,65,65,62,73,51,63,0,0,30,30,64,18,'CAN','Junior Goalie'],
+  [114,'Patriks Plumins','G',75,203,67,69,74,73,70,65,71,68,65,0,0,30,30,64,18,'LVA','Junior Goalie'],
+  [125,'Ryder Fetterolf','G',72,184,65,71,63,67,62,71,73,52,69,0,0,30,30,64,18,'USA','Junior Goalie'],
+  [120,'Marek Sklenicka','G',75,170,69,73,62,66,65,72,65,55,68,0,0,30,30,64,18,'CZE','Junior Goalie'],
+  [123,'Vladimir Proskurin','G',73,170,71,71,70,68,68,60,70,55,63,0,0,30,30,64,18,'RUS','Junior Goalie'],
+  [127,'Brady Knowling','G',77,202,75,68,75,63,62,64,69,63,60,0,0,30,30,63,18,'CAN','Junior Goalie'],
+  [149,'Daniil Rusakovich','G',76,183,70,64,78,69,72,60,66,55,72,0,0,30,30,63,18,'BLR','Junior Goalie'],
+  [137,'Filip Ruzicka','G',79,230,72,64,78,75,73,65,66,63,64,0,0,30,30,63,18,'CZE','Junior Goalie'],
+  [160,'Matvei Nikonovich','G',74,187,67,67,71,70,69,68,66,55,69,0,0,30,30,63,18,'BLR','Junior Goalie'],
+  [142,'Parker Snell','G',74,176,75,66,66,66,67,65,70,52,68,0,0,30,30,63,18,'CAN','Junior Goalie']
+];
+const ETAT_REP = {liste: [], tri: {col: null, desc: true}, ouvert: null};
 
-/* ---------- Parseur de la liste ----------
-   La forme exacte de la page n'est pas figée (export Excel, tableau HTML ou
-   texte collé) : on cherche toute rangée d'en-têtes qui porte au moins 10
-   des 13 cotes, puis on lit les rangées suivantes par nom de colonne. */
-const ALIAS_REP = {
-  it: ['IT','IN','INT','INTENSITY','INTENSITE'],
-  sp: ['SP','SPD','SPEED','VITESSE'],
-  st: ['ST','STR','STRENGTH','FORCE'],
-  en: ['EN','END','ENDURANCE'],
-  du: ['DU','DUR','DURABILITY','DURABILITE'],
-  di: ['DI','DIS','DISCIPLINE'],
-  sk: ['SK','SKA','SKATING','PATINAGE'],
-  pa: ['PA','PAS','PASS','PASSING','PASSE','PASSES'],
-  pc: ['PC','PUCK','PUCK CONTROL','PUCKCONTROL','CONTROLE','CONTROLE DE RONDELLE'],
-  df: ['DF','DEF','DEFENSE','DEFENCE'],
-  sc: ['SC','OF','OFF','SCORING','OFFENSE','OFFENSIVE'],
-  ex: ['EX','EXP','EXPERIENCE'],
-  ld: ['LD','LEAD','LEADERSHIP'],
-  ov: ['OV','OVR','OVERALL','GLOBAL'],
-  nom: ['NOM','NAME','JOUEUR','JOUEURS','PLAYER','PLAYERS','PROSPECT','PROSPECTS','NOM DU JOUEUR','PLAYER NAME','NOM COMPLET'],
-  po: ['PO','POS','POSITION','POSTE'],
-  age: ['AGE'],
-  rang: ['#','RANG','RANK','NO','CLASSEMENT','RG'],
-  hd: ['HD','HAND','SHOOTS','LANCER']
+/* ---------- OV exact, profil et profils atteignables ----------
+   Le moteur nomme deux profils autrement que la liste de la ligue :
+   on affiche les noms de la ligue. */
+const LIBELLES_LIGUE_REP = {
+  'Junior Two-Way': 'Junior Two-Way Forward',
+  'Junior DTwo-Way': 'Junior DDepth Defense',
+  'Prospect DTwo-Way': 'Prospect DDepth Defense'
 };
-function cleEnteteRep(t){ return normTxt(t).toUpperCase().replace(/[^A-Z0-9#]+/g, ' ').trim(); }
-const INDEX_ALIAS_REP = (()=>{
-  const m = new Map();
-  for (const [cle, alias] of Object.entries(ALIAS_REP)) for (const a of alias) m.set(cleEnteteRep(a), cle);
-  return m;
-})();
-function mapperEntetesRep(cellules){
-  const map = {};
-  cellules.forEach((c, i)=>{
-    const cle = INDEX_ALIAS_REP.get(cleEnteteRep(c));
-    if (cle && map[cle] === undefined) map[cle] = i;
-  });
-  return OV_ORDRE.filter(k => map[k] !== undefined).length >= 10 ? map : null;
-}
-/* Nombre en tête de cellule : «72», «72.0», «72 (+3)», «72/80» → 72. */
-function nbRep(s){
-  const m = String(s ?? '').replace(/ /g, ' ').trim().match(/^[-+]?\d+(?:[.,]\d+)?/);
-  return m ? Number(m[0].replace(',', '.')) : null;
-}
-function posRep(brut){
-  const t = normTxt(brut).toUpperCase().replace(/[^A-Z\/ ,-]/g, '').trim().split(/[\/ ,-]+/)[0] || '';
-  if (/^(G|GK|GB|GOALIE|GOALTENDER|GARDIEN)$/.test(t)) return 'G';
-  if (/^(D|LD|RD|DG|DD|DEF|DEFENSE|DEFENSEUR|DEFENSEMAN|DEFENCEMAN)$/.test(t)) return 'D';
-  if (/^(C|CENTRE|CENTER)$/.test(t)) return 'C';
-  if (/^(AG|LW)$/.test(t)) return 'AG';
-  if (/^(AD|RW)$/.test(t)) return 'AD';
-  if (/^(F|W|A|AV|ATT|FWD|FORWARD|ATTAQUANT|AILIER)$/.test(t)) return 'F';
-  return '';
-}
-/* Titre de section («DÉFENSEURS», «Gardiens»…) : position par défaut quand
-   la liste ne publie pas de colonne PO. */
-function groupeDeContexteRep(txt){
-  const t = normTxt(txt);
-  if (/gardien|goal/.test(t)) return 'G';
-  if (/defens/.test(t)) return 'D';
-  if (/attaqu|avants?\b|forward|centre|ailier/.test(t)) return 'F';
+const libelleRep = pr => LIBELLES_LIGUE_REP[pr] || pr;
+/* Matrice d'un profil nommé comme la ligue (ex. Junior DEliteShutdown → DELITESD). */
+function matDeProfilRep(nom){
+  for (const cat of Object.values(PROFILS))
+    for (const grp of Object.values(cat))
+      for (const pr of grp) if (libelleRep(pr.id) === nom) return pr.mat;
   return null;
 }
-function blocsDeHtmlRep(html){
-  const d = new DOMParser().parseFromString(html, 'text/html');
-  const blocs = [];
-  for (const table of d.querySelectorAll('table')){
-    let contexte = '', prec = table.previousElementSibling;
-    for (let n = 0; prec && n < 2 && prec.tagName !== 'TABLE'; n++, prec = prec.previousElementSibling){
-      contexte = (prec.textContent || '').slice(0, 200) + ' ' + contexte;
-    }
-    const lignes = [];
-    for (const tr of table.rows){            // rangées propres à cette table (pas celles des tables imbriquées)
-      const cel = [];
-      for (const c of tr.cells){
-        cel.push((c.textContent || '').replace(/[\s ]+/g, ' ').trim());
-        const span = Math.min(20, parseInt(c.getAttribute('colspan'), 10) || 1);
-        for (let k = 1; k < span; k++) cel.push('');
-      }
-      lignes.push(cel);
-    }
-    blocs.push({contexte, lignes, fusionNom: false});
-  }
-  return blocs;
+/* En-têtes de la liste de la ligue : IT et SC (le calculateur dit IN et OF). */
+const COTES_LIB_REP = Object.assign({}, OVD_LIBELLES, {it: 'IT', sc: 'SC'});
+/* Dans le tableau, « Junior » est implicite (l'âge le dit) : on garde la place pour les profils atteignables. */
+const courtRep = pr => pr.replace(/^Junior /, '');
+function prospectDeLigne(l){
+  const [rang, nom, po, taille, poids, ...reste] = l;
+  const p = {rang, nom, cle: normaliserNom(nom), po, taille, poids};
+  OV_ORDRE.forEach((k, i) => { p[k] = reste[i]; });
+  [p.ovSite, p.age, p.nat, p.profilLigue] = reste.slice(13);
+  return p;
 }
-function blocsDeTexteRep(texte){
-  const brutes = texte.split(/\r?\n/).map(l => l.replace(/ /g, ' ')).filter(l => l.trim());
-  const tab = brutes.some(l => l.includes('\t'));
-  const pv = !tab && brutes.some(l => (l.match(/;/g) || []).length >= 10);
-  const lignes = brutes.map(l => {
-    if (tab) return l.split('\t').map(c => c.trim());
-    if (pv) return l.split(';').map(c => c.trim());
-    return l.trim().split(/\s+/);
-  });
-  return [{contexte: '', lignes, fusionNom: !tab && !pv}];
-}
-function nomDeLigneRep(ligne, map){
-  if (map.nom !== undefined) return (ligne[map.nom] || '').trim();
-  const pris = new Set(Object.values(map));
-  for (let i = 0; i < ligne.length; i++){
-    const v = (ligne[i] || '').trim();
-    if (!pris.has(i) && /[A-Za-zÀ-ÿ]{2,}/.test(v) && !posRep(v)) return v;
-  }
-  return '';
-}
-function prospectsDeBlocsRep(blocs){
-  const out = [], vus = new Set(), apercu = [];
-  for (const bloc of blocs){
-    let map = null, entetes = [], ctx = groupeDeContexteRep(bloc.contexte || '');
-    for (let ligne of bloc.lignes){
-      const m = mapperEntetesRep(ligne);
-      if (m){ map = m; entetes = ligne; continue; }
-      const nonVides = ligne.filter(c => c !== '');
-      if (!map){
-        if (nonVides.length && nonVides.length <= 3) ctx = groupeDeContexteRep(nonVides.join(' ')) || ctx;
-        if (nonVides.length && apercu.length < 4) apercu.push(nonVides.slice(0, 10).join(' | ').slice(0, 120));
-        continue;
-      }
-      // texte séparé par des espaces : le nom (plusieurs mots) absorbe le surplus de colonnes
-      if (bloc.fusionNom && map.nom !== undefined && ligne.length > entetes.length){
-        const surplus = ligne.length - entetes.length;
-        ligne = ligne.slice();
-        ligne.splice(map.nom, surplus + 1, ligne.slice(map.nom, map.nom + surplus + 1).join(' '));
-      }
-      const cotes = {};
-      let n = 0;
-      for (const k of OV_ORDRE){
-        const v = map[k] !== undefined ? nbRep(ligne[map[k]]) : null;
-        cotes[k] = (v !== null && v >= 0 && v <= 99) ? v : null;
-        if (cotes[k] !== null) n++;
-      }
-      const nom = nomDeLigneRep(ligne, map).replace(/\s+/g, ' ').replace(/^\d+[.)]\s+/, '').trim();
-      if (n < 10 || !nom || /\d{2,}/.test(nom)){
-        if (nonVides.length && nonVides.length <= 3) ctx = groupeDeContexteRep(nonVides.join(' ')) || ctx;
-        continue;
-      }
-      const cle = normaliserNom(nom);
-      if (vus.has(cle)) continue;
-      vus.add(cle);
-      const p = Object.assign({nom, cle}, cotes);
-      p.po = map.po !== undefined ? posRep(ligne[map.po]) : '';
-      if (!p.po){
-        // gardien : la page n'a ni DF ni OF pour lui (vides ou 0)
-        p.po = (!cotes.df && !cotes.sc) ? 'G' : (ctx || 'F');
-        p.poDevine = true;
-      }
-      p.age = map.age !== undefined ? nbRep(ligne[map.age]) : null;
-      if (p.age === null){ p.age = REP.ageDefaut; p.ageDevine = true; }
-      p.ovSite = map.ov !== undefined ? nbRep(ligne[map.ov]) : null;
-      p.rang = map.rang !== undefined ? nbRep(ligne[map.rang]) : null;
-      p.hd = map.hd !== undefined ? (ligne[map.hd] || '') : '';
-      // colonnes que l'onglet ne connaît pas (équipe d'origine, pays…) : gardées pour le détail
-      const pris = new Set(Object.values(map));
-      p.extras = {};
-      entetes.forEach((h, i)=>{
-        if (pris.has(i) || !h || !ligne[i] || ligne[i] === nom) return;
-        p.extras[h] = ligne[i];
-      });
-      out.push(p);
-    }
-  }
-  return {prospects: out, apercu};
-}
-function parseRepechage(texte){
-  const t = String(texte || '');
-  const estHtml = /<\s*(table|tr|td)\b/i.test(t);
-  return prospectsDeBlocsRep(estHtml ? blocsDeHtmlRep(t) : blocsDeTexteRep(t));
-}
-
-/* ---------- OV exact, profil et profils atteignables ---------- */
 function enrichirRep(p){
   p._groupe = p.po === 'G' ? 'G' : (p.po === 'D' ? 'D' : 'F');
   p._cotes = Object.fromEntries(OV_ORDRE.map(k => [k, p[k]]));
   p._perm = {};
-  if (p._groupe === 'G'){
-    p._ov = null;   // formule des gardiens distincte : on garde l'OV publié
-    p._profil = p.ovSite !== null ? determinerProfil({po: 'G', ov: p.ovSite, age: p.age}).profil : '—';
-    p._mat = null;
+  p._profil = p.profilLigue;
+  if (p._groupe === 'G'){   // formule des gardiens distincte : OV et profil de la ligue
+    p._ov = null; p._mat = null; p._moteur = p.profilLigue;
     return p;
   }
   const r = ovDetaille(p._cotes, p._groupe);
-  const b = r ? profilDeCotes(p._cotes, p._groupe, p.age) : null;
-  p._ov = r ? r.valeur : null;
-  p._formule = r ? r.formule : '';
-  p._profil = b ? b.profil : '—';
-  p._mat = b ? b.mat : null;
+  const b = profilDeCotes(p._cotes, p._groupe, p.age);
+  p._ov = r.valeur;
+  p._formule = r.formule;
+  p._moteur = libelleRep(b.profil);
+  p._mat = matDeProfilRep(p._profil) || b.mat;   // profil selon les règlements, pour comparaison
   return p;
 }
+/* Profils atteignables en déplaçant au plus `pts` points dans UNE catégorie.
+   Si le joueur remplit déjà les conditions d'un autre profil que celui
+   retenu par la ligue (deux profils possibles), il figure à 0 point. */
 function permRep(p, pts){
-  if (p._groupe === 'G' || p._ov === null) return [];
-  if (!p._perm[pts]) p._perm[pts] = permutationsProfil(p._cotes, p._groupe, p.age, pts).options;
+  if (p._groupe === 'G') return [];
+  if (!p._perm[pts]){
+    const opts = permutationsProfil(p._cotes, p._groupe, p.age, pts).options
+      .map(o => Object.assign({}, o, {profil: libelleRep(o.profil)}))
+      .filter(o => o.profil !== p._profil);
+    if (p._moteur !== p._profil){
+      opts.unshift({profil: p._moteur, mat: matDeProfilRep(p._moteur), cout: 0, categorie: '—', mouvement: [],
+        ov: Math.round(p._ov), ovExact: p._ov, dOv: 0, cotes: p._cotes});
+    }
+    p._perm[pts] = opts;
+  }
   return p._perm[pts];
 }
 function ovTriRep(p){ return p._ov ?? p.ovSite ?? null; }
 
-/* ---------- Stockage (ce navigateur) ---------- */
-function litListeRep(){
-  try{
-    const o = JSON.parse(localStorage.getItem(REP.cleListe));
-    if (o && Array.isArray(o.prospects)) return o;
-  }catch(e){ /* illisible : on repart à vide */ }
-  return null;
-}
+/* ---------- Choix du DG (ce navigateur) ---------- */
 function litChoixRep(){
   try{
     const o = JSON.parse(localStorage.getItem(REP.cleChoix)) || {};
@@ -5945,131 +5950,6 @@ function litChoixRep(){
 }
 function ecritChoixRep(c){
   try{ localStorage.setItem(REP.cleChoix, JSON.stringify(c)); }catch(e){ /* quota ou stockage refusé */ }
-}
-function installerListeRep(prospects, source, date, sansSauver){
-  ETAT_REP.liste = prospects.map(p => enrichirRep(Object.assign({}, p)));
-  ETAT_REP.source = source;
-  ETAT_REP.date = date || new Date().toISOString();
-  ETAT_REP.ouvert = null;
-  etatRepTexte = ''; etatRepAlerte = false;   // une liste valide efface l'échec précédent
-  if (!sansSauver){
-    const brut = ETAT_REP.liste.map(p => Object.fromEntries(Object.entries(p).filter(([k]) => k[0] !== '_')));
-    try{ localStorage.setItem(REP.cleListe, JSON.stringify({date: ETAT_REP.date, source, prospects: brut})); }
-    catch(e){ /* quota : la liste reste en mémoire pour la soirée */ }
-  }
-  const sel = document.getElementById('repProfil');
-  if (sel) sel.dataset.pret = '';   // la liste des profils se reconstruit
-}
-
-/* ---------- Chargement ---------- */
-/* Export Excel « page Web » : le .htm n'est souvent qu'un cadre (frameset)
-   et les données vivent dans …_files/sheet001.htm. On repère ces feuilles
-   (cadres, iframes, liens WorksheetSource) pour aller les lire. */
-function liensFeuillesRep(html, base){
-  const urls = new Set();
-  const ajoute = u => {
-    if (!u || /tabstrip|filelist|\.(css|js|xml|gif|png|jpe?g)(\?|$)/i.test(u)) return;
-    try{ urls.add(new URL(u.replace(/&amp;/g, '&'), base).href); }catch(e){ /* lien illisible */ }
-  };
-  for (const m of String(html).matchAll(/<i?frame\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/gi)) ajoute(m[1]);
-  for (const m of String(html).matchAll(/(?:href|src)\s*=\s*["']?([^"'\s>]*sheet\d+\.html?)/gi)) ajoute(m[1]);
-  return [...urls].slice(0, 12);
-}
-/* Essaie les relais un à un jusqu'à obtenir un contenu accepté : un relais
-   qui répond 200 avec sa propre page d'erreur ne doit pas arrêter la recherche. */
-async function texteViaRelaisRep(url, accepter){
-  const erreurs = [];
-  for (let i = 0; i < CONFIG.proxys.length; i++){
-    try{
-      const ctl = new AbortController();
-      const minuterie = setTimeout(() => ctl.abort(), 20000);
-      const rep = await fetch(CONFIG.proxys[i](url), {signal: ctl.signal});
-      clearTimeout(minuterie);
-      if (!rep.ok) throw new Error('HTTP ' + rep.status);
-      const texte = (typeof TextDecoder !== 'undefined' && rep.arrayBuffer)
-        ? decoderOctetsRep(await rep.arrayBuffer()) : await rep.text();
-      if (accepter(texte)) return texte;
-      erreurs.push(`relais ${i + 1} : page sans liste`);
-    }catch(e){
-      erreurs.push(`relais ${i + 1} : ${e && e.name === 'AbortError' ? 'délai dépassé' : (e && e.message) || e}`);
-    }
-  }
-  const err = new Error(erreurs.join(' · '));
-  err.protegee = erreurs.length > 0 && erreurs.every(x => /HTTP 40[13]/.test(x));
-  throw err;
-}
-function dedoublerRep(liste){
-  const vus = new Set();
-  return liste.filter(p => !vus.has(p.cle) && vus.add(p.cle));
-}
-async function chargerRepDepuisUshl(){
-  if (ETAT_REP.chargement) return;
-  ETAT_REP.chargement = true;
-  ETAT_REP.essaye = true;
-  const btn = document.getElementById('repCharger');
-  if (btn) btn.disabled = true;
-  etatRep('téléchargement de la liste officielle…');
-  try{
-    const texte = await texteViaRelaisRep(REP.url,
-      t => parseRepechage(t).prospects.length >= 3 || liensFeuillesRep(t, REP.url).length > 0);
-    let prospects = parseRepechage(texte).prospects;
-    if (prospects.length < 3){
-      const feuilles = liensFeuillesRep(texte, REP.url);
-      const lien = document.getElementById('repLien');
-      if (lien && feuilles[0]) lien.href = feuilles[0];   // la feuille elle-même, à ouvrir ou enregistrer au besoin
-      for (const [i, u] of feuilles.entries()){
-        etatRep(`la page est un cadre Excel : lecture de la feuille ${i + 1} / ${feuilles.length}…`);
-        const t = await texteViaRelaisRep(u, x => parseRepechage(x).prospects.length > 0).catch(() => null);
-        if (t) prospects = prospects.concat(parseRepechage(t).prospects);
-      }
-      prospects = dedoublerRep(prospects);
-      if (prospects.length < 3){
-        throw new Error(feuilles.length
-          ? 'la page est un cadre Excel et ses feuilles n\'ont pas pu être lues (' + feuilles.map(u => u.split('/').pop()).join(', ') + ')'
-          : 'page reçue, mais aucune table de prospects reconnue');
-      }
-    }
-    installerListeRep(prospects, 'ushl.ca');
-    flash(prospects.length + ' prospects chargés depuis ushl.ca');
-  }catch(e){
-    const conseil = e.protegee
-      ? ' — la page semble protégée (connexion du DG requise) : les relais ne peuvent pas la lire. Ouvre-la dans ton navigateur, clique dans le tableau, Ctrl+A, Ctrl+C et colle ci-dessous (ou Fichier → Enregistrer sous, puis importe le fichier).'
-      : ' — ouvre la page officielle, clique dans le tableau, Ctrl+A, Ctrl+C et colle-la ci-dessous (ou importe le fichier enregistré).';
-    etatRep('échec : ' + e.message + conseil, true);
-    const det = document.getElementById('repColler');
-    if (det) det.open = true;
-  }finally{
-    ETAT_REP.chargement = false;
-    if (btn) btn.disabled = false;
-  }
-  rendreRepechage();
-}
-function importerTexteRep(texte, source){
-  const r = parseRepechage(texte);
-  if (!r.prospects.length){
-    const feuilles = liensFeuillesRep(texte, REP.url);
-    etatRep(feuilles.length
-      ? 'ce fichier n\'est que le cadre de l\'export Excel : importe plutôt la feuille du dossier « _files » ('
-        + feuilles.map(u => u.split('/').pop()).join(', ') + '), ou colle le tableau copié depuis la page.'
-      : 'aucun prospect reconnu : il faut la rangée d\'en-têtes avec les cotes (IN SP ST EN DU DI SK PA PC DF OF EX LD)'
-        + (r.apercu.length ? ' — début lu : ' + r.apercu.slice(0, 2).join(' / ') : ''), true);
-    return 0;
-  }
-  installerListeRep(r.prospects, source);
-  rendreRepechage();
-  flash(r.prospects.length + ' prospects importés');
-  return r.prospects.length;
-}
-/* Exports Excel en Windows-1252 : on tente l'UTF-8 strict, sinon le jeu Windows. */
-function decoderOctetsRep(buf){
-  try{ return new TextDecoder('utf-8', {fatal: true}).decode(buf); }
-  catch(e){ return new TextDecoder('windows-1252').decode(buf); }
-}
-let etatRepTexte = '', etatRepAlerte = false;
-function etatRep(txt, alerte){
-  etatRepTexte = txt; etatRepAlerte = !!alerte;
-  const el = document.getElementById('repEtat');
-  if (el){ el.textContent = txt; el.classList.toggle('alerte', !!alerte); }
 }
 
 /* ---------- Repêchés, cibles ---------- */
@@ -6148,7 +6028,7 @@ function remplirProfilsRep(pts){
 }
 const fmtOvRep = v => v.toFixed(2).replace('.', ',');
 function mouvementRep(o){
-  return o.mouvement.map(m => `${OVD_LIBELLES[m.cle]} ${m.delta > 0 ? '+' : '−'}${Math.abs(m.delta)}`).join(' · ');
+  return o.mouvement.map(m => `${COTES_LIB_REP[m.cle]} ${m.delta > 0 ? '+' : '−'}${Math.abs(m.delta)}`).join(' · ');
 }
 function rendreSommaireRep(choix){
   const el = document.getElementById('repSommaire');
@@ -6159,7 +6039,7 @@ function rendreSommaireRep(choix){
   const carte = (lbl, val, det, cls) =>
     `<div class="stat-carte ${cls || ''}"><div class="lbl">${lbl}</div><div class="val">${val}</div><div class="det">${det}</div></div>`;
   el.innerHTML = total ? [
-    carte('Prospects', total, ETAT_REP.source === 'ushl.ca' ? 'liste officielle' : 'liste ' + (ETAT_REP.source || '')),
+    carte('Prospects', total, 'liste officielle du ' + REP.date),
     carte('Repêchés', Object.keys(choix.pris).filter(k => ETAT_REP.liste.some(p => p.cle === k)).length, 'noircis au tableau', 'alerte'),
     carte('Disponibles', dispo.length, 'encore sur la liste'),
     carte('Meilleur disponible', meilleur ? (meilleur._ov !== null ? fmtOvRep(meilleur._ov) : (meilleur.ovSite ?? '—')) : '—',
@@ -6177,29 +6057,30 @@ function cellulePrisRep(p, info){
 }
 function detailRep(p, pts, nbCols){
   const opts = permRep(p, pts);
-  const extras = Object.entries(p.extras || {}).map(([k, v]) => `${echap(k)} : <b>${echap(v)}</b>`).join(' · ');
+  const taille = `${Math.floor(p.taille / 12)}'${p.taille % 12}"`;
+  const cat = p.age <= 20 ? 'junior' : (p.age <= 24 ? 'prospect' : 'pro');
   const ovTxt = p._ov !== null
-    ? `OV exact <b>${fmtOvRep(p._ov)}</b> (formule ${echap(p._formule)})`
-      + (p.ovSite !== null ? ` · OV publié <b>${p.ovSite}</b>` : '')
-    : `OV publié <b>${p.ovSite ?? '—'}</b> (gardien : formule distincte, non recalculée)`;
-  const age = `${p.age} ans${p.ageDevine ? ' (présumé : âge absent de la page)' : ''} · ${p.age <= 20 ? 'junior' : (p.age <= 24 ? 'prospect' : 'pro')}`;
+    ? `OV exact <b>${fmtOvRep(p._ov)}</b> (formule ${echap(p._formule)}) · OV de la ligue <b>${p.ovSite}</b>`
+    : `OV de la ligue <b>${p.ovSite}</b> (gardien : formule distincte)`;
+  const double = p._moteur !== p._profil
+    ? `<br>Remplit aussi les conditions de <b>${echap(p._moteur)}</b> selon les règlements — la ligue l'a classé <b>${echap(p._profil)}</b>.` : '';
   let cartes;
-  if (p._groupe === 'G') cartes = '<p class="permut-vide">Gardien : profil Starter / Backup selon l\'overall (règle 6.2.5), pas de permutation de cotes.</p>';
+  if (p._groupe === 'G') cartes = '<p class="permut-vide">Gardien : pas de permutation de cotes.</p>';
   else if (!opts.length) cartes = `<p class="permut-vide">Aucun changement de profil en déplaçant jusqu'à ${pts} point${pts > 1 ? 's' : ''} dans une catégorie — <strong>${echap(p._profil)}</strong> est stable.</p>`;
   else cartes = '<div class="permut-liste">' + opts.map(o => {
-    const move = o.mouvement.map(m =>
-      `<span class="${m.delta < 0 ? 'moins' : 'plus'}">${OVD_LIBELLES[m.cle]} ${m.delta > 0 ? '+' : ''}${m.delta}</span>`).join(' · ');
+    const move = o.cout === 0 ? '<span class="plus">aucun déplacement : conditions déjà remplies</span>' : o.mouvement.map(m =>
+      `<span class="${m.delta < 0 ? 'moins' : 'plus'}">${COTES_LIB_REP[m.cle]} ${m.delta > 0 ? '+' : ''}${m.delta}</span>`).join(' · ');
     const dov = (o.dOv >= 0 ? '+' : '') + fmtOvRep(o.dOv);
     return `<div class="permut-carte">
       <div class="pc-tete"><span class="pc-profil">${echap(o.profil)}</span>
-        <span class="pc-cout">${o.cout} pt${o.cout > 1 ? 's' : ''} · catégorie ${o.categorie}</span></div>
+        <span class="pc-cout">${o.cout} pt${o.cout > 1 ? 's' : ''}${o.cout ? ' · catégorie ' + o.categorie : ''}</span></div>
       <div class="pc-move">${move}</div>
       <div class="pc-ov">OV ${fmtOvRep(o.ovExact)} (${dov}) · matrice ${o.mat}</div>
     </div>`;
   }).join('') + '</div>';
   return `<tr class="rep-detail"><td colspan="${nbCols}">
-    <div class="rep-detail-meta"><b>${echap(p.nom)}</b> · ${echap(p.po)}${p.poDevine ? ' (déduit)' : ''} · ${age}<br>
-      ${ovTxt} · profil <b>${echap(p._profil)}</b>${p._mat ? ' (matrice ' + p._mat + ')' : ''}${extras ? '<br>' + extras : ''}</div>
+    <div class="rep-detail-meta"><b>${echap(p.nom)}</b> · Rd ${p.rang} · ${echap(p.po)} · ${p.age} ans (${cat}) · ${echap(p.nat)} · ${taille} · ${p.poids} lb<br>
+      ${ovTxt} · profil <b>${echap(p._profil)}</b>${p._mat ? ' (matrice ' + p._mat + ')' : ''}${double}</div>
     ${cartes}
     ${p._groupe !== 'G' ? `<div class="regl-actions"><button class="rep-btn secondaire" data-rep-ovd="${echap(p.cle)}">Ouvrir dans le calculateur d'OV</button></div>` : ''}
   </td></tr>`;
@@ -6217,26 +6098,14 @@ function valeurTriRep(p, col, choix, pts){
 function rendreRepechage(){
   const table = document.getElementById('tableRepechage');
   if (!table) return;
-  const lien = document.getElementById('repLien');
-  if (lien && !lien.href) lien.href = REP.url;
   const f = filtresRep();
   const choix = litChoixRep();
   remplirProfilsRep(f.pts);
   f.profil = document.getElementById('repProfil').value;
   rendreSommaireRep(choix);
-  if (!ETAT_REP.chargement){
-    if (etatRepAlerte) etatRep(etatRepTexte, true);
-    else if (ETAT_REP.liste.length){
-      const quand = ETAT_REP.date ? new Date(ETAT_REP.date).toLocaleString('fr-CA', {dateStyle: 'medium', timeStyle: 'short'}) : '';
-      etatRep(`liste : ${ETAT_REP.liste.length} prospects · source ${ETAT_REP.source}${quand ? ' · chargée le ' + quand : ''}`);
-    }
-    else etatRep('aucune liste chargée — «Charger depuis ushl.ca», importe le fichier ou colle la page.');
-  }
-  if (!ETAT_REP.liste.length){ table.innerHTML = ''; document.getElementById('repCompte').textContent = ''; return; }
 
   const liste = prospectsFiltresRep(f, choix);
-  const avecRang = ETAT_REP.liste.some(p => p.rang !== null);
-  const tri = ETAT_REP.tri.col ? ETAT_REP.tri : (avecRang ? {col: 'rang', desc: false} : {col: 'ov', desc: true});
+  const tri = ETAT_REP.tri.col ? ETAT_REP.tri : {col: 'rang', desc: false};
   liste.sort((a, b)=>{
     const va = valeurTriRep(a, tri.col, choix, f.pts), vb = valeurTriRep(b, tri.col, choix, f.pts);
     if (va === vb) return (ovTriRep(b) ?? -1) - (ovTriRep(a) ?? -1);
@@ -6249,8 +6118,8 @@ function rendreRepechage(){
   document.getElementById('repCompte').textContent =
     `${liste.length} affiché${liste.length > 1 ? 's' : ''}${nbPris ? ' · ' + nbPris + ' repêché' + (nbPris > 1 ? 's' : '') : ''}`;
 
-  const cols = [['cible', '★'], ['rang', '#'], ['nom', 'Nom'], ['age', 'Âge'],
-    ...OV_ORDRE.map(k => [k, OVD_LIBELLES[k]]), ['ov', 'OV exact'], ['profil', 'Profil'],
+  const cols = [['cible', '★'], ['rang', 'Rd'], ['nom', 'Nom'], ['age', 'Âge'],
+    ...OV_ORDRE.map(k => [k, COTES_LIB_REP[k]]), ['ov', 'OV exact'], ['profil', 'Profil'],
     ['perm', `Atteignable ≤ ${f.pts}`], ['pris', 'Repêchage']];
   let html = '<thead><tr>' + cols.map(([cl, l]) =>
     `<th data-col="${cl}" class="${cl === 'pris' ? 'col-rep ' : ''}${tri.col === cl ? 'tri-actif' : ''}">${l}${tri.col === cl ? (tri.desc ? ' ▾' : ' ▴') : ''}</th>`).join('') + '</tr></thead><tbody>';
@@ -6261,8 +6130,8 @@ function rendreRepechage(){
     html += `<tr data-cle="${echap(p.cle)}" class="${info ? 'rep-pris' : ''}">
       <td class="rep-star ${choix.cibles[p.cle] ? 'on' : ''}" data-rep-cible="${echap(p.cle)}" title="Cible de mon club">${choix.cibles[p.cle] ? '★' : '☆'}</td>
       <td>${p.rang ?? '—'}</td>
-      <td style="text-align:left; font-family:var(--font-body); font-weight:500; font-size:.85rem"><span class="pos-badge ${badge}"${p.poDevine ? ' title="Position absente de la page : déduite"' : ''}>${echap(p.po)}${p.poDevine ? '?' : ''}</span>${echap(p.nom)}</td>
-      <td>${p.age}${p.ageDevine ? '<span class="rep-devine" title="Âge absent de la page : présumé junior">?</span>' : ''}</td>`;
+      <td style="text-align:left; font-family:var(--font-body); font-weight:500; font-size:.85rem"><span class="pos-badge ${badge}">${echap(p.po)}</span>${echap(p.nom)}</td>
+      <td>${p.age}</td>`;
     for (const k of OV_ORDRE){
       const v = p[k];
       const cls = (v === null || v === undefined) ? '' : (v >= 85 ? 'cote-elite' : (v >= 78 ? 'cote-forte' : ''));
@@ -6271,17 +6140,17 @@ function rendreRepechage(){
     let ovAff;
     if (p._ov !== null){
       ovAff = `<strong>${fmtOvRep(p._ov)}</strong>`;
-      if (p.ovSite !== null && Math.round(p._ov) !== p.ovSite)
-        ovAff += `<span class="rep-ovx" title="La page publie OV ${p.ovSite}">≠${p.ovSite}</span>`;
+      if (Math.round(p._ov) !== p.ovSite)
+        ovAff += `<span class="rep-ovx" title="OV de la ligue : ${p.ovSite}">≠${p.ovSite}</span>`;
     } else ovAff = `<strong>${p.ovSite ?? '—'}</strong>`;
     const opts = permRep(p, f.pts);
     const vises = f.profil ? opts.filter(o => o.profil === f.profil) : [];
     const autres = opts.filter(o => !vises.includes(o));
     const chips = vises.concat(autres).slice(0, 2).map(o =>
-      `<span class="rep-chip ${vises.includes(o) ? 'vise' : ''}" title="${echap(o.profil)} : ${echap(mouvementRep(o))} · OV ${fmtOvRep(o.ovExact)}">${echap(o.profil.replace(/^(Junior|Prospect) /, ''))} · ${o.cout} pt${o.cout > 1 ? 's' : ''}</span>`).join('')
+      `<span class="rep-chip ${vises.includes(o) ? 'vise' : ''}" title="${echap(o.profil)} : ${echap(mouvementRep(o))} · OV ${fmtOvRep(o.ovExact)}">${echap(courtRep(o.profil))} · ${o.cout} pt${o.cout > 1 ? 's' : ''}</span>`).join('')
       + (opts.length > 2 ? `<span class="rep-chip plus" title="${echap(opts.slice(2).map(o => o.profil).join(', '))}">+${opts.length - 2}</span>` : '');
     html += `<td>${ovAff}</td>
-      <td style="text-align:left"><span class="profil-tag ${tag}">${echap(p._profil)}</span></td>
+      <td style="text-align:left"><span class="profil-tag ${tag}" title="${echap(p._profil)}">${echap(courtRep(p._profil))}</span></td>
       <td class="rep-perm"><div class="rep-chips">${chips || (p._groupe === 'G' ? '' : '<span class="rep-devine">stable</span>')}</div></td>
       <td class="col-rep">${cellulePrisRep(p, info)}</td></tr>`;
     if (ETAT_REP.ouvert === p.cle) html += detailRep(p, f.pts, cols.length);
@@ -6303,6 +6172,8 @@ function ouvrirDansOvdRep(cle){
 (function brancherRepechage(){
   const table = document.getElementById('tableRepechage');
   if (!table) return;
+  try{ localStorage.removeItem('tml_repechage_liste_v1'); }catch(e){ /* ancienne liste téléchargée : inutile */ }
+  ETAT_REP.liste = REPECHAGE_Y22.map(l => enrichirRep(prospectDeLigne(l)));
   table.addEventListener('click', e => {
     const pris = e.target.closest('[data-rep-pris]');
     if (pris){ e.stopPropagation(); basculerRepeche(pris.dataset.repPris); return; }
@@ -6314,9 +6185,8 @@ function ouvrirDansOvdRep(cle){
     const th = e.target.closest('th[data-col]');
     if (th){
       const col = th.dataset.col;
-      const avecRang = ETAT_REP.liste.some(p => p.rang !== null);
-      const courant = ETAT_REP.tri.col ? ETAT_REP.tri : (avecRang ? {col: 'rang', desc: false} : {col: 'ov', desc: true});
-      ETAT_REP.tri = courant.col === col ? {col, desc: !courant.desc} : {col, desc: !['rang', 'nom', 'po'].includes(col)};
+      const courant = ETAT_REP.tri.col ? ETAT_REP.tri : {col: 'rang', desc: false};
+      ETAT_REP.tri = courant.col === col ? {col, desc: !courant.desc} : {col, desc: !['rang', 'nom'].includes(col)};
       rendreRepechage();
       return;
     }
@@ -6331,19 +6201,6 @@ function ouvrirDansOvdRep(cle){
     const el = document.getElementById(id);
     el.addEventListener(el.tagName === 'INPUT' && el.type !== 'checkbox' ? 'input' : 'change', rendreRepechage);
   });
-  document.getElementById('repCharger').addEventListener('click', chargerRepDepuisUshl);
-  document.getElementById('repImporter').addEventListener('click', () => {
-    const brut = document.getElementById('repTexte').value.trim();
-    if (!brut){ flash('Colle d\'abord le contenu de la page'); return; }
-    if (importerTexteRep(brut, 'collée')) document.getElementById('repColler').open = false;
-  });
-  document.getElementById('repFichier').addEventListener('change', e => {
-    const fichier = e.target.files && e.target.files[0];
-    if (!fichier) return;
-    const lecteur = new FileReader();
-    lecteur.onload = () => importerTexteRep(decoderOctetsRep(lecteur.result), 'fichier ' + fichier.name);
-    lecteur.readAsArrayBuffer(fichier);
-  });
   document.getElementById('repAnnuler').addEventListener('click', annulerDernierRep);
   document.getElementById('repReinit').addEventListener('click', () => {
     if (!confirm('Remettre tous les joueurs sur la liste (les cibles ★ sont conservées) ?')) return;
@@ -6353,21 +6210,14 @@ function ouvrirDansOvdRep(cle){
     rendreRepechage();
     flash('Repêchage réinitialisé');
   });
-  document.querySelector('nav button[data-vue="repechage"]').addEventListener('click', () => {
-    rendreRepechage();
-    // premier passage : on va chercher la liste officielle (le harnais de tests s'en abstient)
-    if (!ETAT_REP.liste.length && !ETAT_REP.essaye && !window.__TML_SANS_AUTO__) chargerRepDepuisUshl();
-  });
-  const sauvee = litListeRep();
-  if (sauvee) installerListeRep(sauvee.prospects, sauvee.source, sauvee.date, true);
+  document.querySelector('nav button[data-vue="repechage"]').addEventListener('click', rendreRepechage);
   rendreRepechage();
 })();
 
 if (typeof window !== 'undefined' && window.__TML__){
-  Object.assign(window.__TML__, {REP, ETAT_REP, parseRepechage, posRep, nbRep, mapperEntetesRep, enrichirRep,
-    permRep, installerListeRep, importerTexteRep, chargerRepDepuisUshl, litChoixRep, ecritChoixRep,
-    basculerRepeche, equipeRepeche, annulerDernierRep, basculerCibleRep, prospectsFiltresRep, filtresRep,
-    rendreRepechage, decoderOctetsRep, ouvrirDansOvdRep, liensFeuillesRep, texteViaRelaisRep});
+  Object.assign(window.__TML__, {REP, ETAT_REP, REPECHAGE_Y22, prospectDeLigne, enrichirRep, permRep, libelleRep,
+    litChoixRep, ecritChoixRep, basculerRepeche, equipeRepeche, annulerDernierRep, basculerCibleRep,
+    prospectsFiltresRep, filtresRep, rendreRepechage, ouvrirDansOvdRep});
 }
 </script>
 </body>
