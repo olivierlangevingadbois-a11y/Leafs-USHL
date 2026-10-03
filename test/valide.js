@@ -1940,6 +1940,43 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     egal(S.importerTexteRep(tsv, 'collée'), 2, 'Import du texte collé');
     ok(!/échec/.test(D.getElementById('repEtat').textContent), 'Une liste valide efface le message d\'échec');
     ok(S.litChoixRep().pris[pB.cle], 'Les choix survivent au remplacement de la liste (clé = nom)');
+    // export Excel « page Web » : le .htm n'est qu'un cadre, les données sont dans …_files/sheet001.htm
+    const cadre = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta name="Excel Workbook Frameset">
+      <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Draft</x:Name>
+      <x:WorksheetSource HRef="Draft_Y22_Vfinal_files/sheet001.htm"/></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+      </head><frameset rows="*,39" border=0><frame src="Draft_Y22_Vfinal_files/sheet001.htm" name="frSheet">
+      <frame src="Draft_Y22_Vfinal_files/tabstrip.htm" name="frTabs"></frameset></html>`;
+    const urlFeuille = 'https://ushl.ca/ushl/menu_ushl/gestion_dg/Draft/Y22/Draft_Y22_Vfinal_files/sheet001.htm';
+    tableauEgal(S.liensFeuillesRep(cadre, S.REP.url), [urlFeuille], 'Cadre Excel : la feuille de données est repérée (tabstrip ignoré)');
+    egal(S.parseRepechage(cadre).prospects.length, 0, 'Le cadre seul ne contient aucun prospect');
+    egal(S.importerTexteRep(cadre, 'fichier'), 0, 'Importer le cadre seul : refusé');
+    ok(/sheet001\.htm/.test(D.getElementById('repEtat').textContent), 'Le message nomme la feuille à importer');
+
+    const fetchOrig = W.fetch;
+    const appels = [];
+    W.fetch = async (u) => {
+      const cible = decodeURIComponent(u);
+      appels.push(cible);
+      // 1er relais : répond 200 avec sa propre page (pas la liste)
+      if (u.includes('allorigins')) return {ok: true, status: 200, text: async () => '<html><body>' + 'Relais occupé. '.repeat(60) + '</body></html>'};
+      if (cible.includes('sheet001.htm')) return {ok: true, status: 200, text: async () => page1};
+      if (cible.includes('Draft_Y22_Vfinal.htm')) return {ok: true, status: 200, text: async () => cadre};
+      return {ok: false, status: 404, text: async () => ''};
+    };
+    S.ETAT_REP.liste = [];
+    await S.chargerRepDepuisUshl();
+    egal(S.ETAT_REP.liste.length, 3, 'Téléchargement : le cadre Excel est suivi jusqu\'à sa feuille');
+    egal(S.ETAT_REP.source, 'ushl.ca', 'Source : ushl.ca');
+    ok(appels.some(c => c.includes('allorigins')) && appels.some(c => c.includes('corsproxy')),
+      'Un relais qui renvoie autre chose n\'arrête pas la recherche');
+    egal(D.getElementById('repLien').href, urlFeuille, 'Le lien « page officielle » mène à la feuille elle-même');
+    ok(!/échec/.test(D.getElementById('repEtat').textContent), 'Aucun message d\'échec');
+
+    W.fetch = async () => ({ok: false, status: 401, text: async () => ''});
+    await S.chargerRepDepuisUshl();
+    ok(/protégée/.test(D.getElementById('repEtat').textContent), 'Page protégée (401 partout) : diagnostic explicite');
+    egal(S.ETAT_REP.liste.length, 3, 'La liste en place reste après l\'échec');
+    W.fetch = fetchOrig;
   }
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
