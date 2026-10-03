@@ -552,7 +552,7 @@
       <span id="repEtat"></span>
     </div>
     <details id="repColler">
-      <summary>Coller la liste (si le téléchargement échoue : ouvre la page, Ctrl+A, Ctrl+C, colle ici)</summary>
+      <summary>Coller la liste (si le téléchargement échoue : ouvre la page, clique dans le tableau, Ctrl+A, Ctrl+C, colle ici)</summary>
       <textarea id="repTexte" placeholder="Colle ici le contenu de la page (tableau copié depuis le navigateur ou code HTML)…"></textarea>
       <button class="rep-btn" id="repImporter">Importer la liste collée</button>
     </details>
@@ -5962,6 +5962,46 @@ function installerListeRep(prospects, source, date, sansSauver){
 }
 
 /* ---------- Chargement ---------- */
+/* Export Excel « page Web » : le .htm n'est souvent qu'un cadre (frameset)
+   et les données vivent dans …_files/sheet001.htm. On repère ces feuilles
+   (cadres, iframes, liens WorksheetSource) pour aller les lire. */
+function liensFeuillesRep(html, base){
+  const urls = new Set();
+  const ajoute = u => {
+    if (!u || /tabstrip|filelist|\.(css|js|xml|gif|png|jpe?g)(\?|$)/i.test(u)) return;
+    try{ urls.add(new URL(u.replace(/&amp;/g, '&'), base).href); }catch(e){ /* lien illisible */ }
+  };
+  for (const m of String(html).matchAll(/<i?frame\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/gi)) ajoute(m[1]);
+  for (const m of String(html).matchAll(/(?:href|src)\s*=\s*["']?([^"'\s>]*sheet\d+\.html?)/gi)) ajoute(m[1]);
+  return [...urls].slice(0, 12);
+}
+/* Essaie les relais un à un jusqu'à obtenir un contenu accepté : un relais
+   qui répond 200 avec sa propre page d'erreur ne doit pas arrêter la recherche. */
+async function texteViaRelaisRep(url, accepter){
+  const erreurs = [];
+  for (let i = 0; i < CONFIG.proxys.length; i++){
+    try{
+      const ctl = new AbortController();
+      const minuterie = setTimeout(() => ctl.abort(), 20000);
+      const rep = await fetch(CONFIG.proxys[i](url), {signal: ctl.signal});
+      clearTimeout(minuterie);
+      if (!rep.ok) throw new Error('HTTP ' + rep.status);
+      const texte = (typeof TextDecoder !== 'undefined' && rep.arrayBuffer)
+        ? decoderOctetsRep(await rep.arrayBuffer()) : await rep.text();
+      if (accepter(texte)) return texte;
+      erreurs.push(`relais ${i + 1} : page sans liste`);
+    }catch(e){
+      erreurs.push(`relais ${i + 1} : ${e && e.name === 'AbortError' ? 'délai dépassé' : (e && e.message) || e}`);
+    }
+  }
+  const err = new Error(erreurs.join(' · '));
+  err.protegee = erreurs.length > 0 && erreurs.every(x => /HTTP 40[13]/.test(x));
+  throw err;
+}
+function dedoublerRep(liste){
+  const vus = new Set();
+  return liste.filter(p => !vus.has(p.cle) && vus.add(p.cle));
+}
 async function chargerRepDepuisUshl(){
   if (ETAT_REP.chargement) return;
   ETAT_REP.chargement = true;
@@ -5970,16 +6010,32 @@ async function chargerRepDepuisUshl(){
   if (btn) btn.disabled = true;
   etatRep('téléchargement de la liste officielle…');
   try{
-    const texte = await chercherViaProxy(REP.url, {timeout: 20000});
-    const r = parseRepechage(texte);
-    if (r.prospects.length < 3){
-      throw new Error('page reçue, mais aucune table de prospects reconnue'
-        + (r.apercu.length ? ' (début : ' + r.apercu.slice(0, 2).join(' / ') + ')' : ''));
+    const texte = await texteViaRelaisRep(REP.url,
+      t => parseRepechage(t).prospects.length >= 3 || liensFeuillesRep(t, REP.url).length > 0);
+    let prospects = parseRepechage(texte).prospects;
+    if (prospects.length < 3){
+      const feuilles = liensFeuillesRep(texte, REP.url);
+      const lien = document.getElementById('repLien');
+      if (lien && feuilles[0]) lien.href = feuilles[0];   // la feuille elle-même, à ouvrir ou enregistrer au besoin
+      for (const [i, u] of feuilles.entries()){
+        etatRep(`la page est un cadre Excel : lecture de la feuille ${i + 1} / ${feuilles.length}…`);
+        const t = await texteViaRelaisRep(u, x => parseRepechage(x).prospects.length > 0).catch(() => null);
+        if (t) prospects = prospects.concat(parseRepechage(t).prospects);
+      }
+      prospects = dedoublerRep(prospects);
+      if (prospects.length < 3){
+        throw new Error(feuilles.length
+          ? 'la page est un cadre Excel et ses feuilles n\'ont pas pu être lues (' + feuilles.map(u => u.split('/').pop()).join(', ') + ')'
+          : 'page reçue, mais aucune table de prospects reconnue');
+      }
     }
-    installerListeRep(r.prospects, 'ushl.ca');
-    flash(r.prospects.length + ' prospects chargés depuis ushl.ca');
+    installerListeRep(prospects, 'ushl.ca');
+    flash(prospects.length + ' prospects chargés depuis ushl.ca');
   }catch(e){
-    etatRep('échec : ' + e.message + ' — ouvre la page officielle, copie tout (Ctrl+A, Ctrl+C) et colle-la ci-dessous.', true);
+    const conseil = e.protegee
+      ? ' — la page semble protégée (connexion du DG requise) : les relais ne peuvent pas la lire. Ouvre-la dans ton navigateur, clique dans le tableau, Ctrl+A, Ctrl+C et colle ci-dessous (ou Fichier → Enregistrer sous, puis importe le fichier).'
+      : ' — ouvre la page officielle, clique dans le tableau, Ctrl+A, Ctrl+C et colle-la ci-dessous (ou importe le fichier enregistré).';
+    etatRep('échec : ' + e.message + conseil, true);
     const det = document.getElementById('repColler');
     if (det) det.open = true;
   }finally{
@@ -5991,8 +6047,12 @@ async function chargerRepDepuisUshl(){
 function importerTexteRep(texte, source){
   const r = parseRepechage(texte);
   if (!r.prospects.length){
-    etatRep('aucun prospect reconnu : il faut la rangée d\'en-têtes avec les cotes (IN SP ST EN DU DI SK PA PC DF OF EX LD)'
-      + (r.apercu.length ? ' — début lu : ' + r.apercu.slice(0, 2).join(' / ') : ''), true);
+    const feuilles = liensFeuillesRep(texte, REP.url);
+    etatRep(feuilles.length
+      ? 'ce fichier n\'est que le cadre de l\'export Excel : importe plutôt la feuille du dossier « _files » ('
+        + feuilles.map(u => u.split('/').pop()).join(', ') + '), ou colle le tableau copié depuis la page.'
+      : 'aucun prospect reconnu : il faut la rangée d\'en-têtes avec les cotes (IN SP ST EN DU DI SK PA PC DF OF EX LD)'
+        + (r.apercu.length ? ' — début lu : ' + r.apercu.slice(0, 2).join(' / ') : ''), true);
     return 0;
   }
   installerListeRep(r.prospects, source);
@@ -6307,7 +6367,7 @@ if (typeof window !== 'undefined' && window.__TML__){
   Object.assign(window.__TML__, {REP, ETAT_REP, parseRepechage, posRep, nbRep, mapperEntetesRep, enrichirRep,
     permRep, installerListeRep, importerTexteRep, chargerRepDepuisUshl, litChoixRep, ecritChoixRep,
     basculerRepeche, equipeRepeche, annulerDernierRep, basculerCibleRep, prospectsFiltresRep, filtresRep,
-    rendreRepechage, decoderOctetsRep, ouvrirDansOvdRep});
+    rendreRepechage, decoderOctetsRep, ouvrirDansOvdRep, liensFeuillesRep, texteViaRelaisRep});
 }
 </script>
 </body>
