@@ -1775,208 +1775,126 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     d.window.close();
   }
 
-  console.log('— Repêchage Y22 (section temporaire) : liste, OV exact, profils atteignables, joueurs noircis');
+  console.log('— Repêchage Y22 (section temporaire) : liste intégrée, OV exact, profils atteignables, joueurs noircis');
   {
     const D = W.document;
-    const ORD = ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld'];
-    // presque Junior Sniper : SP + SK = 127 (il faut 128) — un point de catégorie A suffit
-    const alex = {it:60, sp:64, st:60, en:60, du:60, di:60, sk:63, pa:60, pc:60, df:55, sc:66, ex:40, ld:40};
-    const ben  = {it:65, sp:66, st:70, en:66, du:70, di:65, sk:66, pa:60, pc:60, df:70, sc:55, ex:40, ld:40};
-    const carl = {it:70, sp:72, st:71, en:75, du:74, di:70, sk:73, pa:60, pc:68, df:0, sc:0, ex:40, ld:40};
-    const ovAlex = S.ovDetaille(alex, 'F').valeur, ovBen = S.ovDetaille(ben, 'D').valeur;
-    const cel = c => ORD.map(k => `<td>${c[k]}</td>`).join('');
-    const ent = '<th>IN</th><th>SP</th><th>ST</th><th>EN</th><th>DU</th><th>DI</th><th>SK</th><th>PA</th><th>PC</th><th>DF</th><th>OF</th><th>EX</th><th>LD</th>';
-
-    // 1) tableau HTML classique (en-têtes FHL : IN, OF)
-    const page1 = `<html><body><h2>Repêchage Y22 — version finale</h2><table>
-      <tr><th>#</th><th>Name</th><th>PO</th><th>Age</th>${ent}<th>OV</th><th>Équipe</th></tr>
-      <tr><td>1</td><td>Alex Tremblay</td><td>C</td><td>18</td>${cel(alex)}<td>${Math.round(ovAlex)}</td><td>Rimouski</td></tr>
-      <tr><td>2</td><td>Ben Côté</td><td>D</td><td>19</td>${cel(ben)}<td>${Math.round(ovBen) + 2}</td><td>Halifax</td></tr>
-      <tr><td>3</td><td>Carl Gagnon</td><td>G</td><td>19</td>${cel(carl)}<td>70</td><td>Gatineau</td></tr>
-      <tr><td></td><td>Moyenne</td><td></td><td></td>${ORD.map(()=>'<td></td>').join('')}<td></td><td></td></tr>
-    </table></body></html>`;
-    const r1 = S.parseRepechage(page1);
-    egal(r1.prospects.length, 3, 'Tableau HTML : 3 prospects lus (rangée vide ignorée)');
-    const a1 = r1.prospects[0];
-    egal(a1.nom, 'Alex Tremblay', 'Nom lu');
-    egal(a1.po, 'C', 'Position lue');
-    egal(a1.age, 18, 'Âge lu');
-    egal(a1.sc, 66, 'OF du site → cote sc');
-    egal(a1.it, 60, 'IN du site → cote it');
-    egal(a1.rang, 1, 'Rang de la liste lu');
-    egal(a1.extras['Équipe'], 'Rimouski', 'Colonne inconnue conservée pour le détail');
-    egal(r1.prospects[1].nom, 'Ben Côté', 'Accents conservés');
-    egal(r1.prospects[2].po, 'G', 'Gardien reconnu');
-
-    // 2) export Excel : titre, colspan, sections sans colonne PO, cellules « 72 (+3) »
-    const page2 = `<table>
-      <tr><td colspan="18">DRAFT Y22 - VERSION FINALE</td></tr>
-      <tr><td>Nom du joueur</td><td>Âge</td>${ent.replace(/th>/g,'td>').replace('<td>IN</td>','<td>IT</td>').replace('<td>OF</td>','<td>SC</td>')}<td colspan="2">OV</td><td>Pays</td></tr>
-      <tr><td colspan="3">ATTAQUANTS</td></tr>
-      <tr><td>Alex&nbsp;Tremblay</td><td>18</td>${cel(alex).replace('<td>64</td>','<td>64 (+2)</td>')}<td>${Math.round(ovAlex)}</td><td></td><td>CAN</td></tr>
-      <tr><td>DÉFENSEURS</td></tr>
-      <tr><td>Ben Côté</td><td>19</td>${cel(ben)}<td>${Math.round(ovBen)}</td><td></td><td>CAN</td></tr>
-      <tr><td>Gardiens</td></tr>
-      <tr><td>Carl Gagnon</td><td>19</td>${cel(carl)}<td>70</td><td></td><td>USA</td></tr>
-    </table>`;
-    const r2 = S.parseRepechage(page2);
-    egal(r2.prospects.length, 3, 'Export Excel : 3 prospects');
-    egal(r2.prospects[0].nom, 'Alex Tremblay', 'Espace insécable du nom normalisée');
-    egal(r2.prospects[0].sp, 64, '« 64 (+2) » → 64');
-    egal(r2.prospects[0].ovSite, Math.round(ovAlex), 'OV aligné malgré le colspan de l\'en-tête');
-    egal(r2.prospects[0].extras['Pays'], 'CAN', 'Colonne après le colspan bien alignée');
-    egal(r2.prospects[0].po, 'F', 'Sans colonne PO : section ATTAQUANTS → attaquant');
-    egal(r2.prospects[1].po, 'D', 'Section DÉFENSEURS → défenseur');
-    egal(r2.prospects[2].po, 'G', 'Section Gardiens → gardien');
-    ok(r2.prospects.every(p => p.poDevine), 'Positions déduites marquées comme telles');
-
-    // 3) tableau copié du navigateur (tabulations)
-    const tsv = ['Rang\tJoueur\tPos\tÂge\tIN\tSP\tST\tEN\tDU\tDI\tSK\tPA\tPC\tDF\tOF\tEX\tLD\tOV',
-      `1\tAlex Tremblay\tC\t18\t${ORD.map(k=>alex[k]).join('\t')}\t${Math.round(ovAlex)}`,
-      `2\tBen Côté\tD\t19\t${ORD.map(k=>ben[k]).join('\t')}\t${Math.round(ovBen)}`].join('\n');
-    const r3 = S.parseRepechage(tsv);
-    egal(r3.prospects.length, 2, 'Copier-coller (tabulations) : 2 prospects');
-    egal(r3.prospects[1].df, 70, 'Cote lue dans le texte collé');
-
-    // 4) texte brut séparé par des espaces : le nom à plusieurs mots est recousu
-    const brut = ['# Nom PO Age IN SP ST EN DU DI SK PA PC DF OF EX LD OV',
-      `1 Alex Tremblay C 18 ${ORD.map(k=>alex[k]).join(' ')} ${Math.round(ovAlex)}`,
-      `2 Jean-Ben de la Côté D 19 ${ORD.map(k=>ben[k]).join(' ')} ${Math.round(ovBen)}`].join('\n');
-    const r4 = S.parseRepechage(brut);
-    egal(r4.prospects.length, 2, 'Texte brut : 2 prospects');
-    egal(r4.prospects[1].nom, 'Jean-Ben de la Côté', 'Nom de plusieurs mots recousu');
-    egal(r4.prospects[1].po, 'D', 'Position après le nom recousu');
-    egal(S.parseRepechage('<p>Page en maintenance</p>').prospects.length, 0, 'Page sans table : aucune invention');
-    egal(S.posRep('LW'), 'AG', 'LW → AG'); egal(S.posRep('C/AD'), 'C', 'C/AD → C'); egal(S.posRep('Goalie'), 'G', 'Goalie → G');
-
-    // installation, OV exact et profils
-    S.installerListeRep(r1.prospects, 'test');
     const L = S.ETAT_REP.liste;
-    const pA = L.find(p => p.nom === 'Alex Tremblay'), pB = L.find(p => p.nom === 'Ben Côté'), pC = L.find(p => p.nom === 'Carl Gagnon');
-    egal(pA._ov, ovAlex, 'OV exact = formule du simulateur (attaquant)');
-    egal(pB._ov, ovBen, 'OV exact = formule du simulateur (défenseur)');
-    egal(pC._ov, null, 'Gardien : pas de recalcul (formule distincte)');
-    egal(pA._profil, 'Junior Depth Forward', 'Alex (18 ans) : Junior Depth Forward');
-    egal(pB._profil, 'Junior DDefensive', 'Ben (19 ans) : Junior DDefensive');
-    egal(pC._profil, 'Backup Goalie', 'Gardien à 70 : Backup Goalie');
-    const sn = S.permRep(pA, 3).find(o => o.profil === 'Junior Sniper');
-    ok(!!sn, 'Alex peut devenir Junior Sniper en déplaçant au plus 3 points');
-    egal(sn && sn.cout, 1, 'Un seul point suffit');
-    egal(sn && sn.categorie, 'A', 'Déplacement dans la catégorie A (SP ST EN DU SK)');
-    ok(S.permRep(pA, 3).every(o => o.cout <= 3), 'Jamais plus de 3 points déplacés');
-    egal(S.permRep(pC, 3).length, 0, 'Pas de permutation pour un gardien');
+    const de = nom => L.find(p => p.nom === nom);
+    egal(L.length, 159, '159 prospects intégrés (liste du 3 octobre)');
+    ok(!L.some(p => p.rang === 63), 'Le Rd 63 ne figure pas sur la liste de la ligue');
+    egal(new Set(L.map(p => p.rang)).size, 159, 'Un Rd par joueur');
+    const parPo = {};
+    L.forEach(p => { parPo[p.po] = (parPo[p.po] || 0) + 1; });
+    tableauEgal([parPo.C, parPo.AG, parPo.AD, parPo.D, parPo.G], [37, 25, 23, 52, 22], 'Positions : 37 C, 25 AG (LW), 23 AD (RW), 52 D, 22 G');
+    const mck = de('Gavin McKenna');
+    egal(mck.rang, 1, 'McKenna : Rd 1');
+    egal(mck.po, 'AG', 'LW → AG');
+    tableauEgal([mck.it, mck.sp, mck.sc, mck.ld], [67, 75, 75, 40], 'Cotes de McKenna');
+    tableauEgal([mck.ovSite, mck.age, mck.nat, mck.taille, mck.poids], [76, 19, 'CAN', 71, 170], 'OV, âge, nationalité, taille, poids');
+    egal(mck._profil, 'Junior Elite', 'Profil de la ligue');
+
+    // OV exact : la formule du simulateur retrouve l'OV de la ligue
+    const patineurs = L.filter(p => p.po !== 'G');
+    const ecarts = patineurs.filter(p => Math.round(p._ov) !== p.ovSite).map(p => p.nom).sort();
+    tableauEgal(ecarts, ['Axel Elofsson', 'Jacob Vandeven', 'Jayden Kurtz'],
+      'OV exact : 134 / 137 arrondis identiques à la ligue (3 défenseurs juniors à la limite)');
+    ok(patineurs.every(p => Math.abs(p._ov - p.ovSite) < 0.8), 'Écart toujours sous 0,8 point');
+    egal(mck._ov, S.ovDetaille(mck._cotes, 'F').valeur, 'OV exact = formule du calculateur');
+    // profils : le moteur des règlements retrouve ceux de la ligue
+    const diff = patineurs.filter(p => p._moteur !== p._profil).map(p => p.nom);
+    tableauEgal(diff, ['Chase Reid'], 'Profils : le moteur retrouve la ligue pour 136 / 137 patineurs');
+    egal(de('Tynan Lawrence')._moteur, 'Junior Two-Way Forward', 'Nom de la ligue : Junior Two-Way Forward');
+    egal(de('Luken Huff')._moteur, 'Junior DDepth Defense', 'Nom de la ligue : Junior DDepth Defense');
+    egal(de('Tomas Kralovic')._profil, 'Prospect DOffensive', '21 ans : profil prospect');
+    const reid = de('Chase Reid');
+    egal(reid._profil, 'Junior DEliteShutdown', 'Reid : classé DEliteShutdown par la ligue');
+    const reidQB = S.permRep(reid, 3).find(o => o.profil === 'Junior DEliteQB');
+    egal(reidQB && reidQB.cout, 0, 'Reid remplit aussi DEliteQB : atteignable à 0 point');
+    const trejbal = de('Tobias Trejbal');
+    tableauEgal([trejbal._ov, trejbal.ovSite, trejbal._profil], [null, 70, 'Junior Goalie'], 'Gardien : OV et profil de la ligue');
+    egal(S.permRep(trejbal, 3).length, 0, 'Pas de permutation pour un gardien');
+    ok(L.every(p => S.permRep(p, 3).every(o => o.cout <= 3 && o.profil !== p._profil)),
+      'Jamais plus de 3 points, jamais le profil actuel');
+    ok(L.every(p => S.permRep(p, 1).every(o => S.permRep(p, 3).some(x => x.profil === o.profil))),
+      'Ce qui est atteignable à 1 point l\'est aussi à 3');
+    const exemple = patineurs.find(p => S.permRep(p, 1).some(o => o.cout === 1));
+    ok(!!exemple, 'Au moins un prospect change de profil avec un seul point');
+    const opt = S.permRep(exemple, 1).find(o => o.cout === 1);
+    egal(S.libelleRep(S.profilDeCotes(opt.cotes, exemple._groupe, exemple.age).profil), opt.profil,
+      'Les cotes suggérées produisent bien le profil annoncé');
 
     // l'onglet
     D.querySelector('nav button[data-vue="repechage"]').click();
     ok(D.getElementById('vue-repechage').classList.contains('actif'), 'Onglet Repêchage affiché');
+    ok(!D.getElementById('repCharger') && !D.getElementById('repColler'), 'Plus de chargement : la liste est dans la page');
     const rangees = () => [...D.querySelectorAll('#tableRepechage tbody tr[data-cle]')];
-    egal(rangees().length, 3, '3 rangées au tableau');
-    egal(rangees()[0].dataset.cle, pA.cle, 'Tri par défaut : rang de la liste');
-    ok(D.getElementById('tableRepechage').textContent.includes(ovAlex.toFixed(2).replace('.', ',')), 'OV exact affiché au centième');
-    ok(rangees()[1].querySelector('.rep-ovx'), 'Écart signalé quand la page publie un autre OV');
+    egal(rangees().length, 159, '159 rangées');
+    tableauEgal(rangees().slice(0, 3).map(r => r.dataset.cle), ['gavin mckenna', 'ivar stenberg', 'caleb malhotra'], 'Tri par défaut : Rd');
+    ok(D.getElementById('tableRepechage').textContent.includes(mck._ov.toFixed(2).replace('.', ',')), 'OV exact affiché au centième');
+    ok(rangees().find(r => r.dataset.cle === 'jayden kurtz').querySelector('.rep-ovx'), 'Écart avec l\'OV de la ligue signalé');
     const selProfil = D.getElementById('repProfil');
-    ok([...selProfil.options].some(o => o.value === 'Junior Sniper'), 'Profil atteignable proposé à la recherche');
+    const nbSniper = L.filter(p => p._profil === 'Junior Sniper').length;
     selProfil.value = 'Junior Sniper';
-    D.getElementById('repMode').value = 'atteignable';
-    selProfil.dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 1, 'Recherche « Junior Sniper » (atteignable) : Alex');
-    ok(rangees()[0].querySelector('.rep-chip.vise'), 'Le profil visé est mis en évidence');
     D.getElementById('repMode').value = 'actuel';
+    selProfil.dispatchEvent(new W.Event('change'));
+    egal(rangees().length, nbSniper, 'Profil actuel : les Junior Sniper de la liste');
+    D.getElementById('repMode').value = 'atteignable';
     D.getElementById('repMode').dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 0, 'Profil actuel seulement : personne n\'est déjà Junior Sniper');
+    const nbAtt = L.filter(p => p._profil === 'Junior Sniper' || S.permRep(p, 3).some(o => o.profil === 'Junior Sniper')).length;
+    egal(rangees().length, nbAtt, 'Actuel ou atteignable en ≤ 3 points');
+    ok(nbAtt > nbSniper, 'La recherche « atteignable » élargit la liste');
+    ok(rangees().some(r => r.querySelector('.rep-chip.vise')), 'Le profil visé est mis en évidence');
+    D.getElementById('repPo').value = 'D';
+    D.getElementById('repPo').dispatchEvent(new W.Event('change'));
+    ok(rangees().every(r => L.find(p => p.cle === r.dataset.cle).po === 'D'), 'Filtre de position');
+    D.getElementById('repPo').value = '';
+    D.getElementById('repPo').dispatchEvent(new W.Event('change'));
     selProfil.value = '';
     selProfil.dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 3, 'Filtre retiré');
+    egal(rangees().length, 159, 'Filtres retirés');
 
     // joueurs noircis au fil des choix
-    D.querySelector(`#tableRepechage [data-rep-pris="${pB.cle}"]`).click();
-    let rB = rangees().find(r => r.dataset.cle === pB.cle);
-    ok(rB.classList.contains('rep-pris'), 'Ben repêché : rangée noircie');
-    egal(S.litChoixRep().pris[pB.cle].no, 1, '1er choix numéroté');
+    const cleM = 'gavin mckenna', cleS = 'ivar stenberg';
+    D.querySelector(`#tableRepechage [data-rep-pris="${cleM}"]`).click();
+    ok(rangees().find(r => r.dataset.cle === cleM).classList.contains('rep-pris'), 'McKenna repêché : rangée noircie');
+    egal(S.litChoixRep().pris[cleM].no, 1, '1er choix numéroté');
     ok(!D.querySelector('#tableRepechage tr.rep-detail'), 'Le bouton ne déplie pas la rangée');
-    D.querySelector(`#tableRepechage [data-rep-pris="${pA.cle}"]`).click();
-    egal(S.litChoixRep().pris[pA.cle].no, 2, '2e choix numéroté');
-    const selEq = D.querySelector(`#tableRepechage select[data-rep-eq="${pA.cle}"]`);
+    D.querySelector(`#tableRepechage [data-rep-pris="${cleS}"]`).click();
+    egal(S.litChoixRep().pris[cleS].no, 2, '2e choix numéroté');
+    const selEq = D.querySelector(`#tableRepechage select[data-rep-eq="${cleS}"]`);
     selEq.value = 'BOSTON';
     selEq.dispatchEvent(new W.Event('change', {bubbles: true}));
-    egal(S.litChoixRep().pris[pA.cle].eq, 'BOSTON', 'Équipe qui a repêché enregistrée');
-    egal(S.annulerDernierRep(), pA.cle, '« Annuler le dernier » retire le 2e choix');
-    ok(!S.litChoixRep().pris[pA.cle] && S.litChoixRep().pris[pB.cle], 'Le 1er choix demeure');
+    egal(S.litChoixRep().pris[cleS].eq, 'BOSTON', 'Équipe qui a repêché enregistrée');
+    egal(S.annulerDernierRep(), cleS, '« Annuler le dernier » retire le 2e choix');
+    ok(!S.litChoixRep().pris[cleS] && S.litChoixRep().pris[cleM], 'Le 1er choix demeure');
     D.getElementById('repMasquer').checked = true;
     D.getElementById('repMasquer').dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 2, 'Masquer les repêchés');
+    egal(rangees().length, 158, 'Masquer les repêchés');
     D.getElementById('repMasquer').checked = false;
     D.getElementById('repMasquer').dispatchEvent(new W.Event('change'));
-    ok(D.getElementById('repSommaire').textContent.includes('Disponibles'), 'Sommaire du repêchage');
+    ok(/Stenberg/.test(D.getElementById('repSommaire').textContent), 'Meilleur disponible : Stenberg une fois McKenna parti');
     // cibles et détail
-    D.querySelector(`#tableRepechage [data-rep-cible="${pA.cle}"]`).click();
-    ok(S.litChoixRep().cibles[pA.cle], 'Cible ★ enregistrée');
-    rangees().find(r => r.dataset.cle === pA.cle).click();
+    D.querySelector(`#tableRepechage [data-rep-cible="chase reid"]`).click();
+    ok(S.litChoixRep().cibles['chase reid'], 'Cible ★ enregistrée');
+    rangees().find(r => r.dataset.cle === 'chase reid').click();
     const det = D.querySelector('#tableRepechage tr.rep-detail');
-    ok(det && det.textContent.includes('Junior Sniper') && det.textContent.includes('SK +1') && det.textContent.includes('ST -1'),
-      'Détail : la permutation qui mène à Junior Sniper');
-    D.querySelector(`#tableRepechage [data-rep-ovd="${pA.cle}"]`).click();
+    ok(det && /Remplit aussi/.test(det.textContent) && /DEliteQB/.test(det.textContent), 'Détail : double profil de Reid expliqué');
+    ok(det && /6'3"/.test(det.textContent) && /USA/.test(det.textContent), 'Détail : taille et nationalité');
+    D.querySelector('#tableRepechage [data-rep-ovd="chase reid"]').click();
     ok(D.getElementById('vue-ovdetail').classList.contains('actif'), 'Ouvre le calculateur d\'OV');
-    egal(D.getElementById('ovdValeur').textContent, ovAlex.toFixed(2).replace('.', ','), 'Le calculateur reprend ses cotes');
+    egal(D.getElementById('ovdValeur').textContent, reid._ov.toFixed(2).replace('.', ','), 'Le calculateur reprend ses cotes');
     D.querySelector('nav button[data-vue="repechage"]').click();
 
-    // persistance : la liste et les choix survivent au rechargement
-    const liste = W.localStorage.getItem('tml_repechage_liste_v1'), choix = W.localStorage.getItem('tml_repechage_choix_v1');
-    ok(liste && choix, 'Liste et choix conservés dans le navigateur');
+    // persistance des choix
+    const choix = W.localStorage.getItem('tml_repechage_choix_v1');
     const d2 = await ouvrirPour(w => {
-      w.localStorage.setItem('tml_repechage_liste_v1', liste);
       w.localStorage.setItem('tml_repechage_choix_v1', choix);
+      w.localStorage.setItem('tml_repechage_liste_v1', '{"prospects":[]}');
     });
-    const S2 = d2.window.__TML__;
-    egal(S2.ETAT_REP.liste.length, 3, 'Liste relue à l\'ouverture');
-    ok(d2.window.document.querySelector(`#tableRepechage tr.rep-pris[data-cle="${pB.cle}"]`), 'Ben toujours noirci après rechargement');
+    egal(d2.window.__TML__.ETAT_REP.liste.length, 159, 'Liste intégrée à l\'ouverture');
+    ok(d2.window.document.querySelector('#tableRepechage tr.rep-pris[data-cle="gavin mckenna"]'), 'McKenna toujours noirci après rechargement');
+    egal(d2.window.localStorage.getItem('tml_repechage_liste_v1'), null, 'L\'ancienne liste téléchargée est oubliée');
     d2.window.close();
-
-    // téléchargement impossible : message clair, la liste en place reste
-    await S.chargerRepDepuisUshl();
-    ok(/échec/.test(D.getElementById('repEtat').textContent), 'Échec du téléchargement signalé');
-    ok(D.getElementById('repColler').open, 'La zone « coller la liste » s\'ouvre');
-    egal(S.ETAT_REP.liste.length, 3, 'La liste déjà chargée n\'est pas perdue');
-    egal(S.importerTexteRep(tsv, 'collée'), 2, 'Import du texte collé');
-    ok(!/échec/.test(D.getElementById('repEtat').textContent), 'Une liste valide efface le message d\'échec');
-    ok(S.litChoixRep().pris[pB.cle], 'Les choix survivent au remplacement de la liste (clé = nom)');
-    // export Excel « page Web » : le .htm n'est qu'un cadre, les données sont dans …_files/sheet001.htm
-    const cadre = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta name="Excel Workbook Frameset">
-      <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Draft</x:Name>
-      <x:WorksheetSource HRef="Draft_Y22_Vfinal_files/sheet001.htm"/></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
-      </head><frameset rows="*,39" border=0><frame src="Draft_Y22_Vfinal_files/sheet001.htm" name="frSheet">
-      <frame src="Draft_Y22_Vfinal_files/tabstrip.htm" name="frTabs"></frameset></html>`;
-    const urlFeuille = 'https://ushl.ca/ushl/menu_ushl/gestion_dg/Draft/Y22/Draft_Y22_Vfinal_files/sheet001.htm';
-    tableauEgal(S.liensFeuillesRep(cadre, S.REP.url), [urlFeuille], 'Cadre Excel : la feuille de données est repérée (tabstrip ignoré)');
-    egal(S.parseRepechage(cadre).prospects.length, 0, 'Le cadre seul ne contient aucun prospect');
-    egal(S.importerTexteRep(cadre, 'fichier'), 0, 'Importer le cadre seul : refusé');
-    ok(/sheet001\.htm/.test(D.getElementById('repEtat').textContent), 'Le message nomme la feuille à importer');
-
-    const fetchOrig = W.fetch;
-    const appels = [];
-    W.fetch = async (u) => {
-      const cible = decodeURIComponent(u);
-      appels.push(cible);
-      // 1er relais : répond 200 avec sa propre page (pas la liste)
-      if (u.includes('allorigins')) return {ok: true, status: 200, text: async () => '<html><body>' + 'Relais occupé. '.repeat(60) + '</body></html>'};
-      if (cible.includes('sheet001.htm')) return {ok: true, status: 200, text: async () => page1};
-      if (cible.includes('Draft_Y22_Vfinal.htm')) return {ok: true, status: 200, text: async () => cadre};
-      return {ok: false, status: 404, text: async () => ''};
-    };
-    S.ETAT_REP.liste = [];
-    await S.chargerRepDepuisUshl();
-    egal(S.ETAT_REP.liste.length, 3, 'Téléchargement : le cadre Excel est suivi jusqu\'à sa feuille');
-    egal(S.ETAT_REP.source, 'ushl.ca', 'Source : ushl.ca');
-    ok(appels.some(c => c.includes('allorigins')) && appels.some(c => c.includes('corsproxy')),
-      'Un relais qui renvoie autre chose n\'arrête pas la recherche');
-    egal(D.getElementById('repLien').href, urlFeuille, 'Le lien « page officielle » mène à la feuille elle-même');
-    ok(!/échec/.test(D.getElementById('repEtat').textContent), 'Aucun message d\'échec');
-
-    W.fetch = async () => ({ok: false, status: 401, text: async () => ''});
-    await S.chargerRepDepuisUshl();
-    ok(/protégée/.test(D.getElementById('repEtat').textContent), 'Page protégée (401 partout) : diagnostic explicite');
-    egal(S.ETAT_REP.liste.length, 3, 'La liste en place reste après l\'échec');
-    W.fetch = fetchOrig;
   }
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
