@@ -46,7 +46,9 @@ ligne, et s'actualise depuis ushl.ca à chaque ouverture.
   `TeamRosters.php` et `TeamScoring.php` pour le club choisi, plus
   `USHLxtrastats.html`, via une chaîne de relais anti-CORS, avec validation de
   l'équipe reçue (le serveur de la ligue sert parfois la dernière équipe
-  consultée) et cache local (formation 12 h, production 30 min).
+  consultée) et cache local (formation 12 h, production 30 min). La cache ne
+  sert qu'à l'ouverture : un clic sur le bouton relit toujours le site, et
+  *Actualiser toute la ligue* relit aussi la formation du club.
 - **Autres équipes** : dès qu'une équipe est consultée au comparateur ou au
   calculateur d'OV, son `TeamRosters.php` est téléchargé en direct (validé,
   mis en cache 12 h) et remplace l'instantané intégré — les cotes suivent

@@ -3287,12 +3287,14 @@ async function chercherViaProxy(url, {timeout=15000}={}){
    et purge du cache s'il a déjà été pollué. */
 function validerPageEquipe(texte){ return extraireFiche(texte) !== null; }
 
-async function chercherSource(cle, valider){
+/* `forcer` contourne la cache : un clic sur «Actualiser» doit relire le site,
+   sinon un échange ou une signature y reste invisible jusqu'à 12 h. */
+async function chercherSource(cle, valider, forcer){
   const cache = litCache();
   const maintenant = Date.now();
   const c = cache[cle];
-  if (c && (maintenant - c.t) < CONFIG.ttl[cle]){
-    if (!valider || valider(c.v)) return {texte:c.v, duCache:true};
+  if (!forcer && c && (maintenant - c.t) < CONFIG.ttl[cle]){
+    if (!valider || valider(c.v)) return {texte:c.v, duCache:true, t:c.t};
     delete cache[cle]; ecritCache(cache); // cache pollué par une autre équipe
   }
   let texte = null, essais = 0;
@@ -3304,7 +3306,11 @@ async function chercherSource(cle, valider){
   if (texte === null) throw new Error('le serveur de la ligue sert une autre équipe (session des relais) — réessaie dans un instant');
   cache[cle] = {t:maintenant, v:texte};
   ecritCache(cache);
-  return {texte, duCache:false, essais};
+  return {texte, duCache:false, essais, t:maintenant};
+}
+function ageCache(t){
+  const min = Math.round((Date.now() - t) / 60000);
+  return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h';
 }
 
 /* Limites d'utilisation des gardiens : JSON public du projet gestiongardiens
@@ -3417,28 +3423,35 @@ function extraireFiche(html){
   return m ? `${CONFIG.equipe} ${m[1]}-${m[2]}-${m[3]}` : null;
 }
 
-async function actualiserTout(){
+/* Formation du club (TeamRosters.php). Rend la ligne du rapport. */
+async function actualiserFormationClub(forcer){
+  const {texte, essais, duCache, t} = await chercherSource('roster', validerPageEquipe, forcer);
+  const joueurs = parseRoster(texte);
+  if (joueurs.length < 10) return 'formation : table introuvable, données locales conservées';
+  ETAT.rosterBrut = joueurs; rafraichirRosterClub();
+  memoriserEquipe(CONFIG.equipe, joueurs);   // le club aussi : chiffres du jour conservés
+  const f = extraireFiche(texte); if (f) ETAT.fiche = f;
+  ETAT.source = 'ushl.ca — ' + new Date(t).toLocaleString('fr-CA');
+  return 'formation ✓ ('+joueurs.length+' joueurs'
+    + (duCache ? ', cache de '+ageCache(t) : '')
+    + ((essais||1)>1 ? ', bonne équipe obtenue après réessai' : '') + ')';
+}
+
+/* `forcer` : clic sur le bouton (tout est relu du site). À l'ouverture, la
+   cache évite de marteler les relais. */
+async function actualiserTout({forcer=false}={}){
   const btn = document.getElementById('btnMaj');
   const etat = document.getElementById('etatMaj');
   btn.disabled = true;
   const rapport = [];
   // 1) Formation
   etat.textContent = 'formation…';
-  try{
-    const {texte, essais} = await chercherSource('roster', validerPageEquipe);
-    const joueurs = parseRoster(texte);
-    if (joueurs.length >= 10){
-      ETAT.rosterBrut = joueurs; rafraichirRosterClub();
-      memoriserEquipe(CONFIG.equipe, joueurs);   // le club aussi : chiffres du jour conservés
-      const f = extraireFiche(texte); if (f) ETAT.fiche = f;
-      ETAT.source = 'ushl.ca — ' + new Date().toLocaleString('fr-CA');
-      rapport.push('formation ✓ ('+joueurs.length+' joueurs'+((essais||1)>1?', bonne équipe obtenue après réessai':'')+')');
-    } else rapport.push('formation : table introuvable, données locales conservées');
-  }catch(e){ rapport.push('formation ✗ ('+e.message+')'); }
+  try{ rapport.push(await actualiserFormationClub(forcer)); }
+  catch(e){ rapport.push('formation ✗ ('+e.message+')'); }
   // 2) Pointage
   etat.textContent = 'production…';
   try{
-    const {texte, essais} = await chercherSource('scoring', validerPageEquipe);
+    const {texte, essais} = await chercherSource('scoring', validerPageEquipe, forcer);
     const s = parseScoring(texte);
     if ((essais||1) > 1) rapport.push('production : bonne équipe obtenue après réessai');
     if (s.patineurs.length || s.gardiens.length){
@@ -3453,7 +3466,7 @@ async function actualiserTout(){
   // 3) XtraStats
   etat.textContent = 'XtraStats…';
   try{
-    const {texte} = await chercherSource('xtra');
+    const {texte} = await chercherSource('xtra', null, forcer);
     const x = parseXtra(texte, CONFIG.equipe);
     ETAT.xtraLigue = parseXtraLigue(texte);
     if (x.length >= 5){
@@ -4243,6 +4256,9 @@ async function telechargerLigue(etatId, rafraichir){
   const boutons = [document.getElementById('btnFiches'), document.getElementById('btnLigueMaj')].filter(Boolean);
   boutons.forEach(b=>{ b.disabled = true; });
   const etat = document.getElementById(etatId);
+  // le club du DG d'abord, relu du site : «toute la ligue» l'inclut
+  if (etat) etat.textContent = `téléchargement de ${CONFIG.equipe}…`;
+  try { await actualiserFormationClub(true); } catch(e){ /* formation conservée */ }
   const manquantes = LIGUE_EQUIPES.filter(c=>c!==CONFIG.equipe && !ETAT.equipesLive.has(c));
   let faites = 0;
   for (const code of manquantes){
@@ -4251,6 +4267,7 @@ async function telechargerLigue(etatId, rafraichir){
     rafraichir();
   }
   boutons.forEach(b=>{ b.disabled = false; });
+  toutRendre();   // l'alignement du club a pu changer
   rafraichir();
   const nb = equipesInstantane().length;
   flash(`Ligue actualisée : ${nb} équipe${nb>1?'s':''} enregistrée${nb>1?'s':''} au ${dateInstantane()} — ces chiffres deviennent la référence par défaut`);
@@ -5288,7 +5305,7 @@ document.getElementById('progFiltres').addEventListener('click', e=>{
   ETAT.filtreProg = b.dataset.f;
   rendreProgression();
 });
-$('#btnMaj').addEventListener('click', actualiserTout);
+$('#btnMaj').addEventListener('click', ()=>actualiserTout({forcer:true}));
 $('#btnEffacerCache').addEventListener('click', ()=>{
   localStorage.removeItem(CLES_LS.cache);   // données mises en cache (formation, production, XtraStats, limites, équipes)
   localStorage.removeItem(CLES_LS.proxy);   // relais préféré : on repart de la chaîne complète
@@ -5683,6 +5700,7 @@ if (typeof window !== 'undefined'){
     LIGUE, LIGUE_S21, LIGUE_DATE, DATE_S21, LIGUE_EQUIPES, EQUIPES_PERIMEES, cotesDuSite, provenanceDe,
     joueursEquipe, litTrios, ecritTrios, autoTrios, rendreTrios, texteTrios, SURCHARGE_OV87,
     estFictif, chargerEquipe, actualiserEquipe, urlRosterEquipe, validerPageDe,
+    chercherSource, actualiserTout, actualiserFormationClub, telechargerLigue,
     joueursLigue, joueursLigueFiltres, rendreLigue,
     ECHANGE, projectionEchange, bilanClub, rendreEchange, alertesDG, rendreAlertes,
     resignatureStandard, salaireSaisonEchange, ovExact, nettoyerLigneXtra,
