@@ -1775,6 +1775,46 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     d.window.close();
   }
 
+  console.log('— Actualisation de la formation du club : le bouton relit le site, cache ou pas');
+  {
+    const entetes = '<tr><th>Nom</th><th>PO</th><th>HD</th><th>IN</th><th>SP</th><th>ST</th><th>EN</th><th>DU</th><th>DI</th><th>SK</th><th>PA</th><th>PC</th><th>DF</th><th>OF</th><th>EX</th><th>LD</th><th>OV</th><th>Age</th><th>Salary</th><th>CT</th></tr>';
+    const rangee = nom => `<tr><td>${nom}</td><td>C</td><td>G</td><td>70</td><td>80</td><td>77</td><td>89</td><td>86</td><td>83</td><td>83</td><td>83</td><td>79</td><td>62</td><td>79</td><td>61</td><td>51</td><td>80</td><td>25</td><td>1 000 000 $</td><td>2</td></tr>`;
+    const page = (code, vedette) => {
+      let corps = rangee(vedette);
+      for (let i=1; i<=11; i++) corps += rangee(code+' Joueur'+i);
+      return `<html><body>${code} 3-2-1 <table>${entetes}${corps}</table></body></html>` + ' '.repeat(600);
+    };
+    const d = await ouvrirPour(w => {
+      // formation de TORONTO en cache, fraîche (moins de 12 h) mais d'avant l'échange
+      w.localStorage.setItem('tml_cache_v1', JSON.stringify({roster:{t:Date.now() - 2*3600*1000, v:page('TORONTO', 'Avant Echange')}}));
+    });
+    const SD = d.window.__TML__, LS = d.window.localStorage;
+    let vedette = 'Apres Echange';
+    d.window.fetch = async url => {
+      const code = (decodeURIComponent(String(url)).match(/team=([A-Z.]+)/) || [])[1];
+      if (!code) throw new Error('hors ligne');
+      return {ok:true, status:200, text: async () => page(code, code === 'TORONTO' ? vedette : code + ' Vedette')};
+    };
+    const nomsClub = () => SD.ETAT.rosterBrut.map(j=>j.nom);
+    await SD.actualiserTout();
+    ok(nomsClub().includes('Avant Echange'), 'À l\'ouverture, la formation en cache sert (aucun martelage des relais)');
+    ok(d.window.document.getElementById('etatMaj').textContent.includes('cache de 2 h'), 'Le rapport dit que la formation vient de la cache, et de quand');
+    const btnMaj = d.window.document.getElementById('btnMaj');
+    btnMaj.click();
+    for (let i = 0; i < 50 && (i === 0 || btnMaj.disabled); i++) await new Promise(r => setTimeout(r, 100));
+    ok(nomsClub().includes('Apres Echange') && !nomsClub().includes('Avant Echange'),
+      'Le bouton «Actualiser» relit le site malgré la cache : l\'échange apparaît');
+    ok(!d.window.document.getElementById('etatMaj').textContent.includes('cache de'), 'Rapport sans mention de cache après un clic');
+    ok(JSON.parse(LS.getItem('tml_cache_v1')).roster.v.includes('Apres Echange'), 'La cache prend la formation relue');
+    ok(d.window.document.getElementById('tableAlignement').textContent.includes('Apres Echange'), 'Le tableau Alignement montre la nouvelle formation');
+    vedette = 'Nouvelle Signature';
+    await SD.telechargerLigue('ligueCompte', SD.rendreLigue);
+    ok(nomsClub().includes('Nouvelle Signature'), '«Actualiser toute la ligue» relit aussi la formation du club');
+    ok(d.window.document.getElementById('tableAlignement').textContent.includes('Nouvelle Signature'), 'Et l\'onglet Alignement est redessiné');
+    egal(SD.litInstantane().equipes.TORONTO.length, 12, 'Le club entre dans l\'instantané avec les 31 autres');
+    d.window.close();
+  }
+
   console.log('— Repêchage Y22 (section temporaire) : liste intégrée, OV exact, profils atteignables, joueurs noircis');
   {
     const D = W.document;
