@@ -20,7 +20,6 @@ function rendreProgression(){
   };
   let html = '';
   for (const j of ETAT.roster){
-    if (j.backup) continue;
     const p = j._profil;
     const prod = productionDe(j);
     const grpF = j.po==='G'?'g':(j.po==='D'?'d':'av');
@@ -90,14 +89,10 @@ function rendreProgression(){
       </div>`;
     }
     html += `</div>`;
-    if (prod && prod._modeY21){
-      html += `<div class="jc-note">Mode vérification Y21 : totaux de la saison complète évalués tels quels. Buts gagnants, buts en avantage numérique, différentiel et production des gardiens ne figurent pas dans les données Y21 intégrées.</div>`;
-    }
-    if (prod && prod._reference && !ETAT.modeY21){
-      html += `<div class="jc-note">Repère : saison Y21 complète (aucun match Y22 encore disputé). Les barres reflètent la Y21 face aux seuils actuels.</div>`;
-    }
-    if (prod && prod._xtraSource && !ETAT.modeY21){
-      html += `<div class="jc-note">Production tirée de XtraStats${ETAT.xtraDate?` (en date du ${ETAT.xtraDate})`:''} — TeamScoring indisponible. Les buts gagnants, buts en avantage numérique et le différentiel n'y figurent pas.</div>`;
+    if (prod && prod._reference){
+      html += `<div class="jc-note">Repère : saison précédente complète (aucun match encore disputé cette saison). Les barres reflètent ces totaux face aux seuils actuels.</div>`;
+    } else if (prod && prod.mp === null && j.po !== 'G' && (j._profil.stats||[]).some(c=>['mp','mg','hits20','shots20'].includes(c))){
+      html += `<div class="jc-note">Minutes jouées indisponibles pour le moment (page XtraStats) : les statistiques par 20 minutes ne peuvent pas être évaluées.</div>`;
     }
     if (!prod){
       html += `<div class="jc-note">Aucune production disponible pour ce joueur.</div>`;

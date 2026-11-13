@@ -45,7 +45,7 @@ function projectionEchange(sortants, entrants, nbSaisons){
   for (let k = 0; k < (nbSaisons || 3); k++){
     let masse = 0;
     for (const j of ETAT.roster){
-      if (j.backup || exclus.has(normaliserNom(j.nom))) continue;
+      if (exclus.has(normaliserNom(j.nom))) continue;
       const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
       if (sig){
         if (k < (sig.duree || dureeMaxCharte(sig.statut))) masse += sig.salaire;
@@ -63,7 +63,7 @@ function projectionEchange(sortants, entrants, nbSaisons){
 /* Moyennes du club (OV, âge) pour un état donné de l'échange. */
 function bilanClub(sortants, entrants){
   const exclus = new Set(sortants.map(j=>normaliserNom(j.nom)));
-  const joueurs = ETAT.roster.filter(j=>!j.backup && !exclus.has(normaliserNom(j.nom))).concat(entrants);
+  const joueurs = ETAT.roster.filter(j=>!exclus.has(normaliserNom(j.nom))).concat(entrants);
   const n = joueurs.length || 1;
   return {
     n: joueurs.length,

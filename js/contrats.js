@@ -66,7 +66,7 @@ function salaireMinimum(ov, statut, age, duree, po){
 
 /* Éligibilité : seuls les joueurs dont le contrat est échu (0 an) se prolongent.
    Les joueurs déjà sous contrat ne sont pas prolongeables. */
-function peutProlonger(j){ return !j.backup && j.ct === 0; }
+function peutProlonger(j){ return j.ct === 0; }
 
 /* Durée maximale permise par la charte selon le statut. */
 function dureeMaxCharte(statut){
@@ -89,7 +89,7 @@ const PLAFOND = 104000000;
    Un joueur prolongé compte au plafond avec son salaire de prolongation. */
 function calculerMasse(resignMap){
   const r = resignMap || litResignatures();
-  const actifs = ETAT.roster.filter(j=>!j.backup);
+  const actifs = ETAT.roster;
   let masse = 0;
   for (const j of actifs){
     const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null; // prolongation valable pour les contrats échus seulement

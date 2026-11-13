@@ -189,7 +189,6 @@ function construireOvd(){
   document.getElementById('ovdEquipe').addEventListener('change', ()=>{
     document.getElementById('ovdJoueur').value = '';
     peuplerJoueursOvd();
-    actualiserEquipe(document.getElementById('ovdEquipe').value, ()=>{ peuplerJoueursOvd(); chargerJoueurOvd(); });
   });
   peuplerJoueursOvd();
   calculerOvd();

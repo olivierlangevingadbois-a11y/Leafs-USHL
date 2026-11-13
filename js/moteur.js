@@ -1,24 +1,13 @@
 /* =====================================================================
-   MOTEUR : parseurs, profils, attentes, état
+   MOTEUR : formats, parseurs des pages de la ligue, profils, attentes
    ===================================================================== */
 
 /* ---------- Utilitaires ---------- */
-function normaliserNom(s){
-  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[_\s]+/g,' ').trim().toLowerCase();
-}
 /* Échappe un texte avant interpolation dans du HTML (les noms viennent de pages
    externes : défense en profondeur). */
 function echap(s){
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function nombre(s){
-  if (s===null || s===undefined) return null;
-  const t = String(s).replace(/\u00a0/g,' ').replace(/[$\s]/g,'').replace(',','.');
-  if (t==='' || t==='NA' || t==='-') return null;
-  const n = Number(t);
-  return isFinite(n) ? n : null;
 }
 function fmtArgent(n){
   if (n===null || n===undefined) return '—';
@@ -51,106 +40,6 @@ function fmtStat(cle, v){
   const r = Math.round(v*10)/10;
   const txt = (Math.abs(r % 1) < 1e-9) ? String(Math.round(r)) : r.toFixed(1);
   return (def.signe && v>0 ? '+' : '') + txt;
-}
-
-/* ---------- Parseur : formation (TeamRosters.php) ----------
-   Repère la table dont l'en-tête contient OV, Age et Salary, puis lit
-   chaque rangée par position de colonne (en-têtes courts, sans chiffres). */
-function parseRoster(html, doc){
-  const d = doc || new DOMParser().parseFromString(html, 'text/html');
-  const tables = Array.from(d.querySelectorAll('table'));
-  const attendu = ['PO','HD','IN','SP','ST','EN','DU','DI','SK','PA','PC','DF','OF','EX','LD','OV'];
-  let joueurs = [];
-  for (const table of tables){
-    const lignes = Array.from(table.querySelectorAll('tr'));
-    if (!lignes.length) continue;
-    const entetes = Array.from(lignes[0].querySelectorAll('th,td'))
-      .map(c => c.textContent.trim().toUpperCase());
-    // en-têtes valides : courts et sans chiffres (leçon du projet gardiens)
-    const valides = entetes.every(h => h.length<=8 && !/\d/.test(h));
-    const score = attendu.filter(h => entetes.includes(h)).length;
-    if (!valides || score < 12 || !entetes.includes('OV') || !entetes.includes('AGE')) continue;
-    const idx = {};
-    entetes.forEach((h,i)=>{ idx[h]=i; });
-    const col = h => idx[h]!==undefined ? idx[h] : -1;
-    for (let i=1;i<lignes.length;i++){
-      const cel = Array.from(lignes[i].querySelectorAll('td,th')).map(c=>c.textContent.trim());
-      if (cel.length < entetes.length-2) continue;
-      const nomBrut = (cel[0]||'').replace(/\s+/g,' ').trim();
-      if (!nomBrut) continue; // rangée des moyennes
-      const j = {
-        nom: nomBrut.replace(/\\_/g,'_'),
-        po: cel[col('PO')]||'', hd: cel[col('HD')]||'',
-        it: nombre(cel[col('IN')]), sp: nombre(cel[col('SP')]), st: nombre(cel[col('ST')]),
-        en: nombre(cel[col('EN')]), du: nombre(cel[col('DU')]), di: nombre(cel[col('DI')]),
-        sk: nombre(cel[col('SK')]), pa: nombre(cel[col('PA')]), pc: nombre(cel[col('PC')]),
-        df: nombre(cel[col('DF')]), sc: nombre(cel[col('OF')]),
-        ex: nombre(cel[col('EX')]), ld: nombre(cel[col('LD')]),
-        ov: nombre(cel[col('OV')]), age: nombre(cel[col('AGE')]),
-        salaire: nombre(cel[col('SALARY')]), ct: nombre(cel[col('CT')])
-      };
-      if (j.ov===null || j.age===null) continue;
-      j.backup = /^backup/i.test(j.nom.replace(/[\s_]/g,'')) || /^back ?up/i.test(j.nom);
-      joueurs.push(j);
-    }
-    if (joueurs.length) break; // première table valide = formation PRO
-  }
-  return joueurs;
-}
-
-/* ---------- Parseur : pointage (TeamScoring.php) ----------
-   Table à en-têtes variables ; on mappe par nom d'en-tête reconnu. */
-const ENTETES_SCORING = {
-  gp:['GP','PJ','MJ'], goals:['G','B','BUTS'], assists:['A','P','PASSES'],
-  pts:['PTS','P','POINTS'], plusminus:['+/-','+-','DIFF'],
-  pim:['PIM','PUN','MIN PUN'], ppg:['PP','PPG','BAN'], gwg:['GW','GWG','BG'],
-  shots:['S','SH','SHOTS','T','TIRS'], shotpct:['PCT','%','S%','%T'],
-  w:['W','V'], l:['L','D'], t:['T','N','OTL'], avg:['AVG','GAA','MOY'],
-  svpct:['SV%','SVPCT','%A','SPCT'], so:['SO','BL'], qs:['QS','DQ'], hs:['HS']
-};
-function trouverColonne(entetes, candidats){
-  for (const c of candidats){
-    const i = entetes.indexOf(c);
-    if (i>=0) return i;
-  }
-  return -1;
-}
-function parseScoring(html, doc){
-  const d = doc || new DOMParser().parseFromString(html, 'text/html');
-  const tables = Array.from(d.querySelectorAll('table'));
-  const patineurs = [], gardiens = [];
-  for (const table of tables){
-    const lignes = Array.from(table.querySelectorAll('tr'));
-    if (lignes.length < 2) continue;
-    const entetes = Array.from(lignes[0].querySelectorAll('th,td'))
-      .map(c=>c.textContent.trim().toUpperCase());
-    const valides = entetes.every(h=>h.length<=10 && !/\d/.test(h));
-    if (!valides) continue;
-    const iGP = trouverColonne(entetes, ENTETES_SCORING.gp);
-    if (iGP < 0) continue;
-    const estGardien = trouverColonne(entetes, ENTETES_SCORING.svpct)>=0
-                    || trouverColonne(entetes, ENTETES_SCORING.avg)>=0;
-    const map = {};
-    for (const cle of Object.keys(ENTETES_SCORING)){
-      map[cle] = trouverColonne(entetes, ENTETES_SCORING[cle]);
-    }
-    // Attention : 'A' peut vouloir dire assists, 'P' points... on résout les conflits :
-    if (map.assists === map.pts && map.assists>=0){
-      // si 'P' a servi aux deux, points = colonne suivante d'assists si PTS absent
-      map.pts = trouverColonne(entetes, ['PTS','POINTS']);
-    }
-    for (let i=1;i<lignes.length;i++){
-      const cel = Array.from(lignes[i].querySelectorAll('td,th')).map(c=>c.textContent.trim());
-      if (!cel[0] || cel.length < 3) continue;
-      const rec = { nom: cel[0].replace(/\s+/g,' ').trim() };
-      for (const cle of Object.keys(map)){
-        if (map[cle]>=0 && map[cle]<cel.length) rec[cle] = nombre(cel[map[cle]]);
-      }
-      if (rec.gp===null || rec.gp===undefined) continue;
-      (estGardien ? gardiens : patineurs).push(rec);
-    }
-  }
-  return {patineurs, gardiens};
 }
 
 /* ---------- Parseur : page officielle des MATRICES DES PROFILS ----------
@@ -401,56 +290,6 @@ function parseFicheAttributs(html, doc){
   return [];
 }
 
-/* Nettoie une ligne XtraStats avant analyse : selon le relais, les noms
-   arrivent entourés de balises HTML (<a href>…</a>) ou de liens markdown
-   [Nom](url), avec des entités (&amp;, &#39;). Sans ce nettoyage, les noms
-   s'affichent avec des débris de balises. */
-function nettoyerLigneXtra(l){
-  return l
-    .replace(/<[^>]*>/g, ' ')                       // balises HTML
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')        // liens markdown
-    .replace(/&amp;/g, '&').replace(/&#0?39;|&apos;|&rsquo;/g, "'")
-    .replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ');
-}
-
-/* ---------- Parseur : XtraStats (texte préformaté) ----------
-   Colonnes fixes : Player Team POS GP G A P Sh PiM MP H ...
-   On filtre l'équipe demandée. */
-function parseXtra(texte, equipe){
-  const resultat = [];
-  const lignes = texte.split(/\r?\n/);
-  const re = new RegExp('^\\s*\\*?\\s*(.+?)\\s+' + equipe + '\\s+(C|LW|RW|D|G)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)');
-  for (const l of lignes){
-    const propre = nettoyerLigneXtra(l);
-    const m = propre.match(re);
-    if (!m) continue;
-    resultat.push({
-      nom: m[1].replace(/\s+/g,' ').trim(), pos: m[2],
-      gp: +m[3], goals: +m[4], assists: +m[5], pts: +m[6],
-      shots: +m[7], pim: +m[8], mp: +m[9], hits: +m[10]
-    });
-  }
-  return resultat;
-}
-
-/* Version ligue entière du parseur XtraStats : capture aussi l'équipe.
-   Les codes d'équipe sont en majuscules (points et traits compris : ST.LOUIS). */
-function parseXtraLigue(texte){
-  const resultat = [];
-  const re = /^\s*\*?\s*(.+?)\s+([A-Z][A-Z._-]{2,})\s+(C|LW|RW|D|G)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/;
-  for (const l of texte.split(/\r?\n/)){
-    const propre = nettoyerLigneXtra(l);
-    const m = propre.match(re);
-    if (!m || estFictif(m[1])) continue;
-    resultat.push({
-      nom: m[1].replace(/\s+/g,' ').trim(), equipe: m[2], pos: m[3],
-      gp: +m[4], goals: +m[5], assists: +m[6], pts: +m[7],
-      shots: +m[8], pim: +m[9], mp: +m[10], hits: +m[11]
-    });
-  }
-  return resultat;
-}
-
 /* ---------- Profils ---------- */
 function categorieAge(age){
   if (age<=20) return 'junior';
@@ -576,43 +415,4 @@ function modsEstime(evals){
   const avec = evals.filter(e=>e.ev && e.ev.mods!==null && e.ev.mods!==undefined);
   if (!avec.length) return null;
   return Math.round(avec.reduce((a,e)=>a+e.ev.mods,0)/avec.length);
-}
-
-/* Formation de départ du club choisi. TORONTO garde le bloc SECOURS_ROSTER
-   (mêmes chiffres que le relevé, plus les numéros de chandail relevés à la
-   main) ; les 31 autres clubs partent de leur entrée du relevé du site. */
-function formationDeSecours(){
-  if (CONFIG.equipe === 'TORONTO') return SECOURS_ROSTER.map(j=>({...j}));
-  const duSite = LIGUE[CONFIG.equipe] && LIGUE[CONFIG.equipe].length;
-  return decoderTableau(duSite ? LIGUE[CONFIG.equipe] : LIGUE_S21[CONFIG.equipe], null, !duSite);
-}
-function dateFormationDeSecours(){
-  return CONFIG.equipe === 'TORONTO' || (LIGUE[CONFIG.equipe] && LIGUE[CONFIG.equipe].length)
-    ? DATE_SECOURS : DATE_S21;
-}
-
-/* ---------- État global ---------- */
-const ETAT = {
-  rosterBrut: formationDeSecours(), // formation telle que servie (site ou secours), AVANT transferts locaux
-  roster: formationDeSecours(),     // formation effective = rosterBrut + transferts locaux
-  scoring: {patineurs:[], gardiens:[]},
-  xtra: SECOURS_Y21.map(x=>({...x})),
-  xtraEstY21: true,
-  xtraDate: null,
-  modeY21: false,   // mode vérification : jamais conservé, retour à la saison courante à l'ouverture
-  fiche: CONFIG.equipe + ' 0-0-0',
-  source: 'données intégrées (' + dateFormationDeSecours() + ')',
-  filtreProg: 'tous',
-  rechercheAlign: '',  // filtre texte de la table d'alignement
-  limites: new Map(),  // limites d'utilisation des gardiens (gestiongardiens)
-  equipesLive: new Map(), // alignements des autres équipes téléchargés de ushl.ca
-  fiches: new Map(),   // historiques d'attributs des fiches de joueurs (recotes)
-  xtraLigue: []        // XtraStats de toute la ligue (meneurs)
-};
-function matchsEquipe(){
-  const m = ETAT.fiche.match(/(\d+)-(\d+)-(\d+)/);
-  return m ? Number(m[1])+Number(m[2])+Number(m[3]) : 0;
-}
-function preparerRoster(){
-  for (const j of ETAT.roster){ j._profil = determinerProfil(j); }
 }

@@ -77,7 +77,7 @@ function rendreComparateur(){
 let _distribsCache = null, _distribsStamp = '';
 const COTES_CLES = ['it','sp','st','en','du','di','sk','pa','pc','df','sc','ex','ld'];
 function distributionsLigue(){
-  const stamp = ETAT.equipesLive.size + ':' + ETAT.roster.length;
+  const stamp = ETAT.version + ':' + ETAT.roster.length;
   if (_distribsCache && _distribsStamp === stamp) return _distribsCache;
   const d = {F:{}, D:{}, G:{}};
   const cles = [...COTES_CLES, 'ov'];

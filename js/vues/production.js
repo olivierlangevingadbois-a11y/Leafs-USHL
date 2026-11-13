@@ -1,51 +1,66 @@
-/* ---------- Production ---------- */
+/* ---------- Production du club ----------
+   Statistiques de la saison (API de ushl.ca) et minutes jouées (XtraStats),
+   patineurs puis gardiens. Avant le premier match de la saison, ce sont les
+   totaux de la saison précédente qui s'affichent, à titre de repère. */
+const triProd = {col:'pts', desc:true};
+const COLONNES_PROD = [
+  ['nom','Nom'],['gp','PJ','Parties jouées'],['goals','B','Buts'],['assists','P','Passes'],['pts','PTS','Points'],
+  ['plusminus','+/-','Différentiel'],['pim','PUN','Minutes de punition'],['ppg','BAN','Buts en avantage numérique'],
+  ['shg','BDN','Buts en désavantage numérique'],['gwg','BG','Buts gagnants'],['shots','T','Tirs au but'],
+  ['shotpct','%T','Pourcentage de tirs'],['hits','MEÉ','Mises en échec'],['mp','MIN','Minutes jouées'],
+  ['mg','MIN/PJ','Minutes par match']
+];
+function noteProduction(){
+  if (ETAT.reference) return `Aucun match disputé cette saison : totaux de la saison précédente (XtraStats${ETAT.reference.date ? ' du ' + ETAT.reference.date : ''}), à titre de repère.`;
+  if (!ETAT.enSaison) return 'Aucun match disputé pour le moment.';
+  const minutes = Object.keys(ETAT.minutes.parCle).length
+    ? `minutes jouées : XtraStats${ETAT.minutes.date ? ' du ' + ETAT.minutes.date : ''}`
+    : 'minutes jouées indisponibles pour le moment';
+  return `Statistiques de la saison, lues sur ushl.ca ${ilYA(ETAT.stats.date)} · ${minutes}.`;
+}
 function rendreProduction(){
-  const enCours = ETAT.scoring.patineurs.length > 0;
-  const lignes = [];
-  for (const j of ETAT.roster){
-    if (j.backup) continue;
-    const p = productionDe(j);
-    lignes.push({j, p});
-  }
-  const avecDonnees = lignes.filter(l=>l.p);
-  $('#prodSous').textContent = enCours
-    ? 'Pointage de la saison actuelle (TeamScoring.php) enrichi de XtraStats (minutes, mises en échec)'
-    : 'Aucun match Y22 pour le moment — la référence Y21 (archive XtraStats) s\'affiche après la première actualisation depuis ushl.ca';
-  const totPts = avecDonnees.reduce((s,l)=>s+(l.p.pts||0),0);
-  const totB = avecDonnees.reduce((s,l)=>s+(l.p.goals||0),0);
-  const totH = avecDonnees.reduce((s,l)=>s+(l.p.hits||0),0);
-  $('#prodSommaire').innerHTML = `
-    <div class="stat-carte"><div class="lbl">${enCours?'Saison en cours':'Référence Y21'}</div>
-      <div class="val">${ETAT.fiche}</div><div class="det">${enCours?'données en direct':'en attente des premiers matchs Y22'}</div></div>
-    <div class="stat-carte"><div class="lbl">Buts</div><div class="val">${totB}</div></div>
-    <div class="stat-carte"><div class="lbl">Points</div><div class="val">${totPts}</div></div>
-    <div class="stat-carte orange"><div class="lbl">Mises en échec</div><div class="val">${totH}</div></div>`;
+  $('#prodSous').textContent = noteProduction();
+  const lignes = ETAT.roster.map(j => ({j, p: productionDe(j)})).filter(l => l.p);
+  const patineurs = lignes.filter(l => l.j.po !== 'G');
+  for (const l of patineurs) l.p.mg = (l.p.mp && l.p.gp) ? l.p.mp / l.p.gp : null;
+  const valeur = (l, c) => c === 'nom' ? l.j.nom : l.p[c];
+  patineurs.sort((a,b) => comparer(valeur(a, triProd.col), valeur(b, triProd.col), triProd.desc));
 
-  let html = `<thead><tr><th>Nom</th><th>PJ</th><th>B</th><th>P</th><th>PTS</th><th>+/-</th>
-    <th>BAN</th><th>BG</th><th>T</th><th>%T</th><th>MEÉ</th><th>MIN</th><th>MIN/PJ</th></tr></thead><tbody>`;
-  avecDonnees.sort((a,b)=>(b.p.pts||0)-(a.p.pts||0));
-  for (const {j,p} of avecDonnees){
-    if (j.po==='G') continue;
-    const badge = j.po==='D' ? 'd' : '';
-    html += `<tr><td><span class="pos-badge ${badge}">${j.po}</span>${echap(j.nom)}</td>
-      <td>${p.gp??'—'}</td><td>${p.goals??'—'}</td><td>${p.assists??'—'}</td>
-      <td><strong>${p.pts??'—'}</strong></td><td>${fmtStat('plusminus',p.plusminus)}</td>
-      <td>${p.ppg??'—'}</td><td>${p.gwg??'—'}</td><td>${p.shots??'—'}</td>
-      <td>${p.shotpct!==null?p.shotpct.toFixed(1):'—'}</td>
-      <td>${p.hits??'—'}</td><td>${p.mp??'—'}</td>
-      <td>${(p.mp&&p.gp)?(p.mp/p.gp).toFixed(1):'—'}</td></tr>`;
+  const nb = v => v ?? '—';
+  let html = enteteTriable(COLONNES_PROD, triProd) + '<tbody>';
+  for (const {j, p} of patineurs){
+    html += `<tr><td>${badgePosition(j.po)}${echap(j.nom)}${etiquetteEtat(j)}</td>
+      <td>${nb(p.gp)}</td><td>${nb(p.goals)}</td><td>${nb(p.assists)}</td>
+      <td><strong>${nb(p.pts)}</strong></td><td>${fmtStat('plusminus', p.plusminus)}</td>
+      <td>${nb(p.pim)}</td><td>${nb(p.ppg)}</td><td>${nb(p.shg)}</td><td>${nb(p.gwg)}</td><td>${nb(p.shots)}</td>
+      <td>${p.shotpct!==null ? p.shotpct.toFixed(1) : '—'}</td>
+      <td>${nb(p.hits)}</td><td>${nb(p.mp)}</td><td>${p.mg!==null ? p.mg.toFixed(1) : '—'}</td></tr>`;
   }
-  // gardiens
-  const gardiens = lignes.filter(l=>l.j.po==='G');
+  if (patineurs.length){
+    const somme = c => patineurs.reduce((s, l) => s + (l.p[c] || 0), 0);
+    html += `<tr class="total"><td>Total des patineurs</td><td></td><td>${somme('goals')}</td><td>${somme('assists')}</td>
+      <td><strong>${somme('pts')}</strong></td><td></td><td>${somme('pim')}</td><td>${somme('ppg')}</td><td>${somme('shg')}</td>
+      <td>${somme('gwg')}</td><td>${somme('shots')}</td><td></td><td>${somme('hits')}</td><td></td><td></td></tr>`;
+  }
+  // gardiens : mêmes colonnes de tête, statistiques propres
+  const gardiens = ETAT.roster.filter(j => j.po === 'G').map(j => ({j, p: productionDe(j)}));
   if (gardiens.length){
-    html += `<tr><td colspan="13" style="text-align:left;color:var(--txt-faint);background:var(--bleu-nuit);
-      text-transform:uppercase;font-size:.65rem;letter-spacing:1px">Gardiens ${enCours?'(saison en cours)':'(matchs Y21)'}</td></tr>`;
-    for (const {j,p} of gardiens){
-      html += `<tr><td><span class="pos-badge g">G</span>${echap(j.nom)}</td>
-        <td>${p?.gp??'—'}</td><td colspan="3">V ${p?.w??'—'} · MOY ${p?.avg!==null&&p?.avg!==undefined?p.avg:'—'} · %A ${p?.svpct??'—'}</td>
-        <td colspan="8" style="text-align:left;color:var(--txt-faint)">DQ ${p?.qs??'—'} · MIN ${p?.mp??'—'}</td></tr>`;
+    html += `<tr class="sous-entete"><td>Gardiens</td><td>PJ</td><td title="Victoires">V</td><td title="Défaites">D</td>
+      <td title="Nulles">N</td><td title="Moyenne de buts alloués">MOY</td><td title="Pourcentage d'arrêts">%A</td>
+      <td title="Blanchissages">BL</td><td title="Tirs reçus">TR</td><td title="Buts alloués">BC</td>
+      <td title="Minutes jouées">MIN</td><td colspan="4" class="gauche">Limite de parties</td></tr>`;
+    for (const {j, p} of gardiens){
+      const lim = ETAT.limites.get(normaliserNom(j.nom));
+      const limite = lim ? `${p?.gp ?? 0} / ${lim}` + (p?.gp ? ` (${Math.round(p.gp/lim*100)} %)` : '') : '—';
+      html += `<tr><td>${badgePosition('G')}${echap(j.nom)}${etiquetteEtat(j)}</td>
+        <td>${nb(p?.gp)}</td><td>${nb(p?.w)}</td><td>${nb(p?.l)}</td><td>${nb(p?.t)}</td>
+        <td>${p?.avg!==null && p?.avg!==undefined ? p.avg.toFixed(2) : '—'}</td>
+        <td>${p?.svpct!==null && p?.svpct!==undefined ? p.svpct.toFixed(3).replace(/^0/, '') : '—'}</td>
+        <td>${nb(p?.so)}</td><td>${nb(p?.sa)}</td><td>${nb(p?.ga)}</td><td>${nb(p?.mp)}</td>
+        <td colspan="4" class="gauche">${limite}</td></tr>`;
     }
   }
-  html += '</tbody>';
-  $('#tableProduction').innerHTML = html;
+  const table = $('#tableProduction');
+  table.innerHTML = html + '</tbody>';
+  brancherTri(table, triProd, rendreProduction);
 }

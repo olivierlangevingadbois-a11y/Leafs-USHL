@@ -33,7 +33,7 @@ function litTrios(){
 }
 function ecritTrios(t){ localStorage.setItem(CLES_LS.trios, JSON.stringify(t)); }
 function joueursTrios(type){
-  const js = ETAT.roster.filter(j=>!j.backup);
+  const js = ETAT.roster;
   if (type==='D') return js.filter(j=>j.po==='D');
   if (type==='G') return js.filter(j=>j.po==='G');
   if (type==='X') return js.filter(j=>j.po!=='G'); // unités spéciales : tous les patineurs

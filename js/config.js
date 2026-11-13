@@ -1,7 +1,7 @@
 /* =====================================================================
    POSTE DU DG — USHL PRO (tableau de bord, un club au choix parmi les 32)
    Monofichier vanilla HTML/CSS/JS — aucune dépendance, aucun build.
-   Sources en direct : TeamRosters.php, TeamScoring.php, USHLxtrastats.html
+   Données : API JSON de ushl.ca (voir js/ushl.js), relevé intégré en secours.
    ===================================================================== */
 'use strict';
 
@@ -54,19 +54,13 @@ function litClubChoisi(){
   return CLUB_DEFAUT;
 }
 const CLUB_ACTIF = litClubChoisi();
-const BASE_SIM = 'https://ushl.ca/ushl/menu_sim/USHL-pro/jamesishot/';
-
 /* ------------------ CONFIGURATION ------------------ */
 const CONFIG = {
   equipe: CLUB_ACTIF,
   club: CLUBS[CLUB_ACTIF],
-  urls: {
-    roster:  BASE_SIM + 'TeamRosters.php?team=' + CLUB_ACTIF,
-    scoring: BASE_SIM + 'TeamScoring.php?team=' + CLUB_ACTIF,
-    xtra:    'https://ushl.ca/ushl/menu_sim/USHL-pro/USHLxtrastats.html',
-    matrices:'https://ushl.ca/ushl/menu_ushl/la_ligue/reglements/MATRICES%20DES%20PROFILS.htm'
-  },
-  proxys: [
+  /* Relais anti-CORS, pour les seules pages que l'API ne couvre pas
+     (classement officiel, XtraStats, fiche d'un joueur, matrices). */
+  relais: [
     u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
     u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
     u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
@@ -75,7 +69,10 @@ const CONFIG = {
   ],
   // limites d'utilisation des gardiens (projet gestiongardiens, généré depuis ushl.ca)
   urlLimites: 'https://merciermathieu5.github.io/gestiongardiens/limites.json',
-  ttl: { roster: 12*3600*1000, scoring: 30*60*1000, xtra: 3600*1000, limites: 3600*1000 },
+  /* Fraîcheur : en deçà, l'ouverture de la page ne relit pas la source.
+     Le bouton «Actualiser» relit toujours tout. */
+  ttl: { api: 5*60*1000, pages: 3*3600*1000, limites: 3600*1000, fiche: 12*3600*1000 },
+  delai: { api: 12000, relais: 12000, avanceRelaisPrefere: 2500 },
   matchsSaison: 82
 };
 
@@ -86,25 +83,27 @@ const CONFIG = {
 const CLES_LS = {
   matrices: 'tml_matrices_v1',
   overrides: 'tml_attentes_joueurs_v1',
-  proxy: 'tml_proxy_prefere_v1',
-  cache: 'tml_cache_v1',
+  relais: 'tml_proxy_prefere_v1',
+  cache: 'tml_cache_v2',
   instantane: 'tml_instantane_ligue_v1',
   club: CLE_CLUB,
   resign: 'tml_resignatures_v1:' + CLUB_ACTIF,
   trios: 'tml_trios_v1:' + CLUB_ACTIF,
   transferts: 'tml_transferts_v1:' + CLUB_ACTIF
 };
-/* Avant le choix du club, ces trois clés n'existaient qu'en une version, celle
-   de TORONTO : on la lui attribue une fois pour toutes plutôt que de la perdre. */
-(function migrerClesDuClub(){
+/* Ménage du stockage : ce que d'anciennes versions y ont laissé. */
+(function nettoyerStockage(){
   try {
+    // prolongations, trios et transferts d'avant le choix du club : ils étaient à TORONTO
     for (const base of ['tml_resignatures_v1','tml_trios_v1','tml_transferts_v1']){
       const v = localStorage.getItem(base);
       if (v === null) continue;
       if (localStorage.getItem(base + ':TORONTO') === null) localStorage.setItem(base + ':TORONTO', v);
       localStorage.removeItem(base);
     }
-  } catch (e){ /* stockage refusé : rien à migrer */ }
+    // pages HTML brutes mises en cache (plus d'un mégaoctet) et repêchage Y22 terminé
+    for (const cle of ['tml_cache_v1','tml_repechage_choix_v1','tml_repechage_liste_v1']) localStorage.removeItem(cle);
+  } catch (e){ /* stockage refusé : rien à nettoyer */ }
 })();
 
 /* ------------------ DÉFINITION DES STATS ------------------ */

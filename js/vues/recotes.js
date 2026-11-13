@@ -89,9 +89,6 @@ function recotesEquipe(code){
 function rendreRecotes(){
   const table = document.getElementById('tableRecotes');
   if (!table) return;
-  // au tout premier rendu de l'initialisation, le moteur d'OV (OV_ORDRE,
-  // déclaré plus bas) n'existe pas encore : on repassera au prochain rendu
-  try { void OV_ORDRE; } catch (e){ return; }
   const selEq = document.getElementById('recEquipe');
   if (!selEq.options.length){
     selEq.innerHTML = LIGUE_EQUIPES.map(e=>`<option value="${e}">${e}${e===CONFIG.equipe?' (mon club)':''}</option>`).join('');
@@ -146,11 +143,9 @@ function rendreRecotes(){
   const nbSite = lignes.filter(r=>r.source==='site').length;
   document.getElementById('recNote').textContent =
     (nbSite ? `${nbSite} joueur${nbSite>1?'s':''} depuis les fiches du site · ` : '')
-    + ((selEq.value===CONFIG.equipe ? ETAT.source.includes('ushl.ca') : ETAT.equipesLive.has(selEq.value))
-      ? 'cotes actuelles en direct'
-      : cotesDuSite(selEq.value)
-        ? `cotes actuelles : relevé du site du ${LIGUE_DATE}`
-        : `équipe encore sur les fichiers de la ligue du ${DATE_S21} — actualise-la`);
+    + (cotesDuSite(selEq.value)
+        ? `cotes actuelles : ${provenanceDe(joueursEquipeBrut(selEq.value)[0])}`
+        : `équipe encore sur les fichiers de la ligue du ${DATE_S21} — actualise`);
 }
 /* ---------- Classement des recotes de la ligue ----------
    Pour chaque équipe dont les cotes viennent du site (session en direct ou
@@ -187,8 +182,7 @@ function texteClassementRecotes(){
     l.push(`${String(i+1).padStart(2)}. ${r.eq.padEnd(11)} ${(r.moy>=0?'+':'')}${r.moy.toFixed(3)} d'OV moyen · total ${(r.tot>=0?'+':'')}${r.tot.toFixed(1)} sur ${r.n} patineurs · meilleur : ${r.top.nom} ${(r.top.d>=0?'+':'')}${r.top.d.toFixed(2)}`);
   });
   if (rangs.length < LIGUE_EQUIPES.length){
-    l.push('', `(${rangs.length}/${LIGUE_EQUIPES.length} équipes — «Classer les 32 équipes» télécharge les manquantes${
-      EQUIPES_PERIMEES.length ? ' : ' + EQUIPES_PERIMEES.join(', ') : ''})`);
+    l.push('', `(${rangs.length}/${LIGUE_EQUIPES.length} équipes — les autres n'ont pas encore de cotes du site)`);
   }
   return l.join('\n');
 }
@@ -216,13 +210,14 @@ async function telechargerFichesEquipe(){
   btn.disabled = true;
   const code = document.getElementById('recEquipe').value;
   const manquants = joueursEquipe(code).filter(j=>!ETAT.fiches.has(normaliserNom(j.nom)));
-  let faites = 0;
-  for (const j of manquants){
-    try { await chargerFiche(j.nom); } catch(e){ /* fiche injoignable : on continue */ }
-    rendreRecotes();
-    document.getElementById('recNote').textContent = `fiches ushl.ca : ${++faites}/${manquants.length} (${j.nom})…`;
-  }
+  let faites = 0, lues = 0;
+  await enParallele(manquants, 4, async j => {
+    try { await chargerFiche(j.nom); lues++; } catch(e){ /* fiche injoignable : on continue */ }
+    document.getElementById('recNote').textContent = `fiches ushl.ca : ${++faites}/${manquants.length}…`;
+  });
   btn.disabled = false;
   rendreRecotes();
-  flash('Fiches de ' + code + ' chargées depuis ushl.ca');
+  flash(manquants.length && !lues
+    ? 'Aucune fiche lue : les relais ne répondent pas, réessaie plus tard'
+    : `Fiches de ${code} : ${lues} lue${lues>1?'s':''} sur ${manquants.length}`);
 }

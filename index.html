@@ -6,7 +6,7 @@
 <title>Poste du DG — USHL Pro</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#00205B">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%2300205B%22/><text x=%2250%22 y=%2268%22 font-size=%2256%22 text-anchor=%22middle%22>🍁</text></svg>">
+<link rel="icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
@@ -16,75 +16,80 @@
 
 <header>
   <div class="head-row">
+    <div class="head-ecusson" id="ecussonClub" aria-hidden="true"></div>
     <div class="head-titles">
-      <h1 id="titreClub">MAPLE LEAFS DE TORONTO</h1>
+      <h1 id="titreClub">POSTE DU DG</h1>
+      <div class="head-fiche"><span id="ficheEquipe">—</span><span id="rangEquipe"></span></div>
     </div>
     <div class="head-meta">
-      <div class="fiche" id="ficheEquipe">—</div>
-      <div id="sourceInfo">données locales</div>
+      <div class="etat-donnees" id="etatDonnees" data-etat="releve">
+        <span class="pastille" aria-hidden="true"></span><span id="sourceInfo">relevé intégré</span>
+      </div>
+      <button id="btnMaj" title="Relit toute la ligue sur ushl.ca">Actualiser</button>
     </div>
   </div>
+  <div class="head-detail" id="etatMaj" role="status" aria-live="polite"></div>
 </header>
 
-<nav>
-  <button class="actif" data-vue="alignement">Alignement</button>
-  <button data-vue="production">Production</button>
+<nav id="navPrincipale" aria-label="Sections">
+  <button class="actif" data-vue="club">Mon club</button>
   <button data-vue="progression">Progression</button>
   <button data-vue="trios">Trios</button>
-  <button data-vue="comparateur">Comparateur</button>
   <button data-vue="ligue">Ligue</button>
-  <button data-vue="meneurs">Meneurs</button>
-  <button data-vue="classement">Classement</button>
   <button data-vue="echange">Échange</button>
-  <button data-vue="recotes">Recotes</button>
-  <button data-vue="plafond">Plafond</button>
-  <button data-vue="ovdetail">OV détaillé</button>
+  <button data-vue="analyse">Analyse</button>
   <button data-vue="reglages">Réglages</button>
-  <div class="maj-zone">
-    <button id="btnMaj">Actualiser depuis ushl.ca</button>
-    <button id="btnModeY21" class="secondaire" title="Affiche l'interface avec les totaux complets de la saison Y21 (archive XtraStats téléchargée) pour vérifier le moteur des attentes">Vérifier avec la Y21</button>
-    <button id="btnEffacerCache" title="Efface les données mises en cache (formation, production, XtraStats, limites) puis actualise depuis ushl.ca">Effacer la cache</button>
-    <span id="etatMaj"></span>
-    <div id="bandeauY21" style="display:none">MODE VÉRIFICATION — SAISON Y21 · totaux complets de la saison · l'interface revient à la saison en cours à chaque ouverture</div>
-  </div>
 </nav>
 
 <main>
 
-  <!-- ================= ALIGNEMENT ================= -->
-  <section class="vue actif" id="vue-alignement">
-    <h2>Alignement professionnel</h2>
-    <div class="h2-sous" id="alignSous">Cotes, salaires et contrats — source : TeamRosters.php</div>
+  <!-- ================= MON CLUB : formation, production, plafond ================= -->
+  <section class="vue actif" id="vue-club">
     <div id="alertesDG"></div>
     <div class="sommaire" id="alignSommaire"></div>
-    <div class="align-outils">
-      <input type="search" id="rechercheAlign" placeholder="Filtrer par nom, position ou profil…" aria-label="Filtrer l'alignement">
-      <button id="btnExportCSV" title="Télécharge l'alignement affiché en CSV (séparateur point-virgule, compatible Excel)">Exporter en CSV</button>
+    <div class="sous-nav" role="tablist" aria-label="Mon club">
+      <button class="actif" data-sous="alignement">Formation</button>
+      <button data-sous="production">Production</button>
+      <button data-sous="plafond">Plafond</button>
     </div>
-    <div class="transf-bloc">
-      <span class="transf-titre" title="La base du site met parfois du temps à refléter un échange : déplace un joueur d'une équipe à l'autre DANS L'APPLICATION seulement, le temps que l'administration le traite. S'applique partout (masse, plafond, trios, ligue, recotes) et survit aux actualisations — retire-le quand le site est à jour.">Transfert local :</span>
-      <select id="transfDe" aria-label="Équipe source"></select>
-      <select id="transfJoueur" aria-label="Joueur à transférer"></select>
-      <span class="transf-fleche">→</span>
-      <select id="transfVers" aria-label="Équipe destination"></select>
-      <button id="btnTransferer">Transférer</button>
-      <div id="transfListe"></div>
-    </div>
-    <div class="table-wrap"><table id="tableAlignement"></table></div>
-  </section>
 
-  <!-- ================= PRODUCTION ================= -->
-  <section class="vue" id="vue-production">
-    <h2>Production — saison en cours</h2>
-    <div class="h2-sous" id="prodSous">Pointage de la saison actuelle (TeamScoring.php) enrichi de XtraStats (minutes, mises en échec)</div>
-    <div class="sommaire" id="prodSommaire"></div>
-    <div class="table-wrap"><table id="tableProduction"></table></div>
+    <div class="sous-vue actif" id="sous-alignement">
+      <div class="align-outils">
+        <input type="search" id="rechercheAlign" placeholder="Filtrer par nom, position ou profil…" aria-label="Filtrer l'alignement">
+        <button id="btnExportCSV" class="secondaire" title="Télécharge l'alignement affiché en CSV (séparateur point-virgule, compatible Excel)">Exporter en CSV</button>
+      </div>
+      <div class="table-wrap"><table id="tableAlignement"></table></div>
+      <details class="repli" id="blocTransferts">
+        <summary>Transfert local <span id="transfCompte"></span></summary>
+        <p class="aide">Le site met parfois du temps à refléter un échange. Un transfert local déplace un joueur d'une équipe à l'autre dans cette application seulement (masse, plafond, trios, ligue, recotes) ; retire-le quand le site est à jour.</p>
+        <div class="transf-bloc">
+          <select id="transfDe" aria-label="Équipe source"></select>
+          <select id="transfJoueur" aria-label="Joueur à transférer"></select>
+          <span class="transf-fleche">→</span>
+          <select id="transfVers" aria-label="Équipe destination"></select>
+          <button id="btnTransferer">Transférer</button>
+          <div id="transfListe"></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="sous-vue" id="sous-production">
+      <div class="h2-sous" id="prodSous"></div>
+      <div class="table-wrap"><table id="tableProduction"></table></div>
+    </div>
+
+    <div class="sous-vue" id="sous-plafond">
+      <div class="h2-sous">Masse engagée saison par saison selon les contrats en cours et les prolongations enregistrées. Plafond : 104 M$.</div>
+      <div class="sommaire" id="plafondSommaire"></div>
+      <div class="table-wrap"><table id="tablePlafond"></table></div>
+      <p class="plafond-note">Hypothèses : plafond constant, aucun rachat ni échange. Un contrat de CT&nbsp;= N couvre les N prochaines saisons ; les contrats qui expirent sont à re-signer à la charte (bouton Prolonger de la formation) ou à remplacer.</p>
+    </div>
   </section>
 
   <!-- ================= PROGRESSION ================= -->
   <section class="vue" id="vue-progression">
     <h2>Charte de progression</h2>
-    <div class="h2-sous">Seuils des matrices officielles (article 6.2.6, recote été 2022) selon le profil et l'overall. Un degré est acquis en <em>dépassant strictement</em> son seuil — le <strong style="color:var(--accent-vif)">Mémorable</strong> (ModS +60) exige de faire mieux que le seuil, pas de l'égaler (tableau 18).</div>
+    <div class="h2-sous">Seuils des matrices officielles (article 6.2.6) selon le profil et l'overall. Un degré est acquis en <em>dépassant strictement</em> son seuil.</div>
     <div class="filtres" id="progFiltres">
       <button class="actif" data-f="tous">Tous</button>
       <button data-f="av">Attaquants</button>
@@ -99,7 +104,7 @@
   <!-- ================= TRIOS ================= -->
   <section class="vue" id="vue-trios">
     <h2>Bâtisseur de trios</h2>
-    <div class="h2-sous">Compose les quatre trios, les trois paires de défenseurs, le duo de gardiens et les unités spéciales à partir de l'alignement. Le <strong>double shift</strong> est permis sur le 4e trio : un joueur des trios 1 à 3 peut y reprendre sa place sans conflit. Sauvegardé dans ce navigateur ; «&nbsp;Copier en texte&nbsp;» produit une version prête à coller (courriel, forum, feuille de match).</div>
+    <div class="h2-sous">Quatre trios, trois paires, les gardiens et les unités spéciales. Le double shift est permis sur le 4e trio. Sauvegardé dans ce navigateur.</div>
     <div class="trios-actions">
       <button id="btnTriosAuto">Remplir par OV</button>
       <button id="btnTriosCopier" class="secondaire">Copier en texte</button>
@@ -110,86 +115,78 @@
     <div class="trios-grille" id="triosZone"></div>
   </section>
 
-  <!-- ================= COMPARATEUR ================= -->
-  <section class="vue" id="vue-comparateur">
-    <h2>Comparateur de joueurs</h2>
-    <div class="h2-sous">Deux joueurs de n'importe quelles équipes de la ligue côte à côte : cotes, profil, contrat et modificateurs. La barre pleine marque le plus fort des deux sur chaque cote ; survole une valeur pour voir son centile parmi la ligue à sa position (souligné vert = top 10 %). Pour les autres équipes, les cotes proviennent des fichiers de la ligue (recote Y22) ou du direct dès qu'elles sont consultées.</div>
-    <div class="comp-choix">
-      <label>Équipe A <select id="compEqA"></select></label>
-      <label>Joueur A <select id="compA"></select></label>
-      <span class="comp-vs">VS</span>
-      <label>Équipe B <select id="compEqB"></select></label>
-      <label>Joueur B <select id="compB"></select></label>
-    </div>
-    <div id="compZone"></div>
-  </section>
-
-  <!-- ================= LIGUE ================= -->
+  <!-- ================= LIGUE : classement, joueurs (cotes ou statistiques), recotes ================= -->
   <section class="vue" id="vue-ligue">
-    <h2>Joueurs de la ligue</h2>
-    <div class="h2-sous">Dépistage à l'échelle des 32 équipes. Les cotes d'une équipe passent en direct dès qu'elle est consultée (comparateur ou calculateur d'OV) ; sinon, instantané des fichiers de la ligue. Clique un en-tête pour trier.</div>
-    <div class="ligue-filtres">
-      <input type="search" id="ligueTexte" placeholder="Nom…" aria-label="Filtrer par nom">
-      <select id="ligueEquipe" aria-label="Équipe"><option value="">Toutes les équipes</option></select>
-      <select id="liguePo" aria-label="Position">
-        <option value="">Toutes les positions</option>
-        <option value="F">Attaquants</option>
-        <option value="C">C</option><option value="AG">AG</option><option value="AD">AD</option>
-        <option value="D">D</option><option value="G">G</option>
-      </select>
-      <select id="ligueProfil" aria-label="Profil"><option value="">Tous les profils</option></select>
-      <input type="number" id="ligueOvMin" placeholder="OV min" min="50" max="99" aria-label="OV minimum">
-      <input type="number" id="ligueAgeMax" placeholder="Âge max" min="18" max="45" aria-label="Âge maximum">
-      <label class="lig-chk"><input type="checkbox" id="ligueExpirants"> contrat d'un an ou échu</label>
-      <button id="btnLigueMaj" title="Télécharge l'alignement à jour des 32 équipes depuis ushl.ca (recote, salaires, contrats et âges du site — l'instantané intégré peut retarder d'un cycle)">Actualiser toute la ligue</button>
-      <span id="ligueCompte"></span>
+    <div class="sous-nav" role="tablist" aria-label="Ligue">
+      <button class="actif" data-sous="classement">Classement</button>
+      <button data-sous="joueurs">Joueurs</button>
+      <button data-sous="recotes">Recotes</button>
     </div>
-    <div class="table-wrap"><table id="tableLigue"></table></div>
-  </section>
 
-  <!-- ================= MENEURS ================= -->
-  <section class="vue" id="vue-meneurs">
-    <h2>Meneurs de la ligue</h2>
-    <div class="h2-sous" id="menSous">Classements des patineurs de toute la ligue, tirés de la page XtraStats téléchargée à l'actualisation. Les joueurs de ton club sont surlignés.</div>
-    <div class="comp-choix" style="margin-bottom:14px">
-      <label>Catégorie
-        <select id="menCategorie">
-          <option value="pts">Points</option>
-          <option value="goals">Buts</option>
-          <option value="assists">Passes</option>
-          <option value="hits">Mises en échec</option>
-          <option value="shots">Tirs au but</option>
-          <option value="mp">Minutes jouées</option>
-          <option value="pim">Minutes de punition</option>
-        </select>
-      </label>
-      <label>Position
-        <select id="menPo">
-          <option value="">Toutes</option>
+    <div class="sous-vue actif" id="sous-classement">
+      <div class="barre-outils">
+        <div class="segments" id="classGroupes" role="group" aria-label="Regroupement">
+          <button class="actif" data-groupe="ligue">Ligue</button>
+          <button data-groupe="conf">Associations</button>
+          <button data-groupe="div">Sections</button>
+        </div>
+        <span class="note-outils" id="classEtat"></span>
+      </div>
+      <div id="classementZone"></div>
+    </div>
+
+    <div class="sous-vue" id="sous-joueurs">
+      <div class="barre-outils">
+        <div class="segments" id="ligueMode" role="group" aria-label="Colonnes affichées">
+          <button class="actif" data-mode="cotes">Cotes et contrats</button>
+          <button data-mode="stats">Statistiques</button>
+        </div>
+        <span class="note-outils" id="ligueCompte"></span>
+      </div>
+      <div class="ligue-filtres">
+        <input type="search" id="ligueTexte" placeholder="Nom…" aria-label="Filtrer par nom">
+        <select id="ligueEquipe" aria-label="Équipe"><option value="">Toutes les équipes</option></select>
+        <select id="liguePo" aria-label="Position">
+          <option value="">Toutes les positions</option>
           <option value="F">Attaquants</option>
-          <option value="D">Défenseurs</option>
+          <option value="C">C</option><option value="AG">AG</option><option value="AD">AD</option>
+          <option value="D">D</option><option value="G">G</option>
         </select>
-      </label>
-      <label class="lig-chk" style="align-self:flex-end; padding-bottom:8px"><input type="checkbox" id="menLeafs"> mon club seulement</label>
+        <select id="ligueProfil" aria-label="Profil"><option value="">Tous les profils</option></select>
+        <input type="number" id="ligueOvMin" placeholder="OV min" min="50" max="99" aria-label="OV minimum">
+        <input type="number" id="ligueAgeMax" placeholder="Âge max" min="18" max="45" aria-label="Âge maximum">
+        <label class="lig-chk"><input type="checkbox" id="ligueExpirants"> contrat d'un an ou échu</label>
+      </div>
+      <div class="table-wrap"><table id="tableLigue"></table></div>
+      <div class="pied-table"><button id="ligueTout" class="secondaire" hidden></button></div>
     </div>
-    <div class="table-wrap"><table id="tableMeneurs"></table></div>
-  </section>
 
-  <!-- ================= CLASSEMENT ================= -->
-  <section class="vue" id="vue-classement">
-    <h2>Classement de la ligue</h2>
-    <div class="h2-sous">Fiches V-D-N relevées dans les pages téléchargées de ushl.ca (2 points par victoire, 1 par nulle). Le classement se complète à mesure que les équipes sont consultées — ou d'un coup avec le bouton.</div>
-    <div class="trios-actions">
-      <button id="btnFiches">Télécharger les 32 fiches</button>
-      <span id="classEtat"></span>
+    <div class="sous-vue" id="sous-recotes">
+      <div class="h2-sous">Chaque cote actuelle comparée à la fin de la saison Y21. Vert = a monté, rouge = a baissé ; survole une cellule pour voir avant → après.</div>
+      <div class="comp-choix">
+        <label>Équipe <select id="recEquipe"></select></label>
+        <button id="btnRecFiches" class="secondaire" title="Lit l'historique des attributs de chaque joueur de l'équipe sur sa fiche ushl.ca (source la plus fiable : saison par saison, gardiens compris)">Compléter depuis les fiches du site</button>
+        <span class="note-outils" id="recNote"></span>
+      </div>
+      <div class="table-wrap"><table id="tableRecotes"></table></div>
+
+      <h3 class="titre-bloc">Classement des recotes de la ligue</h3>
+      <div class="h2-sous">Gain moyen d'OV exact par patineur entre la fin S21 et les cotes actuelles, équipe par équipe.</div>
+      <div class="trios-actions">
+        <button id="btnRecClassementTxt" class="secondaire">Télécharger en .txt</button>
+      </div>
+      <div class="table-wrap"><table id="tableRecClassement"></table></div>
     </div>
-    <div class="table-wrap"><table id="tableClassement"></table></div>
   </section>
 
   <!-- ================= ÉCHANGE ================= -->
   <section class="vue" id="vue-echange">
     <h2>Analyseur d'échange</h2>
-    <div class="h2-sous">Simule un échange : choisis qui part et qui arrive, l'impact sur la masse (cette saison et les suivantes), l'OV et l'âge du club se calcule tout seul. La bascule <strong>«&nbsp;re-signé ensuite&nbsp;»</strong> enchaîne, à l'échéance du contrat actuel (qu'elle respecte — on ne re-signe pas un joueur sous contrat), une re-signature à la valeur standard de la charte, au statut de son âge à ce moment. L'OV exact (deux décimales) est entre parenthèses. Rien n'est envoyé nulle part — c'est un brouillon de DG.</div>
+    <div class="h2-sous">Choisis qui part et qui arrive : l'impact sur la masse, l'OV et l'âge du club se calcule tout seul. Rien n'est envoyé nulle part.</div>
+    <details class="repli">
+      <summary>Comment ça marche</summary>
+      <p class="aide">La bascule «&nbsp;re-signé ensuite&nbsp;» enchaîne, à l'échéance du contrat actuel (qu'elle respecte — on ne re-signe pas un joueur sous contrat), une re-signature à la valeur standard de la charte, au statut de son âge à ce moment. L'OV exact (deux décimales) est entre parenthèses.</p>
+    </details>
     <div class="ech-colonnes">
       <div class="ech-cote">
         <h3>Ça part — mon club</h3>
@@ -211,73 +208,62 @@
     </div>
     <div class="sommaire" id="echSommaire"></div>
     <div class="table-wrap" id="echTableWrap"><table id="tableEchange"></table></div>
-    <div class="regl-actions" style="margin-top:12px"><button id="echVider" class="secondaire">Vider l'échange</button></div>
+    <div class="regl-actions"><button id="echVider" class="secondaire">Vider l'échange</button></div>
   </section>
 
-  <!-- ================= RECOTES ================= -->
-  <section class="vue" id="vue-recotes">
-    <h2>Suivi des recotes</h2>
-    <div class="h2-sous">Chaque cote actuelle comparée à la fin de la saison Y21 (fichiers de la ligue) : qui progresse, qui décline — pour cibler les joueurs en ascension et vendre les actifs qui baissent. Vert = a monté, rouge = a baissé. Survole une cellule pour voir avant → après.</div>
-    <div class="comp-choix" style="margin-bottom:14px">
-      <label>Équipe <select id="recEquipe"></select></label>
-      <button id="btnRecFiches" style="align-self:flex-end" title="Télécharge l'historique des attributs de chaque joueur de l'équipe depuis sa fiche ushl.ca (source la plus fiable : saison par saison, OV du site, gardiens compris)">Compléter depuis les fiches du site</button>
-      <span id="recNote" style="font-family:var(--font-data); font-size:.72rem; color:var(--txt-faint); align-self:flex-end; padding-bottom:6px"></span>
+  <!-- ================= ANALYSE : comparateur, OV détaillé ================= -->
+  <section class="vue" id="vue-analyse">
+    <div class="sous-nav" role="tablist" aria-label="Analyse">
+      <button class="actif" data-sous="comparateur">Comparateur</button>
+      <button data-sous="ovdetail">OV détaillé</button>
     </div>
-    <div class="table-wrap"><table id="tableRecotes"></table></div>
 
-    <h2 style="margin-top:28px">Classement des recotes de la ligue</h2>
-    <div class="h2-sous">Gain moyen d'OV exact par patineur entre la fin S21 et les cotes actuelles du site, équipe par équipe. Seules les équipes dont l'alignement en direct est chargé sont classées — le bouton télécharge les 32.</div>
-    <div class="trios-actions">
-      <button id="btnRecClassement">Classer les 32 équipes</button>
-      <button id="btnRecClassementTxt" class="secondaire">Télécharger en .txt</button>
+    <div class="sous-vue actif" id="sous-comparateur">
+      <div class="h2-sous">Deux joueurs de n'importe quelles équipes côte à côte. La barre pleine marque le plus fort ; survole une valeur pour son centile dans la ligue à sa position (souligné vert = top 10 %).</div>
+      <div class="comp-choix">
+        <label>Équipe A <select id="compEqA"></select></label>
+        <label>Joueur A <select id="compA"></select></label>
+        <span class="comp-vs">VS</span>
+        <label>Équipe B <select id="compEqB"></select></label>
+        <label>Joueur B <select id="compB"></select></label>
+      </div>
+      <div id="compZone"></div>
     </div>
-    <div class="table-wrap"><table id="tableRecClassement"></table></div>
-  </section>
 
-  <!-- ================= PLAFOND ================= -->
-  <section class="vue" id="vue-plafond">
-    <h2>Projection du plafond salarial</h2>
-    <div class="h2-sous">Masse engagée saison par saison selon les contrats actuels (et les prolongations enregistrées pour les contrats échus). Plafond de la ligue : 104 M$. Un contrat de CT&nbsp;= N couvre les N prochaines saisons.</div>
-    <div class="sommaire" id="plafondSommaire"></div>
-    <div class="table-wrap"><table id="tablePlafond"></table></div>
-    <p class="plafond-note">Hypothèses : plafond constant à 104 M$, aucun rachat ni échange. Les joueurs dont le contrat expire doivent être re-signés à la charte (voir la colonne Re-signer de l'alignement) ou remplacés.</p>
-  </section>
-
-  <!-- ================= OV DÉTAILLÉ ================= -->
-  <section class="vue" id="vue-ovdetail">
-    <h2>Calculateur d'OV détaillé</h2>
-    <div class="h2-sous">Reproduit au centième l'overall du simulateur à partir des 13 cotes, comme la fonction <em>overall()</em> du classeur Excel. Pondérations calibrées sur les rosters complets de la ligue (8 juillet 2026) : validées au centième sur les 17 OV détaillés de référence du classeur et sur l'arrondi des 697 patineurs de la ligue. Gardiens exclus — leur formule est distincte.</div>
-    <div class="ovd-panneau">
-      <div class="ovd-ligne">
-        <label>Équipe
-          <select id="ovdEquipe"></select>
-        </label>
-        <label>Joueur
-          <select id="ovdJoueur"><option value="">— saisie manuelle —</option></select>
-        </label>
-        <label>Groupe
-          <select id="ovdGroupe">
-            <option value="F">Attaquant</option>
-            <option value="D">Défenseur</option>
-          </select>
-        </label>
-        <label>Âge
-          <input type="number" id="ovdAge" min="18" max="45" value="25" style="background:var(--bleu-nuit); border:1px solid var(--line); color:var(--txt); font-family:var(--font-data); font-size:.82rem; padding:7px 10px; border-radius:2px; width:80px">
-        </label>
-      </div>
-      <div class="ovd-grille" id="ovdGrille"></div>
-      <div class="ovd-resultat">
-        <div class="ovd-badge"><span class="val" id="ovdValeur">—</span><span class="lib">OV détaillé</span></div>
-        <div class="ovd-badge"><span class="val" id="ovdArrondi">—</span><span class="lib">OV affiché (arrondi)</span></div>
-        <div class="ovd-badge profil"><span class="val" id="ovdProfil">—</span><span class="lib" id="ovdProfilLib">Profil</span></div>
-        <div class="ovd-note" id="ovdNote"></div>
-      </div>
-      <div class="ovd-permut">
-        <h4>Changements de profil par permutation de cotes
-          <span class="ovd-cout">jusqu'à <input type="number" id="ovdPoints" min="1" max="6" value="3"> points déplacés</span>
-        </h4>
-        <p class="ovd-permut-note">Les points se déplacent <strong>à l'intérieur d'une même catégorie</strong> — A&nbsp;: SP&nbsp;ST&nbsp;EN&nbsp;DU&nbsp;SK · B&nbsp;: PA&nbsp;PC&nbsp;DF&nbsp;SC · C&nbsp;: IT&nbsp;DI&nbsp;EX&nbsp;LD. Chaque suggestion indique le profil obtenu, le coût en points et l'effet sur l'OV.</p>
-        <div id="ovdPermut"></div>
+    <div class="sous-vue" id="sous-ovdetail">
+      <div class="h2-sous">Reproduit au centième l'overall du simulateur à partir des 13 cotes. Gardiens exclus — leur formule est distincte.</div>
+      <div class="ovd-panneau">
+        <div class="ovd-ligne">
+          <label>Équipe
+            <select id="ovdEquipe"></select>
+          </label>
+          <label>Joueur
+            <select id="ovdJoueur"><option value="">— saisie manuelle —</option></select>
+          </label>
+          <label>Groupe
+            <select id="ovdGroupe">
+              <option value="F">Attaquant</option>
+              <option value="D">Défenseur</option>
+            </select>
+          </label>
+          <label>Âge
+            <input type="number" id="ovdAge" min="18" max="45" value="25">
+          </label>
+        </div>
+        <div class="ovd-grille" id="ovdGrille"></div>
+        <div class="ovd-resultat">
+          <div class="ovd-badge"><span class="val" id="ovdValeur">—</span><span class="lib">OV détaillé</span></div>
+          <div class="ovd-badge"><span class="val" id="ovdArrondi">—</span><span class="lib">OV affiché (arrondi)</span></div>
+          <div class="ovd-badge profil"><span class="val" id="ovdProfil">—</span><span class="lib" id="ovdProfilLib">Profil</span></div>
+          <div class="ovd-note" id="ovdNote"></div>
+        </div>
+        <div class="ovd-permut">
+          <h4>Changements de profil par permutation de cotes
+            <span class="ovd-cout">jusqu'à <input type="number" id="ovdPoints" min="1" max="6" value="3"> points déplacés</span>
+          </h4>
+          <p class="ovd-permut-note">Les points se déplacent <strong>à l'intérieur d'une même catégorie</strong> — A&nbsp;: SP&nbsp;ST&nbsp;EN&nbsp;DU&nbsp;SK · B&nbsp;: PA&nbsp;PC&nbsp;DF&nbsp;SC · C&nbsp;: IT&nbsp;DI&nbsp;EX&nbsp;LD. Chaque suggestion indique le profil obtenu, le coût en points et l'effet sur l'OV.</p>
+          <div id="ovdPermut"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -285,17 +271,12 @@
   <!-- ================= RÉGLAGES ================= -->
   <section class="vue" id="vue-reglages">
     <h2>Réglages</h2>
-    <div class="h2-sous">Club du DG, matrices d'attentes, sauvegarde et sources de données</div>
 
     <div class="regl-bloc">
       <h3>Mon club</h3>
-      <p>Ce tableau de bord sert les 32 clubs de la USHL&nbsp;Pro. Choisis le tien&nbsp;: l'alignement, la production,
-      les trios, le plafond, les échanges et les alertes du Bureau du DG basculent sur ta formation, et la page
-      prend tes couleurs. Le choix est conservé dans ce navigateur — chaque DG a donc le sien.
-      Les prolongations, les trios et les transferts locaux sont enregistrés <em>par club</em>&nbsp;: changer de club
-      ne mélange rien.</p>
+      <p>Ce tableau de bord sert les 32 clubs de la USHL&nbsp;Pro. Le choix est conservé dans ce navigateur ; les prolongations, les trios et les transferts locaux sont enregistrés <em>par club</em>.</p>
       <div>
-        <label>Club</label>
+        <label for="clubDG">Club</label>
         <select id="clubDG"></select>
       </div>
       <div class="regl-actions">
@@ -304,89 +285,71 @@
     </div>
 
     <div class="regl-bloc">
+      <h3>Données</h3>
+      <p id="donneesEtat"></p>
+      <p id="sourcesTexte"></p>
+      <div class="regl-actions">
+        <button id="btnMajReglages">Actualiser maintenant</button>
+        <button id="btnViderCache" class="secondaire" title="Oublie ce que ce navigateur a conservé de ushl.ca et revient au relevé intégré à la page">Effacer les données conservées</button>
+      </div>
+    </div>
+
+    <div class="regl-bloc">
       <h3>Matrices des profils (article 6.2.6)</h3>
-      <p>Les matrices sont préremplies avec les valeurs officielles de la recote de l'été 2022 (Y17), transcrites du document
-      «&nbsp;Attentes.docx&nbsp;». La ligue précise qu'elles sont fournies à titre indicatif et réévaluées à chaque saison :
-      toute cellule modifiée ici remplace la valeur Y17 (conservé dans ce navigateur, exportable en JSON).
-      <strong>La ligue republie ses attentes à chaque saison :</strong> le bouton «&nbsp;Mettre à jour depuis ushl.ca&nbsp;» lit la page officielle
-      <em>MATRICES DES PROFILS</em> et remplace les seuils par les siens (rangée par rangée, profil par profil).
-      Colonnes = seuils à <em>dépasser strictement</em> pour chaque degré ; la colonne Satisfaisante correspond à l'attente de base (100&nbsp;%).</p>
+      <p>Préremplies avec les valeurs officielles de la recote de l'été 2022 (Y17). La ligue republie ses attentes à chaque saison : «&nbsp;Mettre à jour depuis ushl.ca&nbsp;» lit la page officielle et remplace les seuils. Toute cellule modifiée ici l'emporte (conservé dans ce navigateur, exportable en JSON).</p>
       <div>
-        <label>Matrice (profil)</label>
+        <label for="selMatrice">Matrice (profil)</label>
         <select id="selMatrice"></select>
-        <label style="margin-left:14px">Statistique</label>
+        <label for="selStat" class="suite">Statistique</label>
         <select id="selStat"></select>
       </div>
-      <div class="table-wrap" style="margin-top:12px"><table class="matrice" id="tableMatrice"></table></div>
+      <div class="table-wrap marge-haut"><table class="matrice" id="tableMatrice"></table></div>
       <div class="regl-actions">
-        <button id="btnMajMatrices" title="Télécharge la page officielle «MATRICES DES PROFILS» de ushl.ca et remplace les seuils par ceux publiés par la ligue">Mettre à jour depuis ushl.ca</button>
-        <button id="btnExportMat" class="secondaire">Exporter les matrices (JSON)</button>
+        <button id="btnMajMatrices" title="Lit la page officielle «MATRICES DES PROFILS» de ushl.ca et remplace les seuils par ceux publiés par la ligue">Mettre à jour depuis ushl.ca</button>
+        <button id="btnExportMat" class="secondaire">Exporter (JSON)</button>
         <button id="btnImportMat" class="secondaire">Importer (JSON ou page collée)</button>
         <button id="btnViderMat" class="secondaire">Revenir aux valeurs Y17</button>
-        <span id="etatMatrices" style="font-family:var(--font-data); font-size:.72rem; color:var(--txt-dim); align-self:center"></span>
+        <span class="note-outils" id="etatMatrices"></span>
       </div>
-      <textarea id="zoneJson" placeholder="Colle ici un JSON de matrices — ou le contenu de la page «MATRICES DES PROFILS» (copier-coller du tableau ou code HTML) — puis clique «Importer». L'export apparaît aussi ici."></textarea>
+      <textarea id="zoneJson" placeholder="Colle ici un JSON de matrices — ou le contenu de la page «MATRICES DES PROFILS» — puis clique «Importer». L'export apparaît aussi ici."></textarea>
     </div>
 
     <div class="regl-bloc">
-      <h3>Instantané de la ligue</h3>
-      <p id="instantaneEtat"></p>
-      <p>Le site ne peut pas être lu à l'avance : c'est cette page, dans ton navigateur, qui télécharge les alignements.
-      Ce qu'elle rapporte est <strong>conservé ici et devient la référence par défaut</strong> — cotes, contrats et surtout
-      l'équipe de chaque joueur, à la date du téléchargement. «&nbsp;Actualiser toute la ligue&nbsp;» (onglet Ligue) met tout à jour d'un coup.</p>
+      <h3>Cibles Mémorable individuelles</h3>
+      <p>Sur chaque carte de l'onglet Progression, le champ de saisie fixe un seuil <strong>Mémorable</strong> propre au joueur, qui remplace celui de la matrice.</p>
       <div class="regl-actions">
-        <button id="btnMajLigueReglages">Actualiser toute la ligue maintenant</button>
-        <button id="btnExportInstantane" class="secondaire" title="Produit le bloc de code de l'instantané, à graver dans le fichier pour qu'il serve aussi sur un autre appareil">Exporter l'instantané (code)</button>
-        <button id="btnViderInstantane" class="secondaire">Oublier l'instantané conservé</button>
-      </div>
-    </div>
-
-    <div class="regl-bloc">
-      <h3>Cibles Mémorable individuelles (surcharges)</h3>
-      <p>Sur chaque carte de l'onglet Progression, le champ de saisie fixe un seuil <strong>Mémorable</strong> propre au joueur,
-      qui remplace celui de la matrice (les cinq autres degrés restent ceux de la matrice). Le bouton ci-dessous efface toutes ces surcharges.</p>
-      <div class="regl-actions">
-        <button id="btnViderOverrides" class="secondaire">Effacer les attentes individuelles</button>
-      </div>
-    </div>
-
-    <div class="regl-bloc">
-      <h3>Sources et actualisation</h3>
-      <p id="sourcesTexte"></p>
-      <p>Les pages de la USHL n'autorisent pas les requêtes directes entre sites : l'interface passe par une chaîne de relais publics (le premier qui répond est conservé). Si l'actualisation échoue, les données intégrées du <span id="dateSecours"></span> demeurent affichées. Les données récupérées sont mises en cache (formation : 12 h · production : 30 min).</p>
-      <div class="regl-actions">
-        <button id="btnViderCache" class="secondaire">Vider le cache de données</button>
+        <button id="btnViderOverrides" class="secondaire">Effacer les cibles individuelles</button>
       </div>
     </div>
   </section>
 
 </main>
 
-<div class="msg-flash" id="flash"></div>
+<div class="msg-flash" id="flash" role="status" aria-live="polite"></div>
 
 <script src="js/config.js"></script>
 <script src="js/reglements.js"></script>
-<script src="data/secours.js"></script>
+<script src="js/ushl.js"></script>
 <script src="data/s21.js"></script>
-<script src="data/ligue.js"></script>
-<script src="js/ligue.js"></script>
+<script src="data/releve.js"></script>
 <script src="js/moteur.js"></script>
-<script src="js/reseau.js"></script>
+<script src="js/etat.js"></script>
+<script src="js/sources.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/contrats.js"></script>
-<script src="js/vues/alignement.js"></script>
-<script src="js/vues/plafond.js"></script>
-<script src="js/vues/comparateur.js"></script>
-<script src="js/vues/classement.js"></script>
-<script src="js/vues/meneurs.js"></script>
-<script src="js/vues/echange.js"></script>
-<script src="js/vues/recotes.js"></script>
-<script src="js/vues/ligue.js"></script>
-<script src="js/vues/trios.js"></script>
+<script src="js/vues/club.js"></script>
+<script src="js/vues/prolongation.js"></script>
 <script src="js/vues/production.js"></script>
+<script src="js/vues/plafond.js"></script>
 <script src="js/vues/progression.js"></script>
-<script src="js/vues/reglages.js"></script>
+<script src="js/vues/trios.js"></script>
+<script src="js/vues/classement.js"></script>
+<script src="js/vues/ligue.js"></script>
+<script src="js/vues/recotes.js"></script>
+<script src="js/vues/echange.js"></script>
+<script src="js/vues/comparateur.js"></script>
 <script src="js/vues/ov.js"></script>
+<script src="js/vues/reglages.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

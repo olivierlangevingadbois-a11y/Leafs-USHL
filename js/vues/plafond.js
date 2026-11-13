@@ -5,7 +5,7 @@
    rangées {saison, engages, masse, marge, expirants} — pur et testable. */
 function projectionPlafond(nbSaisons, resignMap){
   const r = resignMap || litResignatures();
-  const contrats = ETAT.roster.filter(j=>!j.backup).map(j=>{
+  const contrats = ETAT.roster.map(j=>{
     const sig = (j.ct === 0) ? r[normaliserNom(j.nom)] : null;
     return sig ? {nom:j.nom, salaire:sig.salaire, annees:sig.duree || dureeMaxCharte(sig.statut), prolonge:true}
                : {nom:j.nom, salaire:j.salaire || 0, annees:j.ct || 0, prolonge:false};
