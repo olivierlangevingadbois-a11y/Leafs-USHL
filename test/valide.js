@@ -12,7 +12,13 @@ function egal(a, b, msg){ ok(a===b, msg + ` (obtenu: ${JSON.stringify(a)}, atten
 function proche(a, b, tol, msg){ ok(a!==null && a!==undefined && Math.abs(a-b)<=tol, msg + ` (obtenu: ${a}, attendu: ~${b})`); }
 function tableauEgal(a, b, msg){ ok(JSON.stringify(a)===JSON.stringify(b), msg + ` (obtenu: ${JSON.stringify(a)}, attendu: ${JSON.stringify(b)})`); }
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+/* La page est servie en plusieurs fichiers (css/, js/, data/) : le harnais les
+   insère dans le HTML pour que jsdom les exécute sans réseau ni serveur. */
+const RACINE = path.join(__dirname, '..');
+const lireFichier = f => fs.readFileSync(path.join(RACINE, f), 'utf8');
+const html = lireFichier('index.html')
+  .replace(/<script src="([^"]+)"><\/script>/g, (_, src) => `<script>${lireFichier(src)}</script>`)
+  .replace(/<link rel="stylesheet" href="(css\/[^"]+)">/g, (_, href) => `<style>${lireFichier(href)}</style>`);
 
 (async () => {
   const dom = new JSDOM(html, {
@@ -1813,128 +1819,6 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     ok(d.window.document.getElementById('tableAlignement').textContent.includes('Nouvelle Signature'), 'Et l\'onglet Alignement est redessiné');
     egal(SD.litInstantane().equipes.TORONTO.length, 12, 'Le club entre dans l\'instantané avec les 31 autres');
     d.window.close();
-  }
-
-  console.log('— Repêchage Y22 (section temporaire) : liste intégrée, OV exact, profils atteignables, joueurs noircis');
-  {
-    const D = W.document;
-    const L = S.ETAT_REP.liste;
-    const de = nom => L.find(p => p.nom === nom);
-    egal(L.length, 159, '159 prospects intégrés (liste du 3 octobre)');
-    ok(!L.some(p => p.rang === 63), 'Le Rd 63 ne figure pas sur la liste de la ligue');
-    egal(new Set(L.map(p => p.rang)).size, 159, 'Un Rd par joueur');
-    const parPo = {};
-    L.forEach(p => { parPo[p.po] = (parPo[p.po] || 0) + 1; });
-    tableauEgal([parPo.C, parPo.AG, parPo.AD, parPo.D, parPo.G], [37, 25, 23, 52, 22], 'Positions : 37 C, 25 AG (LW), 23 AD (RW), 52 D, 22 G');
-    const mck = de('Gavin McKenna');
-    egal(mck.rang, 1, 'McKenna : Rd 1');
-    egal(mck.po, 'AG', 'LW → AG');
-    tableauEgal([mck.it, mck.sp, mck.sc, mck.ld], [67, 75, 75, 40], 'Cotes de McKenna');
-    tableauEgal([mck.ovSite, mck.age, mck.nat, mck.taille, mck.poids], [76, 19, 'CAN', 71, 170], 'OV, âge, nationalité, taille, poids');
-    egal(mck._profil, 'Junior Elite', 'Profil de la ligue');
-
-    // OV exact : la formule du simulateur retrouve l'OV de la ligue
-    const patineurs = L.filter(p => p.po !== 'G');
-    const ecarts = patineurs.filter(p => Math.round(p._ov) !== p.ovSite).map(p => p.nom).sort();
-    tableauEgal(ecarts, ['Axel Elofsson', 'Jacob Vandeven', 'Jayden Kurtz'],
-      'OV exact : 134 / 137 arrondis identiques à la ligue (3 défenseurs juniors à la limite)');
-    ok(patineurs.every(p => Math.abs(p._ov - p.ovSite) < 0.8), 'Écart toujours sous 0,8 point');
-    egal(mck._ov, S.ovDetaille(mck._cotes, 'F').valeur, 'OV exact = formule du calculateur');
-    // profils : le moteur des règlements retrouve ceux de la ligue
-    const diff = patineurs.filter(p => p._moteur !== p._profil).map(p => p.nom);
-    tableauEgal(diff, ['Chase Reid'], 'Profils : le moteur retrouve la ligue pour 136 / 137 patineurs');
-    egal(de('Tynan Lawrence')._moteur, 'Junior Two-Way Forward', 'Nom de la ligue : Junior Two-Way Forward');
-    egal(de('Luken Huff')._moteur, 'Junior DDepth Defense', 'Nom de la ligue : Junior DDepth Defense');
-    egal(de('Tomas Kralovic')._profil, 'Prospect DOffensive', '21 ans : profil prospect');
-    const reid = de('Chase Reid');
-    egal(reid._profil, 'Junior DEliteShutdown', 'Reid : classé DEliteShutdown par la ligue');
-    const reidQB = S.permRep(reid, 3).find(o => o.profil === 'Junior DEliteQB');
-    egal(reidQB && reidQB.cout, 0, 'Reid remplit aussi DEliteQB : atteignable à 0 point');
-    const trejbal = de('Tobias Trejbal');
-    tableauEgal([trejbal._ov, trejbal.ovSite, trejbal._profil], [null, 70, 'Junior Goalie'], 'Gardien : OV et profil de la ligue');
-    egal(S.permRep(trejbal, 3).length, 0, 'Pas de permutation pour un gardien');
-    ok(L.every(p => S.permRep(p, 3).every(o => o.cout <= 3 && o.profil !== p._profil)),
-      'Jamais plus de 3 points, jamais le profil actuel');
-    ok(L.every(p => S.permRep(p, 1).every(o => S.permRep(p, 3).some(x => x.profil === o.profil))),
-      'Ce qui est atteignable à 1 point l\'est aussi à 3');
-    const exemple = patineurs.find(p => S.permRep(p, 1).some(o => o.cout === 1));
-    ok(!!exemple, 'Au moins un prospect change de profil avec un seul point');
-    const opt = S.permRep(exemple, 1).find(o => o.cout === 1);
-    egal(S.libelleRep(S.profilDeCotes(opt.cotes, exemple._groupe, exemple.age).profil), opt.profil,
-      'Les cotes suggérées produisent bien le profil annoncé');
-
-    // l'onglet
-    D.querySelector('nav button[data-vue="repechage"]').click();
-    ok(D.getElementById('vue-repechage').classList.contains('actif'), 'Onglet Repêchage affiché');
-    ok(!D.getElementById('repCharger') && !D.getElementById('repColler'), 'Plus de chargement : la liste est dans la page');
-    const rangees = () => [...D.querySelectorAll('#tableRepechage tbody tr[data-cle]')];
-    egal(rangees().length, 159, '159 rangées');
-    tableauEgal(rangees().slice(0, 3).map(r => r.dataset.cle), ['gavin mckenna', 'ivar stenberg', 'caleb malhotra'], 'Tri par défaut : Rd');
-    ok(D.getElementById('tableRepechage').textContent.includes(mck._ov.toFixed(2).replace('.', ',')), 'OV exact affiché au centième');
-    ok(rangees().find(r => r.dataset.cle === 'jayden kurtz').querySelector('.rep-ovx'), 'Écart avec l\'OV de la ligue signalé');
-    const selProfil = D.getElementById('repProfil');
-    const nbSniper = L.filter(p => p._profil === 'Junior Sniper').length;
-    selProfil.value = 'Junior Sniper';
-    D.getElementById('repMode').value = 'actuel';
-    selProfil.dispatchEvent(new W.Event('change'));
-    egal(rangees().length, nbSniper, 'Profil actuel : les Junior Sniper de la liste');
-    D.getElementById('repMode').value = 'atteignable';
-    D.getElementById('repMode').dispatchEvent(new W.Event('change'));
-    const nbAtt = L.filter(p => p._profil === 'Junior Sniper' || S.permRep(p, 3).some(o => o.profil === 'Junior Sniper')).length;
-    egal(rangees().length, nbAtt, 'Actuel ou atteignable en ≤ 3 points');
-    ok(nbAtt > nbSniper, 'La recherche « atteignable » élargit la liste');
-    ok(rangees().some(r => r.querySelector('.rep-chip.vise')), 'Le profil visé est mis en évidence');
-    D.getElementById('repPo').value = 'D';
-    D.getElementById('repPo').dispatchEvent(new W.Event('change'));
-    ok(rangees().every(r => L.find(p => p.cle === r.dataset.cle).po === 'D'), 'Filtre de position');
-    D.getElementById('repPo').value = '';
-    D.getElementById('repPo').dispatchEvent(new W.Event('change'));
-    selProfil.value = '';
-    selProfil.dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 159, 'Filtres retirés');
-
-    // joueurs noircis au fil des choix
-    const cleM = 'gavin mckenna', cleS = 'ivar stenberg';
-    D.querySelector(`#tableRepechage [data-rep-pris="${cleM}"]`).click();
-    ok(rangees().find(r => r.dataset.cle === cleM).classList.contains('rep-pris'), 'McKenna repêché : rangée noircie');
-    egal(S.litChoixRep().pris[cleM].no, 1, '1er choix numéroté');
-    ok(!D.querySelector('#tableRepechage tr.rep-detail'), 'Le bouton ne déplie pas la rangée');
-    D.querySelector(`#tableRepechage [data-rep-pris="${cleS}"]`).click();
-    egal(S.litChoixRep().pris[cleS].no, 2, '2e choix numéroté');
-    const selEq = D.querySelector(`#tableRepechage select[data-rep-eq="${cleS}"]`);
-    selEq.value = 'BOSTON';
-    selEq.dispatchEvent(new W.Event('change', {bubbles: true}));
-    egal(S.litChoixRep().pris[cleS].eq, 'BOSTON', 'Équipe qui a repêché enregistrée');
-    egal(S.annulerDernierRep(), cleS, '« Annuler le dernier » retire le 2e choix');
-    ok(!S.litChoixRep().pris[cleS] && S.litChoixRep().pris[cleM], 'Le 1er choix demeure');
-    D.getElementById('repMasquer').checked = true;
-    D.getElementById('repMasquer').dispatchEvent(new W.Event('change'));
-    egal(rangees().length, 158, 'Masquer les repêchés');
-    D.getElementById('repMasquer').checked = false;
-    D.getElementById('repMasquer').dispatchEvent(new W.Event('change'));
-    ok(/Stenberg/.test(D.getElementById('repSommaire').textContent), 'Meilleur disponible : Stenberg une fois McKenna parti');
-    // cibles et détail
-    D.querySelector(`#tableRepechage [data-rep-cible="chase reid"]`).click();
-    ok(S.litChoixRep().cibles['chase reid'], 'Cible ★ enregistrée');
-    rangees().find(r => r.dataset.cle === 'chase reid').click();
-    const det = D.querySelector('#tableRepechage tr.rep-detail');
-    ok(det && /Remplit aussi/.test(det.textContent) && /DEliteQB/.test(det.textContent), 'Détail : double profil de Reid expliqué');
-    ok(det && /6'3"/.test(det.textContent) && /USA/.test(det.textContent), 'Détail : taille et nationalité');
-    D.querySelector('#tableRepechage [data-rep-ovd="chase reid"]').click();
-    ok(D.getElementById('vue-ovdetail').classList.contains('actif'), 'Ouvre le calculateur d\'OV');
-    egal(D.getElementById('ovdValeur').textContent, reid._ov.toFixed(2).replace('.', ','), 'Le calculateur reprend ses cotes');
-    D.querySelector('nav button[data-vue="repechage"]').click();
-
-    // persistance des choix
-    const choix = W.localStorage.getItem('tml_repechage_choix_v1');
-    const d2 = await ouvrirPour(w => {
-      w.localStorage.setItem('tml_repechage_choix_v1', choix);
-      w.localStorage.setItem('tml_repechage_liste_v1', '{"prospects":[]}');
-    });
-    egal(d2.window.__TML__.ETAT_REP.liste.length, 159, 'Liste intégrée à l\'ouverture');
-    ok(d2.window.document.querySelector('#tableRepechage tr.rep-pris[data-cle="gavin mckenna"]'), 'McKenna toujours noirci après rechargement');
-    egal(d2.window.localStorage.getItem('tml_repechage_liste_v1'), null, 'L\'ancienne liste téléchargée est oubliée');
-    d2.window.close();
   }
 
   console.log(`\n${total - echecs}/${total} vérifications réussies`);
