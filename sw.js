@@ -1,12 +1,22 @@
-/* Service worker — Poste du DG des Maple Leafs.
-   Stratégie : réseau d'abord (la page reste fraîche), cache en secours
-   (l'application s'ouvre hors ligne avec la dernière version vue). */
-const CACHE = 'leafs-dg-v8';
+/* Service worker — Poste du DG (USHL Pro).
+   Stratégie : réseau d'abord (la page et le relevé restent frais), cache en
+   secours (l'application s'ouvre hors ligne avec la dernière version vue).
+   Seuls les fichiers de la page sont concernés : les requêtes vers ushl.ca
+   et les relais ne passent pas par ici. */
+const CACHE = 'poste-dg-v9';
+const FICHIERS = [
+  '.', 'index.html', 'manifest.webmanifest', 'icon.svg', 'css/style.css',
+  'data/s21.js', 'data/releve.js',
+  'js/config.js', 'js/reglements.js', 'js/ushl.js', 'js/moteur.js', 'js/etat.js', 'js/sources.js', 'js/ui.js',
+  'js/contrats.js', 'js/app.js',
+  'js/vues/club.js', 'js/vues/prolongation.js', 'js/vues/production.js', 'js/vues/plafond.js',
+  'js/vues/progression.js', 'js/vues/trios.js', 'js/vues/classement.js', 'js/vues/ligue.js',
+  'js/vues/recotes.js', 'js/vues/echange.js', 'js/vues/comparateur.js', 'js/vues/ov.js', 'js/vues/reglages.js'
+];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c =>
-    c.addAll(['.', 'index.html', 'manifest.webmanifest', 'icon.svg'])));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)));
 });
 
 self.addEventListener('activate', e => {
@@ -21,8 +31,10 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(rep => {
-      const copie = rep.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copie));
+      if (rep.ok){
+        const copie = rep.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copie));
+      }
       return rep;
     }).catch(() =>
       caches.match(e.request, {ignoreSearch: true})

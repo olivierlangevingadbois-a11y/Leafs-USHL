@@ -1,23 +1,19 @@
 {
-  "name": "leafs-ushl",
-  "version": "1.0.0",
-  "description": "Tableau de bord du DG — Maple Leafs de Toronto (USHL Pro)",
-  "main": "index.html",
-  "directories": {
-    "test": "test"
-  },
+  "name": "poste-dg-ushl",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Poste du DG — tableau de bord d'un club de la USHL Pro (les 32 clubs sur la même page)",
   "scripts": {
-    "test": "node test/valide.js"
+    "test": "node test/valide.js",
+    "releve": "node scripts/releve.js"
   },
   "keywords": [
     "ushl",
     "fhl",
-    "maple-leafs",
     "hockey"
   ],
-  "author": "",
   "license": "ISC",
-  "dependencies": {
+  "devDependencies": {
     "jsdom": "^29.1.1"
   }
 }

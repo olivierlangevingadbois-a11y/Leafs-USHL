@@ -253,10 +253,12 @@ function provenanceDe(j){
     default:         return `fichiers de la ligue du ${DATE_S21} — périmé, à actualiser`;
   }
 }
-/* D'où viennent les chiffres affichés, pour l'en-tête. */
+/* D'où viennent les chiffres affichés, pour l'en-tête. Une lecture du jour
+   n'affiche que son heure. */
 function sourceLisible(){
   const {date, origine} = ETAT.ligue;
-  const quand = [dateLisible(date), heureLisible(date)].filter(Boolean).join(', ');
+  const duJour = dateLisible(date) === dateLisible(new Date().toISOString());
+  const quand = (duJour ? [heureLisible(date)] : [dateLisible(date), heureLisible(date)]).filter(Boolean).join(', ');
   if (origine === 'direct') return `ushl.ca en direct · ${quand}`;
   if (origine === 'conserve') return `dernière lecture de ushl.ca · ${quand}`;
   return `relevé de ushl.ca · ${quand}`;

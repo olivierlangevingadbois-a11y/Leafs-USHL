@@ -1922,6 +1922,10 @@ const html = lireFichier('index.html')
     const sw = lire('sw.js');
     ok(sw.includes("addEventListener('fetch'") && sw.includes('caches'), 'Service worker : cache hors ligne');
     ok(html.includes('rel="manifest"'), 'La page déclare le manifest');
+    const fichiersPage = [...lireFichier('index.html').matchAll(/(?:src|href)="((?:js|css|data)\/[^"]+)"/g)].map(m=>m[1]);
+    ok(fichiersPage.length >= 20, 'La page charge ses fichiers séparés (' + fichiersPage.length + ')');
+    tableauEgal(fichiersPage.filter(f=>!sw.includes(`'${f}'`)), [], 'Chaque fichier de la page est dans la cache hors ligne du service worker');
+    ok(fichiersPage.every(f=>fs.existsSync(path.join(RACINE, f))), 'Aucun fichier référencé ne manque');
     ok(html.includes("location.protocol === 'https:'"), 'Enregistrement du service worker réservé au HTTPS');
   }
 
