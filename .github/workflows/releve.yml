@@ -1,0 +1,42 @@
+# Relevé automatique de ushl.ca.
+# Lit la ligue (API, classement, XtraStats) et enregistre data/releve.js s'il a
+# changé : c'est ce que la page affiche à l'ouverture et hors ligne. La page
+# relit de toute façon l'API en direct ; ce relevé couvre surtout le classement
+# officiel et les minutes jouées, que les navigateurs ne peuvent pas lire sans relais.
+name: Relevé de ushl.ca
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'     # toutes les trois heures
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: releve
+  cancel-in-progress: false
+
+jobs:
+  releve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lire ushl.ca
+        run: node scripts/releve.js
+      - name: Enregistrer le relevé s'il a changé
+        run: |
+          # la date du relevé change à chaque lecture : on ne compare que les données
+          if git diff --quiet -I '^date: ' -- data/releve.js; then
+            echo "Aucun changement sur ushl.ca."
+            git checkout -- data/releve.js
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/releve.js
+          git commit -m "Relevé de ushl.ca du $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push
