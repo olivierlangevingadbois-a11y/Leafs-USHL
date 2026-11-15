@@ -1972,6 +1972,8 @@ const html = lireFichier('index.html')
     const sw = lire('sw.js');
     ok(sw.includes("addEventListener('fetch'") && sw.includes('caches'), 'Service worker : cache hors ligne');
     ok(sw.includes("'https://assets.nhle.com/logos/'"), 'Service worker : logos des équipes gardés pour le hors-ligne');
+    ok(sw.includes("{cache: 'no-cache'}"), 'Service worker : revalide les fichiers auprès du serveur (une mise en ligne apparaît au rechargement suivant)');
+    ok(html.includes("updateViaCache: 'none'"), 'Le service worker lui-même est vérifié sans passer par la cache du navigateur');
     ok(html.includes('rel="manifest"'), 'La page déclare le manifest');
     const fichiersPage = [...lireFichier('index.html').matchAll(/(?:src|href)="((?:js|css|data)\/[^"]+)"/g)].map(m=>m[1]);
     ok(fichiersPage.length >= 20, 'La page charge ses fichiers séparés (' + fichiersPage.length + ')');
