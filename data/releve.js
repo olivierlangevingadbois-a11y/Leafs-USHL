@@ -1,7 +1,7 @@
 /* Relevé de ushl.ca — produit par scripts/releve.js. Ne pas modifier à la main :
    «npm run releve» le régénère. Formats : voir les CLES_* de js/ushl.js. */
 const USHL_RELEVE = {
-date: "2026-11-14T10:25:05.714Z",
+date: "2026-11-15T15:03:11.499Z",
 equipes: {
  "NEWJERSEY": [
   ["Frank Nazar","C","D",91,65,83,67,78,77,76,82,81,78,62,73,50,36,78,22,975000,1,null,null],

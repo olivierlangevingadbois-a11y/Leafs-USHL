@@ -36,7 +36,7 @@ function rendreComparateur(){
     <div class="comp-tete ${cote}">
       <span class="nom">${echap(j.nom)}</span>
       <span class="comp-ov"${j.ovEstime?' title="OV estimé"':''}>${j.ovEstime?'~':''}${j.ov}${exact?` <small style="font-size:.85rem;color:var(--txt-dim)">(${exact})</small>`:''}</span>
-      <span class="meta">${j._equipe} · ${j.po} · ${j.age} ans · ${j._profil.profil}</span>
+      <span class="meta">${imgLogo(j._equipe)}${j._equipe} · ${j.po} · ${j.age} ans · ${j._profil.profil}</span>
       <span class="meta">${fmtArgent(j.salaire)} · CT ${j.ct ?? '—'} · ModA ${fmtMod(modA(j))}</span>
     </div>`;
   };

@@ -174,8 +174,11 @@ const html = lireFichier('index.html')
   proche(S.valeurStat(jTest, prod, 'psv'), 905, 1e-9, 'Psv = %A × 1000');
   egal(S.valeurStat(jTest, prod, 'pts'), 25, 'Stat directe inchangée');
   const ctx = {limites: new Map([[S.normaliserNom('Test Joueur'), 62]])};
-  proche(S.valeurStat(jTest, {gp:15}, 'ming', ctx), 15/62, 1e-9, 'MIN gardien = parties jouées / limite (ratio brut)');
-  egal(S.valeurStat(jTest, {gp:15}, 'ming', {limites:new Map()}), null, 'Sans limite connue → à définir');
+  proche(S.valeurStat(jTest, {gp:15, dec:12}, 'ming', ctx), 12/62, 1e-9, 'Limite du gardien = décisions V-D-N / limite (ratio brut)');
+  egal(S.valeurStat(jTest, {gp:15, dec:null}, 'ming', ctx), null, 'Sans fiche V-D-N → à définir (les parties jouées ne comptent pas)');
+  egal(S.valeurStat(jTest, {gp:15, dec:12}, 'ming', {limites:new Map()}), null, 'Sans limite connue → à définir');
+  egal(S.partiesDecision({w:1, l:6, t:1}), 8, 'Décisions = V + D + N');
+  egal(S.partiesDecision({w:null, l:null, t:null}), null, 'Aucune fiche → aucune décision connue');
 
   console.log('— Rang du différentiel dans le club (tableau 20)');
   const rangs = S.calculerPmRangs([
@@ -633,6 +636,11 @@ const html = lireFichier('index.html')
     ok(lignesProd[0].textContent.includes('Connor Bedard'), 'Table de production : meilleur pointeur en tête');
     ok(lignesProd.some(l=>l.classList.contains('total')), 'Rangée de total des patineurs');
     ok(lignesProd.some(l=>l.textContent.includes('Chris Gibson') && l.textContent.includes('2.31')), 'Gardiens à la suite, avec leur moyenne');
+    S.ETAT.limites.set(S.normaliserNom('Chris Gibson'), 40);
+    S.rendreProduction();
+    ok([...doc.querySelectorAll('#tableProduction tbody tr')].some(l=>l.textContent.includes('Chris Gibson') && l.textContent.includes('9 / 40 décisions')),
+      'Limite du gardien : 9 décisions (6-2-1) sur 40');
+    S.ETAT.limites.delete(S.normaliserNom('Chris Gibson'));
     doc.querySelector('#tableProduction th[data-col="hits"]').click();
     ok(doc.querySelector('#tableProduction th[data-col="hits"]').classList.contains('tri-actif'), 'Production triable par colonne');
     doc.querySelector('#tableProduction th[data-col="pts"]').click();
@@ -909,6 +917,9 @@ const html = lireFichier('index.html')
     }
     return rangees;
   };
+  /* Page servie par le filtre anti-robots de ushl.ca (relevée sur le site, abrégée). */
+  const PAGE_ANTI_ROBOT = '<!DOCTYPE html><html><head><script>(function(){ setTimeout(function(){ window.location.reload(); }, 5000); }())</script>'
+    + '<title>One moment, please...</title></head><body><h1>One moment, please...</h1><p>Please wait while your request is being verified...</p></body></html>';
   /* Faux réseau : sert l'API de ushl.ca, refuse tout le reste (relais, limites). */
   const fauxReseau = (reponses, journal) => async url => {
     journal.push(String(url));
@@ -916,7 +927,8 @@ const html = lireFichier('index.html')
     if (!u.startsWith(S.URLS_USHL.api)) throw new Error('hors ligne');
     const cle = u.includes('api=search') ? 'joueurs' : u.includes('type=goalie') ? 'gardiens' : 'patineurs';
     if (reponses[cle] === undefined) throw new Error('panne');
-    return {ok:true, status:200, json: async () => ({data: reponses[cle]})};
+    if (reponses[cle] === 'anti-robot') return {ok:true, status:200, text: async () => PAGE_ANTI_ROBOT};
+    return {ok:true, status:200, text: async () => JSON.stringify({data: reponses[cle]})};
   };
   const etatInitial = () => {
     W.localStorage.removeItem(S.CLES_LS.cache);
@@ -982,6 +994,28 @@ const html = lireFichier('index.html')
     journal.length = 0;
     await S.actualiserTout({forcer:true});
     egal(journal.filter(u=>u.startsWith(S.URLS_USHL.api)).length, 3, 'Clic sur Actualiser : l\'API est relue');
+    // filtre anti-robots de ushl.ca : la page «One moment, please…» est reconnue et la requête refaite
+    {
+      let rafale = 2;   // les deux premières requêtes tombent sur le filtre
+      const fauxApi = fauxReseau({joueurs: joueursApi, patineurs: [], gardiens: []}, journal);
+      W.fetch = async url => (String(url).startsWith(S.URLS_USHL.api) && rafale-- > 0)
+        ? {ok:true, status:200, text: async () => PAGE_ANTI_ROBOT} : fauxApi(url);
+      journal.length = 0;
+      const rapportFiltre = await S.actualiserTout({forcer:true});
+      egal(rapportFiltre.erreur, null, 'Page anti-robots reconnue : la lecture est refaite et aboutit');
+      egal(rapportFiltre.principal?.equipes, 32, 'Ligue complète après la pause');
+      ok(journal.filter(u=>u.startsWith(S.URLS_USHL.api)).length >= 3, 'Les requêtes refusées ont été refaites');
+    }
+    // filtre persistant sur les statistiques seulement : les alignements s'installent quand même
+    {
+      W.fetch = fauxReseau({joueurs: joueursApi, patineurs: 'anti-robot', gardiens: []}, journal);
+      const rapportPartiel = await S.actualiserTout({forcer:true});
+      egal(rapportPartiel.erreur, null, 'Lecture partielle : pas une panne');
+      ok(/statistiques \(filtre anti-robots/.test((rapportPartiel.partiel || []).join()), 'Le rapport nomme ce qui manque et pourquoi');
+      egal(S.ETAT.ligue.origine, 'direct', 'Les alignements lus sont installés malgré tout');
+      egal(doc.getElementById('etatDonnees').dataset.etat, 'partiel', 'Pastille : lecture partielle');
+      ok(doc.getElementById('etatMaj').textContent.includes('lu en partie seulement'), 'Message : lecture partielle');
+    }
     // site injoignable : on garde ce qu'on a et on le dit
     W.fetch = fauxReseau({}, journal);
     const rapport3 = await S.actualiserTout({forcer:true});
@@ -1266,11 +1300,14 @@ const html = lireFichier('index.html')
     // gardien près de sa limite / au-delà
     const avLim = new Map(S.ETAT.limites);
     S.ETAT.limites.set(S.normaliserNom('Chris Gibson'), 40);
-    poserStatsClub([], [{nom:'Chris Gibson', gp:36, w:20, l:14, t:2, avg:2.5, svpct:0.91}]);
+    poserStatsClub([], [{nom:'Chris Gibson', gp:45, w:20, l:11, t:2, avg:2.5, svpct:0.91}]);   // 33 décisions sur 45 parties
     alertes = S.alertesDG();
-    ok(alertes.some(a=>a.niveau==='jaune' && a.texte.includes('approche sa limite') && a.texte.includes('36/40')),
+    ok(!alertes.some(a=>a.texte.includes('Chris Gibson')), '45 parties jouées mais 33 décisions sur 40 (82 %) : pas d\'alerte — les relèves ne comptent pas');
+    poserStatsClub([], [{nom:'Chris Gibson', gp:38, w:20, l:14, t:2, avg:2.5, svpct:0.91}]);   // 36 décisions
+    alertes = S.alertesDG();
+    ok(alertes.some(a=>a.niveau==='jaune' && a.texte.includes('approche sa limite') && a.texte.includes('36/40 décisions')),
       'Gardien à 90 % de sa limite → alerte jaune');
-    poserStatsClub([], [{nom:'Chris Gibson', gp:40, w:22, l:16, t:2, avg:2.5, svpct:0.91}]);
+    poserStatsClub([], [{nom:'Chris Gibson', gp:44, w:22, l:16, t:2, avg:2.5, svpct:0.91}]);
     alertes = S.alertesDG();
     ok(alertes.some(a=>a.niveau==='rouge' && a.texte.includes('atteint sa limite')),
       'Gardien à sa limite → alerte rouge');
@@ -1549,8 +1586,21 @@ const html = lireFichier('index.html')
       [{nom:'A', equipe:'TORONTO', gp:9, goals:23}, {nom:'B', equipe:'SANJOSE', gp:8, goals:30}, {nom:'C', equipe:'ST.LOUIS', gp:8, goals:18}],
       [{nom:'G1', equipe:'TORONTO', gp:9, w:6, l:2, t:1, ga:19}, {nom:'G2', equipe:'SANJOSE', gp:8, w:7, l:1, t:0, ga:12},
        {nom:'G3', equipe:'ST.LOUIS', gp:8, w:3, l:3, t:2, ga:22}], {date: new Date().toISOString()});
-    egal(S.ETAT.classement.officiel, false, 'Classement officiel en retard d\'un match : fiches calculées');
+    egal(S.ETAT.classement.officiel, true, 'Le classement officiel reste la base');
+    egal(S.ETAT.classement.calculees, 1, 'Seule l\'équipe qui a joué depuis passe à la fiche calculée');
+    egal(S.ficheEquipe('TORONTO').source, 'calcule', 'TORONTO : fiche calculée (9 matchs contre 8 au classement officiel)');
+    egal(S.ficheEquipe('SANJOSE').source, 'officiel', 'SANJOSE : fiche officielle conservée');
     egal(S.ETAT.fiche, 'TORONTO 6-2-1', 'Fiche du club à jour malgré le classement officiel en retard');
+    S.rendreClassement();
+    ok(doc.getElementById('classEtat').textContent.includes('1 équipe ayant joué depuis'), 'La note dit quelle part est calculée');
+    ok(!!doc.querySelector('#classementZone .rangee-club .marque-calcul'), 'La fiche calculée est marquée d\'un astérisque');
+    // un gardien parti en cours de saison emporte ses décisions dans l'API : la fiche officielle fait foi
+    S.poserStats(
+      [{nom:'A', equipe:'TORONTO', gp:8, goals:20}, {nom:'B', equipe:'SANJOSE', gp:8, goals:30}, {nom:'C', equipe:'ST.LOUIS', gp:8, goals:18}],
+      [{nom:'G1', equipe:'TORONTO', gp:8, w:5, l:2, t:1, ga:18}, {nom:'G2', equipe:'SANJOSE', gp:5, w:5, l:0, t:0, ga:7},
+       {nom:'G3', equipe:'ST.LOUIS', gp:8, w:3, l:3, t:2, ga:22}], {date: new Date().toISOString()});
+    egal(S.ficheEquipe('SANJOSE').w, 7, 'Gardien parti (décisions manquantes dans l\'API) : la fiche officielle 7-1-0 reste affichée');
+    egal(S.ficheEquipe('SANJOSE').source, 'officiel', 'Fiche officielle, pas le calcul incomplet');
     egal(S.ficheEquipe('TORONTO').conf, 'Eastern', 'Les associations connues restent attachées aux fiches calculées');
     ok(!doc.getElementById('btnFiches'), 'Plus de bouton «Télécharger les 32 fiches»');
     viderStats();
@@ -1921,6 +1971,7 @@ const html = lireFichier('index.html')
     ok(lire('icon.svg').includes('#0e2f63'), 'Icône neutre de la ligue');
     const sw = lire('sw.js');
     ok(sw.includes("addEventListener('fetch'") && sw.includes('caches'), 'Service worker : cache hors ligne');
+    ok(sw.includes("'https://assets.nhle.com/logos/'"), 'Service worker : logos des équipes gardés pour le hors-ligne');
     ok(html.includes('rel="manifest"'), 'La page déclare le manifest');
     const fichiersPage = [...lireFichier('index.html').matchAll(/(?:src|href)="((?:js|css|data)\/[^"]+)"/g)].map(m=>m[1]);
     ok(fichiersPage.length >= 20, 'La page charge ses fichiers séparés (' + fichiersPage.length + ')');
@@ -1934,15 +1985,37 @@ const html = lireFichier('index.html')
     // le club par défaut reste TORONTO, et la page en porte les couleurs
     tableauEgal(Object.keys(S.CLUBS).slice().sort(), S.LIGUE_EQUIPES.slice().sort(),
       'Un club décrit pour chacune des 32 équipes de la ligue, ni plus ni moins');
-    ok(Object.values(S.CLUBS).every(c=>c.nom && /^#[0-9A-Fa-f]{6}$/.test(c.couleur) && c.emoji),
-      'Chaque club a un nom, une couleur et un emblème');
+    ok(Object.values(S.CLUBS).every(c=>c.nom && /^#[0-9A-Fa-f]{6}$/.test(c.couleur) && /^[A-Z]{3}$/.test(c.abr)),
+      'Chaque club a un nom, une couleur et son abréviation LNH');
+    egal(new Set(Object.values(S.CLUBS).map(c=>c.abr)).size, 32, '32 abréviations distinctes');
+    egal(S.logoClub('TORONTO'), 'https://assets.nhle.com/logos/nhl/svg/TOR_dark.svg', 'Logo officiel de la LNH, version pour fond sombre');
+    egal(S.logoClub('ST.LOUIS'), 'https://assets.nhle.com/logos/nhl/svg/STL_dark.svg', 'ST.LOUIS → STL');
+    egal(S.logoClub('INCONNU'), null, 'Équipe inconnue : aucun logo');
+    {
+      const img = doc.querySelector('#ecussonClub img');
+      ok(!!img && img.src === S.logoClub('TORONTO'), 'Logo du club dans l\'en-tête');
+      egal(doc.getElementById('ecussonClub').textContent, '', 'Plus d\'emoji dans l\'en-tête');
+      img.dispatchEvent(new W.Event('error'));
+      egal(doc.querySelector('#ecussonClub .logo-texte')?.textContent, 'TOR', 'Logo injoignable : l\'abréviation le remplace');
+      S.habillerClub();
+    }
+    egal(doc.querySelector('link[rel="icon"]').href, S.logoClub('TORONTO'), 'Favicon : logo du club');
+    S.ouvrirVue('classement');
+    S.poserClassement([{equipe:'TORONTO', conf:'Eastern', div:'Atlantic', gp:1, w:1, l:0, t:0, otl:0, pts:2, gf:3, ga:1, l10:'1-0-0', serie:'W1'}], {date: new Date().toISOString()});
+    S.rendreClassement();
+    ok(doc.querySelector('#classementZone td.equipe img.logo')?.src.endsWith('TOR_dark.svg'), 'Logo de l\'équipe au classement');
+    S.ETAT.classementOfficiel = null; S.poserStats([], [], {});
+    S.ouvrirVue('joueurs');
+    ok(doc.querySelectorAll('#tableLigue td.equipe img.logo').length >= 50, 'Logos des équipes dans la table des joueurs');
+    S.ouvrirVue('classement');
+    S.ouvrirVue('alignement');
     egal(S.CONFIG.equipe, 'TORONTO', 'Club par défaut : TORONTO');
     egal(doc.title, 'Maple Leafs de Toronto — Poste du DG', 'Titre de la page aux couleurs du club');
-    egal(doc.getElementById('ecussonClub').textContent, '🍁', 'Emblème du club dans l\'en-tête');
+    ok(doc.querySelector('#ecussonClub img')?.src.endsWith('TOR_dark.svg'), 'Logo du club dans l\'en-tête');
     egal(doc.getElementById('titreClub').textContent, 'MAPLE LEAFS DE TORONTO', 'En-tête au nom du club');
     egal(doc.querySelector('meta[name="theme-color"]').content, '#00205B', 'Couleur de thème du club');
     egal(doc.documentElement.style.getPropertyValue('--club'), '#00205B', 'Variable CSS --club posée');
-    ok(doc.querySelector('link[rel="icon"]').href.includes('%2300205B'), 'Favicon aux couleurs du club');
+    ok(doc.querySelector('link[rel="icon"]').href.endsWith('TOR_dark.svg'), 'Favicon : logo du club');
     // les clés propres au club portent son code : rien ne déborde d'un DG à l'autre
     egal(S.CLES_LS.trios, 'tml_trios_v1:TORONTO', 'Trios rangés sous le code du club');
     egal(S.CLES_LS.resign, 'tml_resignatures_v1:TORONTO', 'Prolongations rangées sous le code du club');
@@ -1980,6 +2053,7 @@ const html = lireFichier('index.html')
     egal(D.title, 'Islanders de New York — Poste du DG', 'Titre au nom des Islanders');
     egal(D.getElementById('titreClub').textContent, 'ISLANDERS DE NEW YORK', 'En-tête au nom des Islanders');
     egal(D.querySelector('meta[name="theme-color"]').content, '#00539B', 'Couleurs des Islanders');
+    ok(D.querySelector('#ecussonClub img')?.src.endsWith('NYI_dark.svg'), 'Logo des Islanders dans l\'en-tête');
     // la formation servie est bien la sienne, tirée du relevé du site
     const effectif = SI.USHL_RELEVE.equipes.ISLANDERS.length;
     egal(SI.ETAT.roster.length, effectif, 'Formation de départ = son alignement du relevé du site');
@@ -2044,7 +2118,7 @@ const html = lireFichier('index.html')
       const u = String(url);
       if (!u.startsWith(SD.URLS_USHL.api)) throw new Error('hors ligne');
       appelsApi++;
-      return {ok:true, status:200, json: async () => ({data: u.includes('api=search') ? versApi(avecVedette(vedette)) : []})};
+      return {ok:true, status:200, text: async () => JSON.stringify({data: u.includes('api=search') ? versApi(avecVedette(vedette)) : []})};
     };
     const nomsClub = () => SD.ETAT.rosterBrut.map(j=>j.nom);
     egal(SD.ETAT.ligue.origine, 'conserve', 'À l\'ouverture : la lecture conservée, plus récente que le relevé intégré');
@@ -2067,6 +2141,23 @@ const html = lireFichier('index.html')
     DD.getElementById('btnMajReglages').click();
     for (let i = 0; i < 50 && !nomsClub().includes('Nouvelle Signature'); i++) await new Promise(r => setTimeout(r, 100));
     ok(nomsClub().includes('Nouvelle Signature'), '«Actualiser maintenant» (Réglages) relit aussi le site');
+    d.window.close();
+  }
+
+  console.log('— Relecture de ushl.ca au retour sur la page');
+  {
+    let appels = 0;
+    const d = await ouvrirPour(() => {});
+    d.window.fetch = () => { appels++; return Promise.reject(new Error('hors ligne')); };
+    const SR = d.window.__TML__;
+    SR.relireSiAncien(10*60*1000);
+    await new Promise(r => setTimeout(r, 50));
+    ok(appels >= 1, 'Page revenue au premier plan, aucune lecture récente : ushl.ca est relu');
+    await SR.actualiserTout();
+    appels = 0;
+    SR.relireSiAncien(10*60*1000);
+    await new Promise(r => setTimeout(r, 50));
+    egal(appels, 0, 'Lecture de moins de 10 minutes : rien n\'est redemandé');
     d.window.close();
   }
 

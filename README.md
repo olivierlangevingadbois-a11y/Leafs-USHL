@@ -16,7 +16,7 @@ Adapté du tableau de bord des Sharks de San Jose
 
 | Section | Sous-vues | Ce qu'on y trouve |
 |---|---|---|
-| **Mon club** | Formation · Production · Plafond | Les alertes du *Bureau du DG* (plafond, contrats échus ou qui expirent, joueurs sous les attentes, gardiens près de leur limite) et un sommaire commun : fiche, masse, effectif. **Formation** : cotes, contrats, profils, blessures et suspensions, bouton *Prolonger* (charte des re-signatures Y22), export CSV, transferts locaux. **Production** : statistiques de la saison, patineurs et gardiens, triables. **Plafond** : masse engagée sur 5 saisons. |
+| **Mon club** | Formation · Production · Plafond | Les alertes du *Bureau du DG* (plafond, contrats échus ou qui expirent, joueurs sous les attentes, gardiens près de leur limite — seules les décisions V-D-N comptent) et un sommaire commun : fiche, masse, effectif. **Formation** : cotes, contrats, profils, blessures et suspensions, bouton *Prolonger* (charte des re-signatures Y22), export CSV, transferts locaux. **Production** : statistiques de la saison, patineurs et gardiens, triables. **Plafond** : masse engagée sur 5 saisons. |
 | **Progression** | — | Cartes d'attentes par joueur : seuils des matrices officielles (article 6.2.6) selon le profil et l'overall, statuts, ModA / ModS, fourchette de recote. |
 | **Trios** | — | Quatre trios, trois paires, gardiens et unités spéciales ; remplissage par OV, export texte. |
 | **Ligue** | Classement · Joueurs · Recotes | **Classement** officiel par ligue, association ou section. **Joueurs** : une seule table pour le dépistage et les meneurs — mêmes filtres (équipe, position, profil, OV, âge, contrat), colonnes *Cotes et contrats* ou *Statistiques*. **Recotes** : évolution de chaque cote depuis la fin Y21, classement des 32 équipes. |
@@ -41,6 +41,7 @@ d'un navigateur. C'est la source principale :
 | Minutes jouées | `USHLxtrastats.html` | relais ou relevé |
 | Historique des attributs d'un joueur, matrices | pages du site | relais, à la demande |
 | Limites d'utilisation des gardiens | [gestiongardiens](https://merciermathieu5.github.io/gestiongardiens/limites.json) | direct |
+| Logos des équipes | site de la LNH (`assets.nhle.com`, version pour fond sombre) | direct, gardés hors ligne |
 
 À l'ouverture :
 
@@ -51,8 +52,21 @@ d'un navigateur. C'est la source principale :
 3. Les deux pages sans API (classement, XtraStats) sont demandées à des relais
    publics, tous **en course** — le premier qui répond gagne. Si aucun ne
    répond, le relevé intégré fournit déjà ces données ; rien n'est bloqué.
-   Sans classement officiel à jour, les fiches V-D-N sont calculées des
-   décisions des gardiens.
+
+**Fiche des équipes.** Pour chaque équipe, la fiche officielle (Standings.php)
+fait foi tant qu'elle compte au moins autant de matchs que les statistiques ;
+sinon — l'équipe a joué depuis la dernière lecture du classement — la fiche est
+calculée des décisions des gardiens et marquée d'un astérisque. Le calcul seul
+ne suffit pas : un gardien qui quitte l'équipe emporte ses décisions dans l'API.
+
+**Filtre anti-robots.** Sur une rafale de requêtes (y compris depuis un onglet
+ushl.ca ouvert à côté), le site répond par une page « One moment, please… » au
+lieu des données. La page la reconnaît et refait la requête après une pause ;
+chaque réponse de l'API s'installe dès qu'elle arrive, sans attendre les autres.
+
+**Fraîcheur.** Une page laissée ouverte (onglet, application installée) relit
+ushl.ca quand on y revient après plus de 10 minutes, et toutes les 15 minutes
+tant qu'elle est visible.
 
 La pastille de l'en-tête dit d'où viennent les chiffres : verte (en direct),
 jaune (relevé ou dernière lecture), rouge (ushl.ca injoignable). Ce qui est lu
@@ -66,7 +80,8 @@ npm run releve
 
 `scripts/releve.js` lit ushl.ca (Node 18+, sans dépendance) et régénère
 `data/releve.js`. L'action GitHub `.github/workflows/releve.yml` le fait toutes
-les trois heures et n'enregistre que si les données ont changé. Si le site ne
+les heures (GitHub retarde souvent ces tâches) et n'enregistre que si les
+données ont changé. Si le site ne
 répond pas ou renvoie une ligue incomplète, le fichier précédent est conservé.
 
 ### Par club, par navigateur

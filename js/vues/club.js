@@ -24,15 +24,15 @@ function alertesDG(){
   if (expirants.length){
     alertes.push({niveau:'info', texte:`<b>${expirants.length} contrat${expirants.length>1?'s':''}</b> expire${expirants.length>1?'nt':''} à la fin de la saison — planifie les re-signatures (Mon club → Plafond).`});
   }
-  // gardiens : limite de parties (limites.json + parties jouées de la saison)
+  // gardiens : limite de parties (limites.json) — seules les décisions V-D-N comptent
   for (const g of actifs.filter(j=>j.po==='G')){
     const lim = ETAT.limites.get(normaliserNom(g.nom));
     const prod = productionDe(g);
-    if (!lim || !prod || !prod.gp || prod._reference) continue;
-    if (prod.gp >= lim){
-      alertes.push({niveau:'rouge', texte:`<b>${echap(g.nom)} a atteint sa limite de parties</b> (${prod.gp}/${lim}) — chaque départ de plus expose le club aux sanctions.`});
-    } else if (prod.gp / lim >= 0.85){
-      alertes.push({niveau:'jaune', texte:`<b>${echap(g.nom)} approche sa limite</b> : ${prod.gp}/${lim} parties (${Math.round(prod.gp/lim*100)} %).`});
+    if (!lim || !prod || !prod.dec || prod._reference) continue;
+    if (prod.dec >= lim){
+      alertes.push({niveau:'rouge', texte:`<b>${echap(g.nom)} a atteint sa limite de parties</b> (${prod.dec}/${lim} décisions) — chaque décision de plus expose le club aux sanctions.`});
+    } else if (prod.dec / lim >= 0.85){
+      alertes.push({niveau:'jaune', texte:`<b>${echap(g.nom)} approche sa limite</b> : ${prod.dec}/${lim} décisions (${Math.round(prod.dec/lim*100)} %).`});
     }
   }
   // joueurs sous les attentes (au moins une statistique Décevante ou À oublier)

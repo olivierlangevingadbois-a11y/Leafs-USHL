@@ -17,7 +17,7 @@ function tableClassement(fiches, complet){
     const club = f.equipe === CONFIG.equipe;
     const diff = (f.gf ?? 0) - (f.ga ?? 0);
     html += `<tr class="${club?'rangee-club':''}"><td>${i+1}</td>
-      <td class="gauche ${club?'eq-club':''}" title="${echap(CLUBS[f.equipe]?.nom || f.equipe)}">${club?'<strong>':''}${f.equipe}${club?'</strong>':''}</td>
+      <td class="gauche equipe ${club?'eq-club':''}" title="${echap(CLUBS[f.equipe]?.nom || f.equipe)}">${imgLogo(f.equipe)}${club?'<strong>':''}${f.equipe}${club?'</strong>':''}${f.source==='calcule' && complet ? '<span class="marque-calcul" title="Fiche calculée des décisions des gardiens : le classement officiel n\'a pas encore été relu depuis ses derniers matchs">*</span>' : ''}</td>
       <td>${f.gp}</td><td>${f.w}</td><td>${f.l}</td><td>${f.t}</td>${complet ? `<td>${f.otl ?? '—'}</td>` : ''}
       <td><strong>${f.pts}</strong></td><td>${f.gf ?? '—'}</td><td>${f.ga ?? '—'}</td>
       <td class="${diff>0?'positif':(diff<0?'negatif':'')}">${diff>0?'+':''}${diff}</td>
@@ -45,7 +45,10 @@ function rendreClassement(){
     zone.innerHTML = '<div class="classement-groupes">' + groupes.map(g =>
       `<div><h3 class="titre-bloc">${echap(g)}</h3>${tableClassement(fiches.filter(f => f[cle] === g), officiel)}</div>`).join('') + '</div>';
   }
-  etat.textContent = officiel
-    ? `classement officiel de ushl.ca, lu ${ilYA(date)}`
-    : 'fiches calculées des décisions des gardiens (classement officiel non relu) — 2 pts par victoire, 1 par nulle';
+  const {calculees} = ETAT.classement;
+  etat.textContent = !officiel
+    ? 'fiches calculées des décisions des gardiens (classement officiel non relu) — 2 pts par victoire, 1 par nulle'
+    : `classement officiel de ushl.ca, lu ${ilYA(date)}` + (calculees
+      ? ` · ${calculees} équipe${calculees>1?'s':''} ayant joué depuis : fiche${calculees>1?'s':''} calculée${calculees>1?'s':''} des statistiques (*)`
+      : '');
 }

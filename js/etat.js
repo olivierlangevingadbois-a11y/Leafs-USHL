@@ -168,19 +168,29 @@ function poserClassement(fiches, {date} = {}){
   ETAT.classementOfficiel = {fiches: fiches || [], date: date || null};
   majClassement();
 }
+/* Fiche de chaque équipe, choisie équipe par équipe :
+   - la fiche officielle (Standings.php) quand elle compte au moins autant de
+     matchs que les statistiques : elle seule est exacte quand un gardien a
+     quitté l'équipe (ses décisions partent avec lui dans l'API) ;
+   - sinon la fiche calculée des décisions des gardiens, plus récente : le
+     classement officiel n'a pas encore été relu depuis les derniers matchs. */
 function majClassement(){
-  const calcule = classementDepuisStats(ETAT.stats.patineurs, ETAT.stats.gardiens);
-  const officiel = ETAT.classementOfficiel?.fiches || [];
-  const parties = fs => fs.reduce((n, f) => n + f.w + f.l + f.t, 0);
-  // le classement officiel retarde si les statistiques comptent plus de matchs que lui
-  const officielAJour = officiel.length > 0 && officiel.length >= calcule.length && parties(officiel) >= parties(calcule);
-  if (officielAJour){
-    ETAT.classement = {fiches: officiel, officiel: true, date: ETAT.classementOfficiel.date};
-  } else {
-    const groupes = new Map(officiel.map(f => [f.equipe, f]));
-    for (const f of calcule){ f.conf = groupes.get(f.equipe)?.conf ?? null; f.div = groupes.get(f.equipe)?.div ?? null; }
-    ETAT.classement = {fiches: calcule, officiel: false, date: ETAT.stats.date};
+  const calcule = new Map(classementDepuisStats(ETAT.stats.patineurs, ETAT.stats.gardiens).map(f => [f.equipe, f]));
+  const officiel = new Map((ETAT.classementOfficiel?.fiches || []).map(f => [f.equipe, f]));
+  const matchs = f => f ? f.w + f.l + f.t : -1;
+  const fiches = [];
+  for (const code of new Set([...officiel.keys(), ...calcule.keys()])){
+    const o = officiel.get(code), c = calcule.get(code);
+    if (o && matchs(o) >= matchs(c)) fiches.push({...o, source: 'officiel'});
+    else fiches.push({...c, conf: o?.conf ?? null, div: o?.div ?? null, source: 'calcule'});
   }
+  const officielles = fiches.filter(f => f.source === 'officiel').length;
+  ETAT.classement = {
+    fiches,
+    officiel: officielles > 0,
+    calculees: fiches.length - officielles,
+    date: officielles ? ETAT.classementOfficiel.date : ETAT.stats.date
+  };
   const f = ficheEquipe(CONFIG.equipe);
   ETAT.fiche = CONFIG.equipe + ' ' + (f ? `${f.w}-${f.l}-${f.t}` : '0-0-0');
 }
@@ -332,7 +342,8 @@ function productionDe(j, equipe){
   if (!s) return null;
   const out = Object.assign(productionVide(), {gp: s.gp});
   if (j.po === 'G'){
-    Object.assign(out, {mp: s.mp, w: s.w, l: s.l, t: s.t, avg: s.avg, svpct: s.svpct, so: s.so, hs: s.so, sa: s.sa, ga: s.ga});
+    Object.assign(out, {mp: s.mp, w: s.w, l: s.l, t: s.t, avg: s.avg, svpct: s.svpct, so: s.so, hs: s.so, sa: s.sa, ga: s.ga,
+      dec: partiesDecision(s)});
   } else {
     Object.assign(out, {goals: s.goals, assists: s.assists, pts: s.pts, plusminus: s.plusminus, pim: s.pim,
       ppg: s.ppg, shg: s.shg, gwg: s.gwg, hits: s.hits, shots: s.shots,
@@ -341,8 +352,15 @@ function productionDe(j, equipe){
   }
   return out;
 }
+/* Parties qui comptent pour la limite d'utilisation d'un gardien : celles où
+   il a reçu la décision (victoire, défaite ou nulle). Une présence en relève
+   sans décision ne compte pas. */
+function partiesDecision(s){
+  if (!s || [s.w, s.l, s.t].every(v => v === null || v === undefined)) return null;
+  return (s.w || 0) + (s.l || 0) + (s.t || 0);
+}
 function productionVide(){
   return {gp: null, goals: null, assists: null, pts: null, plusminus: null, pim: null, ppg: null, shg: null, gwg: null,
     hits: null, shots: null, shotpct: null, mp: null, w: null, l: null, t: null, avg: null, svpct: null,
-    so: null, hs: null, qs: null, sa: null, ga: null, _reference: false};
+    so: null, hs: null, qs: null, sa: null, ga: null, dec: null, _reference: false};
 }

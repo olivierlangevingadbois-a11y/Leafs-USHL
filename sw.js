@@ -1,9 +1,9 @@
 /* Service worker — Poste du DG (USHL Pro).
    Stratégie : réseau d'abord (la page et le relevé restent frais), cache en
    secours (l'application s'ouvre hors ligne avec la dernière version vue).
-   Seuls les fichiers de la page sont concernés : les requêtes vers ushl.ca
-   et les relais ne passent pas par ici. */
-const CACHE = 'poste-dg-v9';
+   Les fichiers de la page et les logos des équipes sont concernés ; les
+   requêtes vers ushl.ca et les relais ne passent pas par ici. */
+const CACHE = 'poste-dg-v10';
 const FICHIERS = [
   '.', 'index.html', 'manifest.webmanifest', 'icon.svg', 'css/style.css',
   'data/s21.js', 'data/releve.js',
@@ -26,8 +26,21 @@ self.addEventListener('activate', e => {
       .then(() => self.clients.claim()));
 });
 
+/* Logos des équipes (site de la LNH) : servis depuis la cache, rafraîchis en
+   arrière-plan — ils s'affichent donc aussi hors ligne. */
+const LOGOS = 'https://assets.nhle.com/logos/';
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (e.request.method === 'GET' && e.request.url.startsWith(LOGOS)){
+    e.respondWith(caches.open(CACHE).then(async c => {
+      const enCache = await c.match(e.request);
+      const frais = fetch(e.request)
+        .then(rep => { if (rep.ok || rep.type === 'opaque') c.put(e.request, rep.clone()); return rep; })
+        .catch(() => enCache || Response.error());
+      return enCache || frais;
+    }));
+    return;
+  }
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(rep => {

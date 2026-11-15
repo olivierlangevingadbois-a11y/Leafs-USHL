@@ -388,9 +388,10 @@ function valeurStat(j, prod, statCle, ctx){
     case 'psv':     return (ok(prod.svpct)!==null)               ? prod.svpct*1000           : null;
     case 'pmrang': { const r = ctx?.pmRangs?.get(normaliserNom(j.nom)); return r ? r.prop : null; }
     case 'ming': {
+      // seules les décisions (V, D, N) comptent pour la limite
       const lim = ctx?.limites?.get(normaliserNom(j.nom));
-      if (!lim || ok(prod.gp)===null) return null;
-      return prod.gp / lim;
+      if (!lim || ok(prod.dec)===null) return null;
+      return prod.dec / lim;
     }
     default: return ok(prod[statCle]);
   }

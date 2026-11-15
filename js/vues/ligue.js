@@ -106,7 +106,7 @@ function rendreLigue(){
   const nb = v => v ?? '—';
   const celluleOv = j => `<td class="${j.ov>=82?'cote-elite':(j.ov>=78?'cote-forte':'')}"><strong>${ovAff(j)}</strong></td>`;
   const tete = (j, rang) => `<td class="rang">${rang}</td><td>${badgePosition(j.po)}${echap(j.nom)}${etiquetteEtat(j)}</td>
-    <td class="${j.equipe===CONFIG.equipe?'eq-club':''}">${j.equipe}</td>`;
+    <td class="equipe ${j.equipe===CONFIG.equipe?'eq-club':''}" title="${echap(CLUBS[j.equipe]?.nom || j.equipe)}">${imgLogo(j.equipe)}${j.equipe}</td>`;
   let html = enteteTriable(COLONNES_LIGUE[vue], tri).replace('<tr>', '<tr><th class="sans-tri rang">#</th>') + '<tbody>';
   visibles.forEach(({j, p}, i) => {
     const club = j.equipe === CONFIG.equipe ? ' class="rangee-club"' : '';

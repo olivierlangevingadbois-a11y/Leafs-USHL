@@ -166,6 +166,10 @@ function afficherRapport(rapport, enCours){
     $('#etatDonnees').dataset.etat = 'erreur';
     notes.push(`ushl.ca ne répond pas (${rapport.erreur}) — affichage du ${ETAT.ligue.origine === 'conserve' ? 'dernier état lu' : 'relevé intégré'}, ${ilYA(ETAT.ligue.date)}.`);
   }
+  if (rapport.partiel){
+    if (!rapport.erreur) $('#etatDonnees').dataset.etat = 'partiel';
+    notes.push(`lu en partie seulement — manque : ${rapport.partiel.join(', ')}.`);
+  }
   const ratees = rapport.secondaires.filter(s => !s.ok).map(s => s.nom);
   if (enCours && !ratees.length) notes.push('compléments en cours de lecture…');
   if (ratees.length) notes.push(`non relu cette fois : ${ratees.join(', ')} — les valeurs du relevé sont utilisées.`);

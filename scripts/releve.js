@@ -20,24 +20,29 @@ const U = require('../js/ushl.js');
 const SORTIE = path.join(__dirname, '..', 'data', 'releve.js');
 const DELAI_MS = 30000;
 
-async function lire(url, essais = 3){
+/* ushl.ca a un filtre anti-robots : sur une rafale de requêtes, il répond
+   «200» avec une page «One moment, please…». `valider` la reconnaît et la
+   requête est refaite après une pause croissante. */
+const PAGE_ANTI_ROBOT = /One moment, please/i;
+async function lire(url, {essais = 4, valider = t => !PAGE_ANTI_ROBOT.test(t)} = {}){
   let derniere;
   for (let i = 1; i <= essais; i++){
     try {
       const rep = await fetch(url, {signal: AbortSignal.timeout(DELAI_MS), headers: {'user-agent': 'releve-ushl'}});
       if (!rep.ok) throw new Error('HTTP ' + rep.status);
-      return await rep.text();
+      const texte = await rep.text();
+      if (!valider(texte)) throw new Error(PAGE_ANTI_ROBOT.test(texte) ? 'filtre anti-robots' : 'réponse inattendue');
+      return texte;
     } catch (e){
       derniere = e;
-      if (i < essais) await new Promise(r => setTimeout(r, 1500 * i));
+      if (i < essais) await new Promise(r => setTimeout(r, 3000 * i));
     }
   }
   throw new Error(`${url} : ${derniere.message}`);
 }
+const estJsonData = t => { try { return Array.isArray(JSON.parse(t).data); } catch { return false; } };
 async function lireApi(url){
-  const donnees = JSON.parse(await lire(url)).data;
-  if (!Array.isArray(donnees)) throw new Error(`${url} : réponse sans tableau «data»`);
-  return donnees;
+  return JSON.parse(await lire(url, {valider: estJsonData})).data;
 }
 /* Une page secondaire qui manque n'empêche pas le relevé. */
 const facultatif = promesse => promesse.catch(e => { console.warn('  ⚠ ' + e.message); return null; });
@@ -90,13 +95,12 @@ ${lignes(U.CLES_XTRA, r.reference)}
 
 (async () => {
   console.log('Relevé de ushl.ca…');
-  const [joueurs, statsP, statsG, pageClassement, pageXtra] = await Promise.all([
-    lireApi(U.REQUETES_API.joueurs),
-    lireApi(U.REQUETES_API.patineurs),
-    lireApi(U.REQUETES_API.gardiens),
-    facultatif(lire(U.URLS_USHL.classement)),
-    facultatif(lire(U.URLS_USHL.xtra))
-  ]);
+  // une requête à la fois : une rafale déclencherait le filtre anti-robots
+  const joueurs = await lireApi(U.REQUETES_API.joueurs);
+  const statsP = await lireApi(U.REQUETES_API.patineurs);
+  const statsG = await lireApi(U.REQUETES_API.gardiens);
+  const pageClassement = await facultatif(lire(U.URLS_USHL.classement, {valider: t => U.parseClassement(t).length >= 30}));
+  const pageXtra = await facultatif(lire(U.URLS_USHL.xtra, {valider: t => U.parseXtraLigue(t).length >= 100}));
   const r = {
     date: new Date().toISOString(),
     equipes: U.equipesDepuisApi(joueurs),
