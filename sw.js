@@ -3,7 +3,7 @@
    secours (l'application s'ouvre hors ligne avec la dernière version vue).
    Les fichiers de la page et les logos des équipes sont concernés ; les
    requêtes vers ushl.ca et les relais ne passent pas par ici. */
-const CACHE = 'poste-dg-v10';
+const CACHE = 'poste-dg-v11';
 const FICHIERS = [
   '.', 'index.html', 'manifest.webmanifest', 'icon.svg', 'css/style.css',
   'data/s21.js', 'data/releve.js',
@@ -16,7 +16,7 @@ const FICHIERS = [
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS.map(f => new Request(f, {cache: 'no-cache'})))));
 });
 
 self.addEventListener('activate', e => {
@@ -42,8 +42,11 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  /* «no-cache» : le navigateur revalide auprès du serveur au lieu de servir sa
+     copie (GitHub Pages la garde 10 minutes) — une nouvelle version apparaît
+     dès le rechargement suivant. Hors ligne, la cache prend le relais. */
   e.respondWith(
-    fetch(e.request).then(rep => {
+    fetch(e.request, {cache: 'no-cache'}).then(rep => {
       if (rep.ok){
         const copie = rep.clone();
         caches.open(CACHE).then(c => c.put(e.request, copie));

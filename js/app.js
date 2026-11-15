@@ -304,6 +304,6 @@ if (!window.__TML_SANS_AUTO__){
   surveillerFraicheur();
   /* PWA : la page s'installe et s'ouvre hors ligne. Uniquement en HTTPS. */
   if ('serviceWorker' in navigator && location.protocol === 'https:'){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).catch(()=>{});
   }
 }
