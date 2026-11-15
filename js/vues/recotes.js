@@ -196,7 +196,7 @@ function rendreClassementRecotes(){
   rangs.forEach((r,i)=>{
     const club = r.eq === CONFIG.equipe;
     html += `<tr${club?' style="background:rgba(77,159,255,.10)"':''}>
-      <td>${i+1}</td><td class="${club?'eq-club':''}" style="text-align:left">${club?'<strong>':''}${r.eq}${club?'</strong>':''}</td>
+      <td>${i+1}</td><td class="gauche equipe ${club?'eq-club':''}">${imgLogo(r.eq)}${club?'<strong>':''}${r.eq}${club?'</strong>':''}</td>
       <td class="${r.moy>0?'rec-plus':(r.moy<0?'rec-moins':'rec-zero')}">${r.moy>=0?'+':''}${r.moy.toFixed(3)}</td>
       <td>${r.tot>=0?'+':''}${r.tot.toFixed(1)}</td><td>${r.n}</td>
       <td style="text-align:left">${echap(r.top.nom)} ${r.top.d>=0?'+':''}${r.top.d.toFixed(2)}</td></tr>`;

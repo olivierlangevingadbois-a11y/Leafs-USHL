@@ -7,7 +7,7 @@ name: Relevé de ushl.ca
 
 on:
   schedule:
-    - cron: '17 */3 * * *'     # toutes les trois heures
+    - cron: '17 * * * *'       # toutes les heures (GitHub retarde souvent les tâches planifiées)
   workflow_dispatch:
 
 permissions:

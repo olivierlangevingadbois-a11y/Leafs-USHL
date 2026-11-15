@@ -16,19 +16,37 @@ function litCache(){ try{ return JSON.parse(localStorage.getItem(CLES_LS.cache))
 function ecritCache(c){ try{ localStorage.setItem(CLES_LS.cache, JSON.stringify(c)); }catch(e){ /* quota */ } }
 function majCache(cle, valeur){ const c = litCache(); c[cle] = valeur; ecritCache(c); }
 
-/* ---------- API de ushl.ca (requête directe) ---------- */
-async function lireApi(url){
+/* ---------- API de ushl.ca (requête directe) ----------
+   ushl.ca est protégé par un filtre anti-robots : quand trop de requêtes
+   arrivent coup sur coup (y compris de ton propre onglet ushl.ca ouvert à
+   côté), il répond «200» avec une page HTML «One moment, please…» au lieu des
+   données. Ce cas est reconnu et la requête est refaite après une pause. */
+const PAUSES_API = [1500, 4000];        // avant le 2e puis le 3e essai
+const attendre = ms => new Promise(r => setTimeout(r, ms));
+async function lireApiUneFois(url){
   const ctl = new AbortController();
   const echeance = setTimeout(() => ctl.abort(), CONFIG.delai.api);
   try {
     const rep = await fetch(url, {signal: ctl.signal, cache: 'no-store'});
     if (!rep.ok) throw new Error('HTTP ' + rep.status);
-    const corps = await rep.json();
+    const texte = await rep.text();
+    if (/^\s*</.test(texte)) throw Object.assign(new Error('filtre anti-robots de ushl.ca'), {antiRobot: true});
+    let corps;
+    try { corps = JSON.parse(texte); } catch { throw new Error('réponse illisible'); }
     if (!Array.isArray(corps?.data)) throw new Error('réponse inattendue');
     return corps.data;
   } catch (e){
-    throw new Error(e.name === 'AbortError' ? 'délai dépassé' : e.message);
+    throw e.name === 'AbortError' ? new Error('délai dépassé') : e;
   } finally { clearTimeout(echeance); }
+}
+async function lireApi(url){
+  for (let essai = 0; ; essai++){
+    try { return await lireApiUneFois(url); }
+    catch (e){
+      if (essai >= PAUSES_API.length) throw e;
+      await attendre(PAUSES_API[essai]);
+    }
+  }
 }
 
 /* ---------- Relais (pages sans API) ----------
@@ -121,21 +139,42 @@ const pagesValides = {
   xtra: t => /XtraStats/i.test(t) && parseXtraLigue(t).length >= 100
 };
 /* La ligue et ses statistiques : trois requêtes directes, simultanées. */
+/* La ligue et ses statistiques : trois requêtes directes. Chacune s'installe
+   dès qu'elle aboutit : un alignement lu ne dépend pas des statistiques, et
+   inversement. Le rapport dit ce qui manque. */
 async function actualiserLigue(){
-  const [joueurs, statsP, statsG] = await Promise.all([
-    lireApi(REQUETES_API.joueurs), lireApi(REQUETES_API.patineurs), lireApi(REQUETES_API.gardiens)]);
-  const equipes = equipesDepuisApi(joueurs);
-  const codes = Object.keys(equipes);
-  if (codes.length < 30 || codes.some(c => equipes[c].length < 10)) throw new Error('réponse incomplète de ushl.ca');
   const date = new Date().toISOString();
-  const patineurs = patineursDepuisApi(statsP), gardiens = gardiensDepuisApi(statsG);
-  poserLigue(equipes, {date, origine: 'direct'});
-  poserStats(patineurs, gardiens, {date});
-  memoriserLigue(equipes, date);
-  majCache('stats', {date,
-    patineurs: patineurs.map(p => compacter(CLES_PATINEUR, p)),
-    gardiens: gardiens.map(g => compacter(CLES_GARDIEN, g))});
-  return {joueurs: codes.reduce((n, c) => n + equipes[c].length, 0), equipes: codes.length};
+  const [rJoueurs, rPatineurs, rGardiens] = await Promise.allSettled([
+    lireApi(REQUETES_API.joueurs), lireApi(REQUETES_API.patineurs), lireApi(REQUETES_API.gardiens)]);
+  const manques = [];
+  let resultat = null;
+  if (rJoueurs.status === 'fulfilled'){
+    const equipes = equipesDepuisApi(rJoueurs.value);
+    const codes = Object.keys(equipes);
+    if (codes.length < 30 || codes.some(c => equipes[c].length < 10)) manques.push('alignements (réponse incomplète)');
+    else {
+      poserLigue(equipes, {date, origine: 'direct'});
+      memoriserLigue(equipes, date);
+      resultat = {joueurs: codes.reduce((n, c) => n + equipes[c].length, 0), equipes: codes.length};
+    }
+  } else manques.push(`alignements (${rJoueurs.reason.message})`);
+  const statsVides = rPatineurs.status === 'fulfilled' && rGardiens.status === 'fulfilled'
+    && !rPatineurs.value.length && !rGardiens.value.length;
+  if (statsVides) manques.push('statistiques (réponse vide)');   // jamais installée par-dessus des données réelles
+  else if (rPatineurs.status === 'fulfilled' && rGardiens.status === 'fulfilled'){
+    const patineurs = patineursDepuisApi(rPatineurs.value), gardiens = gardiensDepuisApi(rGardiens.value);
+    poserStats(patineurs, gardiens, {date});
+    majCache('stats', {date,
+      patineurs: patineurs.map(p => compacter(CLES_PATINEUR, p)),
+      gardiens: gardiens.map(g => compacter(CLES_GARDIEN, g))});
+    resultat = resultat || {statistiques: true};
+  } else {
+    const raison = [rPatineurs, rGardiens].find(r => r.status === 'rejected').reason.message;
+    manques.push(`statistiques (${raison})`);
+  }
+  if (!resultat) throw new Error(manques.join(', '));
+  if (manques.length) resultat.manques = manques;
+  return resultat;
 }
 async function actualiserClassement(){
   const fiches = parseClassement(await lireViaRelais(URLS_USHL.classement, {valider: pagesValides.classement}));
@@ -150,6 +189,20 @@ async function actualiserXtra(){
 }
 
 let actualisationEnCours = null;
+let derniereLecture = 0;       // dernière lecture de l'API, réussie ou non
+
+/* La page reste souvent ouverte des heures (onglet, application installée) :
+   en revenant dessus, elle relit ushl.ca si sa dernière lecture date de plus
+   de 10 minutes ; tant qu'elle est visible, elle relit toutes les 15 minutes. */
+const RELIRE_AU_RETOUR = 10*60*1000, RELIRE_EN_CONTINU = 15*60*1000;
+function relireSiAncien(age){
+  if (document.visibilityState === 'visible' && Date.now() - derniereLecture > age) actualiserTout();
+}
+function surveillerFraicheur(){
+  document.addEventListener('visibilitychange', () => relireSiAncien(RELIRE_AU_RETOUR));
+  window.addEventListener('pageshow', e => { if (e.persisted) relireSiAncien(RELIRE_AU_RETOUR); });
+  setInterval(() => relireSiAncien(RELIRE_EN_CONTINU), 60*1000);
+}
 /* `forcer` : clic sur le bouton — tout est relu. À l'ouverture, ce qui vient
    d'être lu (5 min pour l'API, 3 h pour les pages relayées) n'est pas redemandé. */
 function actualiserTout({forcer = false} = {}){
@@ -175,9 +228,14 @@ async function executerActualisation(forcer){
 
   if (frais(cache.stats?.date, CONFIG.ttl.api) && ETAT.ligue.origine !== 'releve'){
     rapport.principal = 'récent';
+    derniereLecture = Date.parse(cache.stats.date);
   } else {
-    try { rapport.principal = await actualiserLigue(); }
+    try {
+      rapport.principal = await actualiserLigue();
+      if (rapport.principal.manques) rapport.partiel = rapport.principal.manques;
+    }
     catch (e){ rapport.erreur = e.message; }
+    derniereLecture = Date.now();
   }
   toutRendre();
   afficherRapport(rapport, true);

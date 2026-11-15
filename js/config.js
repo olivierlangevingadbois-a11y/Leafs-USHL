@@ -10,39 +10,49 @@
    choisit le sien dans les Réglages et l'application s'habille à ses couleurs.
    Le choix est conservé dans le navigateur, une installation par DG. */
 const CLUBS = {
-  'TORONTO':    {nom:'Maple Leafs de Toronto',    couleur:'#00205B', emoji:'🍁'},
-  'BOSTON':     {nom:'Bruins de Boston',          couleur:'#FFB81C', emoji:'🐻'},
-  'OTTAWA':     {nom:"Sénateurs d'Ottawa",        couleur:'#C8102E', emoji:'🏛️'},
-  'NEWJERSEY':  {nom:'Devils du New Jersey',      couleur:'#CE1126', emoji:'😈'},
-  'NYRANGERS':  {nom:'Rangers de New York',       couleur:'#0038A8', emoji:'🗽'},
-  'ISLANDERS':  {nom:'Islanders de New York',     couleur:'#00539B', emoji:'🏝️'},
-  'MONTREAL':   {nom:'Canadiens de Montréal',     couleur:'#AF1E2D', emoji:'⚜️'},
-  'FLORIDE':    {nom:'Panthers de la Floride',    couleur:'#C8102E', emoji:'🐆'},
-  'CAROLINA':   {nom:'Hurricanes de la Caroline', couleur:'#CC0000', emoji:'🌀'},
-  'CHICAGO':    {nom:'Blackhawks de Chicago',     couleur:'#CF0A2C', emoji:'🪶'},
-  'COLORADO':   {nom:'Avalanche du Colorado',     couleur:'#6F263D', emoji:'🏔️'},
-  'VANCOUVER':  {nom:'Canucks de Vancouver',      couleur:'#00205B', emoji:'🐋'},
-  'CALGARY':    {nom:'Flames de Calgary',         couleur:'#D2001C', emoji:'🔥'},
-  'EDMONTON':   {nom:"Oilers d'Edmonton",         couleur:'#FF4C00', emoji:'🛢️'},
-  'MINNESOTA':  {nom:'Wild du Minnesota',         couleur:'#154734', emoji:'🌲'},
-  'LOSANGELES': {nom:'Kings de Los Angeles',      couleur:'#A2AAAD', emoji:'👑'},
-  'SANJOSE':    {nom:'Sharks de San Jose',        couleur:'#006D75', emoji:'🦈'},
-  'ANAHEIM':    {nom:"Ducks d'Anaheim",           couleur:'#F47A38', emoji:'🦆'},
-  'DALLAS':     {nom:'Stars de Dallas',           couleur:'#006847', emoji:'⭐'},
-  'UTAH':       {nom:"Mammoth de l'Utah",         couleur:'#71AFE5', emoji:'🦣'},
-  'WINNIPEG':   {nom:'Jets de Winnipeg',          couleur:'#041E42', emoji:'✈️'},
-  'VEGAS':      {nom:'Golden Knights de Vegas',   couleur:'#B4975A', emoji:'⚔️'},
-  'SEATTLE':    {nom:'Kraken de Seattle',         couleur:'#99D9D9', emoji:'🐙'},
-  'PITTSBURGH': {nom:'Penguins de Pittsburgh',    couleur:'#FCB514', emoji:'🐧'},
-  'BUFFALO':    {nom:'Sabres de Buffalo',         couleur:'#003087', emoji:'🦬'},
-  'ST.LOUIS':   {nom:'Blues de Saint-Louis',      couleur:'#002F87', emoji:'🎵'},
-  'NASHVILLE':  {nom:'Predators de Nashville',    couleur:'#FFB81C', emoji:'🎸'},
-  'WASHINGTON': {nom:'Capitals de Washington',    couleur:'#C8102E', emoji:'🦅'},
-  'DETROIT':    {nom:'Red Wings de Detroit',      couleur:'#CE1126', emoji:'🛞'},
-  'COLUMBUS':   {nom:'Blue Jackets de Columbus',  couleur:'#002654', emoji:'🐝'},
-  'PHILLY':     {nom:'Flyers de Philadelphie',    couleur:'#F74902', emoji:'🟠'},
-  'TAMPABAY':   {nom:'Lightning de Tampa Bay',    couleur:'#1B72D0', emoji:'⚡'}
+  'TORONTO':    {nom:'Maple Leafs de Toronto',    couleur:'#00205B', abr:'TOR'},
+  'BOSTON':     {nom:'Bruins de Boston',          couleur:'#FFB81C', abr:'BOS'},
+  'OTTAWA':     {nom:"Sénateurs d'Ottawa",        couleur:'#C8102E', abr:'OTT'},
+  'NEWJERSEY':  {nom:'Devils du New Jersey',      couleur:'#CE1126', abr:'NJD'},
+  'NYRANGERS':  {nom:'Rangers de New York',       couleur:'#0038A8', abr:'NYR'},
+  'ISLANDERS':  {nom:'Islanders de New York',     couleur:'#00539B', abr:'NYI'},
+  'MONTREAL':   {nom:'Canadiens de Montréal',     couleur:'#AF1E2D', abr:'MTL'},
+  'FLORIDE':    {nom:'Panthers de la Floride',    couleur:'#C8102E', abr:'FLA'},
+  'CAROLINA':   {nom:'Hurricanes de la Caroline', couleur:'#CC0000', abr:'CAR'},
+  'CHICAGO':    {nom:'Blackhawks de Chicago',     couleur:'#CF0A2C', abr:'CHI'},
+  'COLORADO':   {nom:'Avalanche du Colorado',     couleur:'#6F263D', abr:'COL'},
+  'VANCOUVER':  {nom:'Canucks de Vancouver',      couleur:'#00205B', abr:'VAN'},
+  'CALGARY':    {nom:'Flames de Calgary',         couleur:'#D2001C', abr:'CGY'},
+  'EDMONTON':   {nom:"Oilers d'Edmonton",         couleur:'#FF4C00', abr:'EDM'},
+  'MINNESOTA':  {nom:'Wild du Minnesota',         couleur:'#154734', abr:'MIN'},
+  'LOSANGELES': {nom:'Kings de Los Angeles',      couleur:'#A2AAAD', abr:'LAK'},
+  'SANJOSE':    {nom:'Sharks de San Jose',        couleur:'#006D75', abr:'SJS'},
+  'ANAHEIM':    {nom:"Ducks d'Anaheim",           couleur:'#F47A38', abr:'ANA'},
+  'DALLAS':     {nom:'Stars de Dallas',           couleur:'#006847', abr:'DAL'},
+  'UTAH':       {nom:"Mammoth de l'Utah",         couleur:'#71AFE5', abr:'UTA'},
+  'WINNIPEG':   {nom:'Jets de Winnipeg',          couleur:'#041E42', abr:'WPG'},
+  'VEGAS':      {nom:'Golden Knights de Vegas',   couleur:'#B4975A', abr:'VGK'},
+  'SEATTLE':    {nom:'Kraken de Seattle',         couleur:'#99D9D9', abr:'SEA'},
+  'PITTSBURGH': {nom:'Penguins de Pittsburgh',    couleur:'#FCB514', abr:'PIT'},
+  'BUFFALO':    {nom:'Sabres de Buffalo',         couleur:'#003087', abr:'BUF'},
+  'ST.LOUIS':   {nom:'Blues de Saint-Louis',      couleur:'#002F87', abr:'STL'},
+  'NASHVILLE':  {nom:'Predators de Nashville',    couleur:'#FFB81C', abr:'NSH'},
+  'WASHINGTON': {nom:'Capitals de Washington',    couleur:'#C8102E', abr:'WSH'},
+  'DETROIT':    {nom:'Red Wings de Detroit',      couleur:'#CE1126', abr:'DET'},
+  'COLUMBUS':   {nom:'Blue Jackets de Columbus',  couleur:'#002654', abr:'CBJ'},
+  'PHILLY':     {nom:'Flyers de Philadelphie',    couleur:'#F74902', abr:'PHI'},
+  'TAMPABAY':   {nom:'Lightning de Tampa Bay',    couleur:'#1B72D0', abr:'TBL'}
 };
+/* Logos officiels de la LNH (version pour fond sombre), servis par le site de
+   la ligue. Mis en cache par le service worker pour l'usage hors ligne. */
+const logoClub = code => CLUBS[code] ? `https://assets.nhle.com/logos/nhl/svg/${CLUBS[code].abr}_dark.svg` : null;
+/* Balise <img> d'un logo ; si l'image ne charge pas, l'abréviation la remplace. */
+function imgLogo(code, classe = 'logo'){
+  const url = logoClub(code);
+  if (!url) return '';
+  return `<img class="${classe}" src="${url}" alt="" loading="lazy" decoding="async" `
+    + `onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'${classe} logo-texte',textContent:'${CLUBS[code].abr}'}))">`;
+}
 const CLUB_DEFAUT = 'TORONTO';
 const CLE_CLUB = 'tml_club_v1';
 /* Club du DG assis devant l'écran (localStorage indisponible → club par défaut). */
@@ -123,7 +133,7 @@ const STATS_DEF = {
   mp:        {nom:'Minutes jouées', court:'MIN', rythme:true },
   hs:        {nom:'HS (« head stand »)', court:'HS', rythme:true },
   qggp:      {nom:'DQ / match',  court:'DQ/M', rythme:false, decimales:2 },
-  ming:      {nom:'Parties / max permis', court:'MJ/max', rythme:false, decimales:2 },
+  ming:      {nom:'Décisions / max permis', court:'DÉC/max', rythme:false, decimales:2 },
   psv:       {nom:'Psv (%A × 1000)', court:'Psv', rythme:false, decimales:0 },
   plusminus: {nom:'Différentiel',court:'+/-',  rythme:true, signe:true },
   w:         {nom:'Victoires',   court:'V',    rythme:true },

@@ -38,14 +38,11 @@ function habillerClub(){
   const c = CONFIG.club;
   document.title = c.nom + ' — Poste du DG';
   $('#titreClub').textContent = c.nom.toUpperCase();
-  $('#ecussonClub').textContent = c.emoji;
+  $('#ecussonClub').innerHTML = imgLogo(CONFIG.equipe, 'logo-ecusson');
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = c.couleur;
   const icone = document.querySelector('link[rel="icon"]');
-  if (icone) icone.href = 'data:image/svg+xml,' + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-    '<rect width="100" height="100" rx="18" fill="' + c.couleur + '"/>' +
-    '<text x="50" y="68" font-size="56" text-anchor="middle">' + c.emoji + '</text></svg>');
+  if (icone){ icone.href = logoClub(CONFIG.equipe); icone.type = 'image/svg+xml'; }
   document.documentElement.style.setProperty('--club', c.couleur);
 }
 function rendreChoixClub(){
@@ -268,10 +265,10 @@ window.__TML__ = {
   // configuration et règlements
   CONFIG, CLUBS, CLES_LS, MATRICES, STATS_PAR_MATRICE, NIVEAUX, PROFILS, STATS_DEF,
   // lecture de ushl.ca
-  URLS_USHL, REQUETES_API, CLES_JOUEUR, CLES_PATINEUR, CLES_GARDIEN, CLES_FICHE, compacter, decompacter,
+  URLS_USHL, REQUETES_API, logoClub, imgLogo, CLES_JOUEUR, CLES_PATINEUR, CLES_GARDIEN, CLES_FICHE, compacter, decompacter,
   normaliserNom, nombre, estFictif, equipesDepuisApi, patineursDepuisApi, gardiensDepuisApi,
   parseClassement, classementDepuisStats, parseXtra, parseXtraLigue, nettoyerLigneXtra, minutesDepuisXtra, cleJoueur,
-  lireApi, lireViaRelais, actualiserTout, actualiserLigue, chargerFiche, chargerLimites, litCache, ecritCache,
+  lireApi, lireViaRelais, actualiserTout, relireSiAncien, partiesDecision, actualiserLigue, chargerFiche, chargerLimites, litCache, ecritCache,
   // état et modèle de la ligue
   ETAT, USHL_RELEVE, LIGUE_S21, DATE_S21, LIGUE_EQUIPES, COTES_Y21,
   restaurerDonnees, poserLigue, poserStats, poserXtra, poserMinutes, poserClassement, ficheEquipe, matchsEquipe,
@@ -304,6 +301,7 @@ window.__TML__ = {
    aucun réseau en test). */
 if (!window.__TML_SANS_AUTO__){
   actualiserTout();
+  surveillerFraicheur();
   /* PWA : la page s'installe et s'ouvre hors ligne. Uniquement en HTTPS. */
   if ('serviceWorker' in navigator && location.protocol === 'https:'){
     navigator.serviceWorker.register('sw.js').catch(()=>{});

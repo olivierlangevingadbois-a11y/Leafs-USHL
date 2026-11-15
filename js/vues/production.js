@@ -48,10 +48,11 @@ function rendreProduction(){
     html += `<tr class="sous-entete"><td>Gardiens</td><td>PJ</td><td title="Victoires">V</td><td title="Défaites">D</td>
       <td title="Nulles">N</td><td title="Moyenne de buts alloués">MOY</td><td title="Pourcentage d'arrêts">%A</td>
       <td title="Blanchissages">BL</td><td title="Tirs reçus">TR</td><td title="Buts alloués">BC</td>
-      <td title="Minutes jouées">MIN</td><td colspan="4" class="gauche">Limite de parties</td></tr>`;
+      <td title="Minutes jouées">MIN</td><td colspan="4" class="gauche" title="Seules les parties avec décision (V, D ou N) comptent">Limite (décisions V-D-N)</td></tr>`;
     for (const {j, p} of gardiens){
       const lim = ETAT.limites.get(normaliserNom(j.nom));
-      const limite = lim ? `${p?.gp ?? 0} / ${lim}` + (p?.gp ? ` (${Math.round(p.gp/lim*100)} %)` : '') : '—';
+      const dec = p?.dec ?? 0;   // seules les décisions (V-D-N) comptent pour la limite
+      const limite = lim ? `${dec} / ${lim} décisions` + (dec ? ` (${Math.round(dec/lim*100)} %)` : '') : '—';
       html += `<tr><td>${badgePosition('G')}${echap(j.nom)}${etiquetteEtat(j)}</td>
         <td>${nb(p?.gp)}</td><td>${nb(p?.w)}</td><td>${nb(p?.l)}</td><td>${nb(p?.t)}</td>
         <td>${p?.avg!==null && p?.avg!==undefined ? p.avg.toFixed(2) : '—'}</td>
